@@ -1,0 +1,42 @@
+/* Preview Content Styles - Ensures text wraps properly within A4 page */
+.preview-content * {
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.preview-content p,
+.preview-content div,
+.preview-content span,
+.preview-content strong,
+.preview-content em,
+.preview-content li {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+
+.preview-content table {
+    width: 100%;
+    table-layout: fixed;
+    word-break: break-word;
+}
+
+.preview-content img {
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+.preview-content ul,
+.preview-content ol {
+    padding-left: 2rem;
+    word-break: break-word;
+}
+
+/* Ensure Quill editor content doesn't overflow */
+.ql-editor p,
+.ql-editor div,
+.ql-editor span {
+    word-break: break-word;
+    overflow-wrap: break-word;
+}

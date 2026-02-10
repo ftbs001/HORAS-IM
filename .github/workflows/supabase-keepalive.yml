@@ -1,0 +1,52 @@
+name: Supabase Keepalive
+
+# Jalankan setiap 5 hari untuk menjaga project Supabase tetap aktif
+# Supabase free tier akan pause project setelah 7 hari tidak ada aktivitas
+on:
+  schedule:
+    # Jalankan setiap 5 hari pada jam 00:00 UTC (07:00 WIB)
+    - cron: '0 0 */5 * *'
+  
+  # Izinkan manual trigger untuk testing
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run keepalive heartbeat
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          node -e "
+            import('./src/utils/keepalive.js').then(async (module) => {
+              const result = await module.keepaliveWithRetry(3);
+              console.log('Keepalive result:', result);
+              if (!result.success) {
+                process.exit(1);
+              }
+            }).catch(error => {
+              console.error('Error:', error);
+              process.exit(1);
+            });
+          "
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "⚠️ Supabase keepalive failed! Check your database connection."
+          echo "Project may be paused. Visit Supabase dashboard to restore it."

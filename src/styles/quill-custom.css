@@ -1,0 +1,1028 @@
+/* Custom Quill Editor Styling */
+.quill-editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.quill-editor-container .quill {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.quill-editor-container .ql-container {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'Times New Roman', serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    background-color: #f3f4f6;
+    /* Workspace background */
+    padding: 40px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.quill-editor-container .ql-editor {
+    width: 210mm;
+    /* A4 Width */
+    min-height: 297mm;
+    /* A4 Height */
+    background-color: white;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    padding: 2.54cm;
+    /* Standard A4 Margin (~96px) */
+    margin-bottom: 40px;
+    /* Default Text Styling */
+    color: #1f2937;
+}
+
+.quill-editor-container .ql-editor p {
+    text-align: justify;
+    /* Default justify for neatness */
+    margin-bottom: 0.3em;
+    line-height: 1.4;
+    /* Compact spacing for professional documents */
+}
+
+.quill-editor-container .ql-toolbar {
+    border-bottom: 2px solid #e5e7eb;
+    background-color: #f9fafb;
+    padding: 12px;
+    flex-shrink: 0;
+}
+
+/* Toolbar Button Styling */
+.ql-toolbar button {
+    transition: all 0.2s;
+}
+
+.ql-toolbar button:hover {
+    background-color: #e0e7ff;
+    border-radius: 4px;
+}
+
+.ql-toolbar button.ql-active {
+    background-color: #3b82f6;
+    color: white;
+    border-radius: 4px;
+}
+
+/* Custom Font Families */
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="arial"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="arial"]::before {
+    content: 'Arial';
+    font-family: Arial, sans-serif;
+}
+
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times-new-roman"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times-new-roman"]::before {
+    content: 'Times New Roman';
+    font-family: 'Times New Roman', serif;
+}
+
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="courier"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="courier"]::before {
+    content: 'Courier';
+    font-family: 'Courier New', monospace;
+}
+
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before {
+    content: 'Georgia';
+    font-family: Georgia, serif;
+}
+
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="verdana"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="verdana"]::before {
+    content: 'Verdana';
+    font-family: Verdana, sans-serif;
+}
+
+/* Apply fonts to editor content */
+.ql-font-arial {
+    font-family: Arial, sans-serif;
+}
+
+.ql-font-times-new-roman {
+    font-family: 'Times New Roman', serif;
+}
+
+.ql-font-courier {
+    font-family: 'Courier New', monospace;
+}
+
+.ql-font-georgia {
+    font-family: Georgia, serif;
+}
+
+.ql-font-verdana {
+    font-family: Verdana, sans-serif;
+}
+
+/* Custom Font Sizes */
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="8px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="8px"]::before {
+    content: '8';
+    font-size: 8px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="10px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before {
+    content: '10';
+    font-size: 10px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before {
+    content: '12';
+    font-size: 12px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before {
+    content: '14';
+    font-size: 14px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before {
+    content: '16';
+    font-size: 16px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before {
+    content: '18';
+    font-size: 18px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before {
+    content: '24';
+    font-size: 24px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="32px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before {
+    content: '32';
+    font-size: 32px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="48px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="48px"]::before {
+    content: '48';
+    font-size: 48px !important;
+}
+
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="72px"]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="72px"]::before {
+    content: '72';
+    font-size: 72px !important;
+}
+
+/* Apply sizes to editor content */
+.ql-size-8px {
+    font-size: 8px;
+}
+
+.ql-size-10px {
+    font-size: 10px;
+}
+
+.ql-size-12px {
+    font-size: 12px;
+}
+
+.ql-size-14px {
+    font-size: 14px;
+}
+
+.ql-size-16px {
+    font-size: 16px;
+}
+
+.ql-size-18px {
+    font-size: 18px;
+}
+
+.ql-size-24px {
+    font-size: 24px;
+}
+
+.ql-size-32px {
+    font-size: 32px;
+}
+
+.ql-size-48px {
+    font-size: 48px;
+}
+
+.ql-size-72px {
+    font-size: 72px;
+}
+
+/* Line Height - Custom Attribute */
+.ql-snow .ql-picker.ql-line-height .ql-picker-label[data-value="1.0"]::before,
+.ql-snow .ql-picker.ql-line-height .ql-picker-item[data-value="1.0"]::before {
+    content: '1.0';
+}
+
+.ql-snow .ql-picker.ql-line-height .ql-picker-label[data-value="1.15"]::before,
+.ql-snow .ql-picker.ql-line-height .ql-picker-item[data-value="1.15"]::before {
+    content: '1.15';
+}
+
+.ql-snow .ql-picker.ql-line-height .ql-picker-label[data-value="1.5"]::before,
+.ql-snow .ql-picker.ql-line-height .ql-picker-item[data-value="1.5"]::before {
+    content: '1.5';
+}
+
+.ql-snow .ql-picker.ql-line-height .ql-picker-label[data-value="2.0"]::before,
+.ql-snow .ql-picker.ql-line-height .ql-picker-item[data-value="2.0"]::before {
+    content: '2.0';
+}
+
+.ql-snow .ql-picker.ql-line-height .ql-picker-label[data-value="2.5"]::before,
+.ql-snow .ql-picker.ql-line-height .ql-picker-item[data-value="2.5"]::before {
+    content: '2.5';
+}
+
+.ql-snow .ql-picker.ql-line-height .ql-picker-label[data-value="3.0"]::before,
+.ql-snow .ql-picker.ql-line-height .ql-picker-item[data-value="3.0"]::before {
+    content: '3.0';
+}
+
+/* Apply line heights */
+.ql-line-height-1\.0 {
+    line-height: 1.0;
+}
+
+.ql-line-height-1\.15 {
+    line-height: 1.15;
+}
+
+.ql-line-height-1\.5 {
+    line-height: 1.5;
+}
+
+.ql-line-height-2\.0 {
+    line-height: 2.0;
+}
+
+.ql-line-height-2\.5 {
+    line-height: 2.5;
+}
+
+.ql-line-height-3\.0 {
+    line-height: 3.0;
+}
+
+/* Improve overall appearance */
+.ql-editor.ql-blank::before {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.ql-editor h1,
+.ql-editor h2,
+.ql-editor h3 {
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}
+
+.ql-editor p {
+    margin-bottom: 1em;
+}
+
+.ql-editor ul,
+.ql-editor ol {
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+/* Preview Mode HTML Rendering */
+.preview-content {
+    font-family: 'Times New Roman', serif;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}
+
+.preview-content p {
+    margin-bottom: 1em;
+    text-align: justify;
+}
+
+.preview-content ul,
+.preview-content ol {
+    margin-bottom: 1em;
+    padding-left: 2em;
+}
+
+.preview-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Image Resize and Editing Styles */
+.ql-editor img {
+    max-width: 100%;
+    height: auto;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ql-editor img:hover {
+    opacity: 0.9;
+}
+
+.ql-editor img.selected,
+.ql-editor img:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Image resize handles */
+.quill-image-resize-handle {
+    width: 10px;
+    height: 10px;
+    background: #3b82f6;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    cursor: nwse-resize;
+}
+
+.quill-image-resize-handle.quill-image-resize-handle-nw {
+    cursor: nw-resize;
+}
+
+.quill-image-resize-handle.quill-image-resize-handle-ne {
+    cursor: ne-resize;
+}
+
+.quill-image-resize-handle.quill-image-resize-handle-sw {
+    cursor: sw-resize;
+}
+
+.quill-image-resize-handle.quill-image-resize-handle-se {
+    cursor: se-resize;
+}
+
+/* Image display size indicator */
+.ql-image-resize-display-size {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Image toolbar */
+.ql-image-toolbar {
+    position: absolute;
+    z-index: 100;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    gap: 4px;
+}
+
+.ql-image-toolbar button {
+    padding: 6px 10px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.ql-image-toolbar button:hover {
+    background: #f3f4f6;
+    border-color: #3b82f6;
+}
+
+.ql-image-toolbar button.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+/* Drag and drop indicator */
+.ql-editor.dragging-over {
+    background: #eff6ff;
+    border: 2px dashed #3b82f6;
+}
+
+/* ========================================= */
+/* Table of Contents (DAFTAR ISI) Styling   */
+/* ========================================= */
+.toc-container {
+    font-family: 'Times New Roman', serif;
+    font-size: 12pt;
+    line-height: 1.15;
+}
+
+.toc-container .toc-title {
+    text-align: center;
+    font-weight: bold;
+    font-size: 14pt;
+    margin-bottom: 12pt;
+}
+
+/* TOC Editor specific styling for tight spacing */
+.toc-editor-wrapper .ql-editor p {
+    margin-bottom: 0 !important;
+    line-height: 1.15 !important;
+    text-align: left !important;
+}
+
+.toc-editor-wrapper .ql-editor {
+    line-height: 1.15 !important;
+}
+
+/* Preview TOC indentation classes */
+.preview-content .ql-indent-1,
+.toc-preview .ql-indent-1 {
+    padding-left: 20px !important;
+}
+
+.preview-content .ql-indent-2,
+.toc-preview .ql-indent-2 {
+    padding-left: 40px !important;
+}
+
+.preview-content .ql-indent-3,
+.toc-preview .ql-indent-3 {
+    padding-left: 60px !important;
+}
+
+.preview-content .ql-indent-4,
+.toc-preview .ql-indent-4 {
+    padding-left: 80px !important;
+}
+
+/* TOC Preview styling - VERY compact */
+.toc-preview {
+    font-family: 'Times New Roman', serif !important;
+    font-size: 12pt !important;
+    line-height: 1.15 !important;
+}
+
+.toc-preview p {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1.15 !important;
+    text-align: left !important;
+}
+
+.toc-preview strong {
+    font-weight: bold;
+}
+
+@media print {
+
+    /* Hide UI elements during print */
+    .ql-toolbar,
+    button,
+    .sidebar,
+    nav,
+    header .flex.items-center.gap-3,
+    .bg-gray-100.p-1.rounded-lg {
+        display: none !important;
+    }
+
+    /* Page setup */
+    @page {
+        size: A4;
+        margin: 3cm 3cm 3cm 4cm;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Page breaks for sections */
+    .page-break,
+    .cover-letter,
+    .cover-page,
+    .foreword-section,
+    .toc-section {
+        page-break-after: always;
+    }
+
+    .chapter-section {
+        page-break-before: always;
+    }
+
+    /* TOC styling for print */
+    .toc-container,
+    .toc-preview {
+        page-break-after: always;
+    }
+
+    .toc-preview p {
+        margin-bottom: 0 !important;
+        line-height: 1.15 !important;
+    }
+
+    /* Ensure images don't break across pages */
+    img {
+        page-break-inside: avoid;
+        max-width: 100% !important;
+    }
+
+    /* Tables don't break awkwardly */
+    table,
+    tr,
+    td,
+    th {
+        page-break-inside: avoid;
+    }
+
+    /* Preview content styling for print */
+    .preview-content {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Hide scrollbars */
+    * {
+        overflow: visible !important;
+    }
+}
+
+/* ========================================= */
+/* Enhanced Editor Styling - MS Word-like   */
+/* ========================================= */
+
+/* Blockquote styling */
+.ql-editor blockquote {
+    border-left: 4px solid #3b82f6;
+    background-color: #f8fafc;
+    padding: 12px 20px;
+    margin: 16px 0;
+    font-style: italic;
+    color: #334155;
+}
+
+.preview-content blockquote {
+    border-left: 4px solid #3b82f6;
+    background-color: #f8fafc;
+    padding: 12px 20px;
+    margin: 16px 0;
+    font-style: italic;
+    color: #334155;
+}
+
+/* Code block styling */
+.ql-editor pre.ql-syntax,
+.ql-editor .ql-code-block-container {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-family: 'Courier New', Consolas, Monaco, monospace;
+    font-size: 11pt;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+.preview-content pre {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-family: 'Courier New', Consolas, Monaco, monospace;
+    font-size: 11pt;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+/* Video embed styling */
+.ql-editor .ql-video {
+    width: 100%;
+    max-width: 560px;
+    height: 315px;
+    border: none;
+    border-radius: 8px;
+    margin: 16px auto;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.preview-content iframe {
+    width: 100%;
+    max-width: 560px;
+    height: 315px;
+    border: none;
+    border-radius: 8px;
+    margin: 16px auto;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Superscript and Subscript */
+.ql-editor sup {
+    font-size: 0.7em;
+    vertical-align: super;
+}
+
+.ql-editor sub {
+    font-size: 0.7em;
+    vertical-align: sub;
+}
+
+/* Direction RTL support */
+.ql-editor .ql-direction-rtl {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Enhanced header styles */
+.ql-editor h4 {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-top: 0.8em;
+    margin-bottom: 0.4em;
+}
+
+.ql-editor h5 {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-top: 0.7em;
+    margin-bottom: 0.3em;
+}
+
+.ql-editor h6 {
+    font-size: 11pt;
+    font-weight: bold;
+    margin-top: 0.6em;
+    margin-bottom: 0.3em;
+}
+
+/* Toolbar separator styling */
+.ql-toolbar .ql-formats {
+    margin-right: 10px;
+    padding-right: 10px;
+    border-right: 1px solid #e5e7eb;
+}
+
+.ql-toolbar .ql-formats:last-child {
+    border-right: none;
+}
+
+/* Enhanced dropdown styling */
+.ql-snow .ql-picker {
+    font-size: 13px;
+}
+
+.ql-snow .ql-picker-options {
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 8px 0;
+}
+
+.ql-snow .ql-picker-item {
+    padding: 6px 12px;
+}
+
+.ql-snow .ql-picker-item:hover {
+    background-color: #f1f5f9;
+}
+
+/* =================================================
+   PROFESSIONAL REPORT PREVIEW STYLES
+   Government Document Layout System
+   ================================================= */
+
+/* Preview Container - A4 Paper Simulation */
+.preview-paper {
+    width: 210mm;
+    min-height: 297mm;
+    background: white;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    margin: 20px auto;
+    padding: 3cm 3cm 3cm 4cm;
+    /* Top Right Bottom Left */
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #000;
+    box-sizing: border-box;
+}
+
+/* Heading Level 1 - BAB (12pt Bold Uppercase Center) */
+.preview-paper .bab-header,
+.preview-paper .chapter-header {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    text-align: center;
+    margin: 0 0 24pt 0;
+    padding: 0;
+    page-break-before: always;
+}
+
+.preview-paper .bab-header:first-of-type,
+.preview-paper .chapter-header:first-of-type {
+    page-break-before: auto;
+}
+
+/* Heading Level 2 - Sub BAB (12pt Bold Left) */
+.preview-paper .sub-bab-header,
+.preview-paper .section-title {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    font-weight: bold;
+    text-align: left;
+    margin: 18pt 0 12pt 0;
+    padding: 0;
+}
+
+/* Heading Level 3 - Sub-Sub BAB (12pt Normal Left) */
+.preview-paper .sub-sub-bab-header,
+.preview-paper .subsection-title {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    font-weight: normal;
+    text-align: left;
+    margin: 12pt 0 6pt 0.5cm;
+    padding: 0;
+}
+
+/* Body Paragraph - 12pt Justify, 1.25cm first-line indent */
+.preview-paper p,
+.preview-paper .content p {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    text-align: justify;
+    text-indent: 1.25cm;
+    margin: 0 0 6pt 0;
+    line-height: 1.5;
+}
+
+.preview-paper .content {
+    margin-bottom: 12pt;
+}
+
+/* Title Styles (14pt Bold Center) */
+.preview-paper .title,
+.preview-paper .document-title {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
+    margin: 0 0 24pt 0;
+}
+
+/* ============================================
+   TABLE OF CONTENTS WITH DOT LEADER
+   ============================================ */
+.preview-paper .toc-container {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+}
+
+.preview-paper .toc-title {
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 24pt;
+}
+
+.preview-paper .toc-entry {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 6pt;
+    line-height: 1.5;
+}
+
+.preview-paper .toc-entry-level-0 {
+    font-weight: bold;
+}
+
+.preview-paper .toc-entry-level-1 {
+    font-weight: bold;
+    padding-left: 0.75cm;
+}
+
+.preview-paper .toc-entry-level-2 {
+    font-weight: normal;
+    padding-left: 1.5cm;
+}
+
+.preview-paper .toc-text {
+    flex-shrink: 0;
+}
+
+.preview-paper .toc-dots {
+    flex-grow: 1;
+    border-bottom: 1px dotted #000;
+    margin: 0 8px 4px 8px;
+}
+
+.preview-paper .toc-page {
+    flex-shrink: 0;
+    text-align: right;
+    min-width: 30px;
+}
+
+/* ============================================
+   COVER LETTER (SURAT PENGANTAR) STYLES
+   ============================================ */
+.preview-paper .cover-letter-header {
+    text-align: center;
+    margin-bottom: 0;
+}
+
+.preview-paper .cover-letter-header .kop-line {
+    font-family: 'Times New Roman', Times, serif;
+    font-weight: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.preview-paper .cover-letter-header .kop-line.main {
+    font-size: 12pt;
+}
+
+.preview-paper .cover-letter-header .kop-line.sub {
+    font-size: 10pt;
+}
+
+.preview-paper .cover-letter-header .kop-line.small {
+    font-size: 9pt;
+    font-weight: normal;
+}
+
+.preview-paper .cover-letter-header .kop-border {
+    border-bottom: 3px solid #000;
+    margin: 10pt 0 20pt 0;
+}
+
+.preview-paper .cover-letter-meta {
+    margin-bottom: 20pt;
+}
+
+.preview-paper .cover-letter-meta table {
+    border: none;
+    border-collapse: collapse;
+}
+
+.preview-paper .cover-letter-meta td {
+    border: none;
+    padding: 2pt 8pt 2pt 0;
+    font-size: 12pt;
+    vertical-align: top;
+}
+
+.preview-paper .cover-letter-signature {
+    text-align: right;
+    margin-top: 40pt;
+}
+
+.preview-paper .cover-letter-signature .name {
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+/* ============================================
+   COVER PAGE (HALAMAN JUDUL) STYLES
+   ============================================ */
+.preview-paper .cover-page {
+    text-align: center;
+    padding-top: 60pt;
+}
+
+.preview-paper .cover-page .institution {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 60pt;
+    line-height: 1.5;
+}
+
+.preview-paper .cover-page .report-title {
+    font-size: 22pt;
+    font-weight: bold;
+    margin-bottom: 20pt;
+}
+
+.preview-paper .cover-page .period {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-bottom: 100pt;
+}
+
+.preview-paper .cover-page .footer-institution {
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: 1.6;
+    margin-top: 100pt;
+}
+
+/* ============================================
+   KATA PENGANTAR (FOREWORD) STYLES
+   ============================================ */
+.preview-paper .foreword-content p {
+    text-indent: 1.25cm;
+    text-align: justify;
+    line-height: 2;
+    margin-bottom: 12pt;
+}
+
+/* ============================================
+   PAGE BREAK STYLING
+   ============================================ */
+.preview-paper .page-break {
+    page-break-after: always;
+    height: 0;
+    margin: 0;
+    padding: 0;
+}
+
+/* Visual separator in preview mode */
+.preview-separator {
+    border: none;
+    border-top: 2px dashed #ccc;
+    margin: 40pt 0;
+}
+
+/* ============================================
+   TABLES IN PREVIEW
+   ============================================ */
+.preview-paper table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12pt 0;
+}
+
+.preview-paper th,
+.preview-paper td {
+    border: 1px solid #000;
+    padding: 6pt 8pt;
+    font-size: 12pt;
+    vertical-align: top;
+}
+
+.preview-paper th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* No border table */
+.preview-paper table.no-border,
+.preview-paper table.no-border td,
+.preview-paper table.no-border th {
+    border: none;
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+    .preview-paper {
+        box-shadow: none;
+        margin: 0;
+        padding: 3cm 3cm 3cm 4cm;
+    }
+
+    .preview-paper .page-break {
+        page-break-after: always;
+    }
+
+    .preview-paper .bab-header,
+    .preview-paper .chapter-header {
+        page-break-before: always;
+    }
+
+    .preview-paper .bab-header:first-of-type,
+    .preview-paper .chapter-header:first-of-type {
+        page-break-before: auto;
+    }
+}
