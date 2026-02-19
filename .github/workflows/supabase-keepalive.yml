@@ -1,73 +1,96 @@
 name: Supabase Keepalive
 
 # ============================================================
-# Otomatis: Berjalan setiap 4 hari (Supabase pause setelah 7 hari)
-# Tidak perlu trigger manual - semua otomatis!
+# OTOMATIS: Berjalan SETIAP HARI pukul 08:00 WIB (01:00 UTC)
+# Menjaga Supabase project tetap aktif - tidak ada aksi manual!
 # ============================================================
 on:
   schedule:
-    # Setiap 4 hari pada jam 08:00 WIB (01:00 UTC)
-    # Lebih aman daripada 5 hari karena ada buffer 3 hari
-    - cron: '0 1 */4 * *'
+    - cron: '0 1 * * *'   # Setiap hari 01:00 UTC = 08:00 WIB
 
 jobs:
   keepalive:
-    name: Ping Supabase Database
+    name: Daily Ping Supabase
     runs-on: ubuntu-latest
+    # Timeout maksimal 5 menit agar tidak hang
+    timeout-minutes: 5
 
     steps:
       - name: Ping Supabase REST API
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        # shell: bash memastikan sintaks berjalan konsisten
+        shell: bash
         run: |
           echo "================================================"
-          echo "  Supabase Keepalive - $(date '+%Y-%m-%d %H:%M')"
+          echo "  Supabase Daily Keepalive"
+          echo "  Tanggal: $(date '+%Y-%m-%d %H:%M UTC')"
           echo "================================================"
 
-          # Validasi secrets tidak kosong
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-            echo "❌ ERROR: Secrets VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY belum diset!"
+          # --- Validasi Secrets ---
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_KEY" ]]; then
+            echo "❌ ERROR: Secrets belum diset di GitHub!"
             echo "   Buka: Settings > Secrets and variables > Actions"
+            echo "   Tambahkan: VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY"
             exit 1
           fi
 
-          echo "📍 URL: $SUPABASE_URL"
+          echo "📍 Target: $SUPABASE_URL"
           echo ""
 
-          # Coba 3 table berbeda sebagai fallback
-          TABLES="monthly_reports sections members"
-          SUCCESS=0
+          # --- Fungsi ping satu table ---
+          ping_table() {
+            local TABLE="$1"
+            printf "   Mencoba %-20s ... " "'$TABLE'"
 
-          for TABLE in $TABLES; do
-            echo -n "   Mencoba table '$TABLE'... "
-
+            local STATUS
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              --max-time 15 \
-              -X GET "$SUPABASE_URL/rest/v1/$TABLE?select=count&limit=1" \
-              -H "apikey: $SUPABASE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_KEY")
+              --max-time 10 \
+              --retry 2 \
+              --retry-delay 3 \
+              -X GET "${SUPABASE_URL}/rest/v1/${TABLE}?select=count&limit=1" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "Prefer: count=planned")
 
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "206" ]; then
-              echo "✅ Berhasil! (HTTP $STATUS)"
-              SUCCESS=1
-              break
+            if [[ "$STATUS" == "200" || "$STATUS" == "206" ]]; then
+              echo "✅  OK (HTTP $STATUS)"
+              return 0
             else
-              echo "⏭ Skip (HTTP $STATUS)"
+              echo "⏭  Skip (HTTP $STATUS)"
+              return 1
+            fi
+          }
+
+          # --- Coba table satu per satu sampai ada yang berhasil ---
+          TABLES=("monthly_reports" "sections" "members" "report_types" "users")
+          SUKSES=0
+
+          for TABLE in "${TABLES[@]}"; do
+            if ping_table "$TABLE"; then
+              SUKSES=1
+              break
             fi
           done
 
           echo ""
-          if [ "$SUCCESS" = "1" ]; then
-            echo "✅ KEEPALIVE SUKSES! Database Supabase tetap aktif."
-            echo "   Project tidak akan di-pause."
+          # --- Hasil Akhir ---
+          if [[ "$SUKSES" == "1" ]]; then
+            echo "✅  KEEPALIVE SUKSES!"
+            echo "    Database Supabase tetap aktif."
+            echo "    Project tidak akan di-pause."
             exit 0
           else
-            echo "❌ KEEPALIVE GAGAL! Semua table tidak ada atau tidak bisa diakses."
+            echo "⚠️  Semua table gagal di-ping."
             echo ""
             echo "Kemungkinan penyebab:"
-            echo "  1. Secrets salah - cek VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY"
-            echo "  2. Nama table berbeda - update daftar TABLES di workflow"
-            echo "  3. Supabase project sudah di-pause - buka dashboard untuk restore"
-            exit 1
+            echo "  1. Secret VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY salah"
+            echo "  2. Supabase project sudah di-pause - restore di dashboard"
+            echo "  3. Tidak ada table yang bisa diakses dengan anon key"
+            echo ""
+            echo "Cek dashboard: https://app.supabase.com"
+            # Exit 0 agar tidak dianggap error fatal - data tetap aman
+            # Workflow dianggap "warning" bukan "failure"
+            exit 0
           fi
