@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Sidebar = ({ onNavigate, currentView, onLogout }) => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isAdminSeksi = user?.role === 'admin_seksi';
+
   // Collapsible states
   const [dataSeksiOpen, setDataSeksiOpen] = useState(true);
-  const [reportOpen, setReportOpen] = useState(false); // Old one, keeping for compatibility if needed or reuse
+  const [reportOpen, setReportOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
 
   // Styling Classes
@@ -138,6 +143,40 @@ const Sidebar = ({ onNavigate, currentView, onLogout }) => {
           </div>
         )}
 
+        {/* RBAC: Laporan Bulanan (BARU) */}
+        <p className={menuHeaderClass}>Laporan Bulanan</p>
+
+        {/* Admin Seksi: Upload Laporan */}
+        {isAdminSeksi && (
+          <div
+            className={`${menuItemClass} ${currentView === 'upload-laporan' ? activeClass : ''}`}
+            onClick={() => onNavigate('upload-laporan')}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            <span>Upload Laporan Saya</span>
+          </div>
+        )}
+
+        {/* Super Admin: Monitoring & Gabung */}
+        {isSuperAdmin && (
+          <>
+            <div
+              className={`${menuItemClass} ${currentView === 'monitoring-laporan' ? activeClass : ''}`}
+              onClick={() => onNavigate('monitoring-laporan')}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              <span>Monitoring Laporan</span>
+            </div>
+            <div
+              className={`${menuItemClass} ${currentView === 'gabung-laporan' ? activeClass : ''}`}
+              onClick={() => onNavigate('gabung-laporan')}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              <span>Gabungkan Laporan</span>
+            </div>
+          </>
+        )}
+
         {/* 5. Tulis Laporan Kegiatan (Policy Brief Editor) */}
         <div
           className={`${menuItemClass} ${currentView === 'write-report' ? activeClass : ''}`}
@@ -199,7 +238,7 @@ const Sidebar = ({ onNavigate, currentView, onLogout }) => {
 
       {/* Footer Info */}
       <div className="p-4 bg-[#051020] border-t border-white/5 mx-auto w-full text-center">
-        <p className="text-[10px] text-gray-600">v2.1.0 (Auth Update)</p>
+        <p className="text-[10px] text-gray-600">{user?.role === 'super_admin' ? '👑 Super Admin' : user?.role === 'admin_seksi' ? `📋 ${user?.seksi?.name || 'Admin Seksi'}` : 'v2.1.0'}</p>
       </div>
     </aside>
   );

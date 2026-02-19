@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LoginPage = () => {
-    const { login, resetPassword } = useAuth();
+    const { login } = useAuth();
 
     // Login State
-    const [credentials, setCredentials] = useState({ username: '', password: '' });
+    const [credentials, setCredentials] = useState({ email: '', password: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -21,11 +21,11 @@ const LoginPage = () => {
         setIsLoading(true);
 
         try {
-            if (!credentials.username || !credentials.password) {
-                throw new Error('Silakan isi Username dan Password.');
+            if (!credentials.email || !credentials.password) {
+                throw new Error('Silakan isi Email dan Password.');
             }
 
-            const result = await login(credentials.username, credentials.password);
+            const result = await login(credentials.email, credentials.password);
 
             if (!result.success) {
                 throw new Error(result.message);
@@ -90,17 +90,17 @@ const LoginPage = () => {
                             )}
 
                             <div>
-                                <label className="block text-blue-200 text-xs font-bold uppercase tracking-wider mb-2 ml-1">Username / NIP</label>
+                                <label className="block text-blue-200 text-xs font-bold uppercase tracking-wider mb-2 ml-1">Email</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-blue-300 group-focus-within:text-imigrasi-gold transition-colors">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                     </div>
                                     <input
-                                        type="text"
-                                        value={credentials.username}
-                                        onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                                        type="email"
+                                        value={credentials.email}
+                                        onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                                         className="w-full pl-12 pr-4 py-3.5 bg-[#0a1a30]/50 border border-white/10 rounded-xl text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-imigrasi-gold/50 focus:bg-[#0a1a30]/80 transition-all font-medium"
-                                        placeholder="Masukkan Username"
+                                        placeholder="email@horas-im.local"
                                     />
                                 </div>
                             </div>

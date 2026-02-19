@@ -1,158 +1,140 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
+    if (!context) throw new Error('useAuth must be used within an AuthProvider');
     return context;
 };
 
-// Simple hash function for basic security (Note: Not for production use)
-const simpleHash = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return hash.toString();
+// --- SHA-256 hash menggunakan Web Crypto API (built-in browser, tanpa library) ---
+const sha256 = async (message) => {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Initial default credentials
-    const DEFAULT_CREDENTIALS = {
-        username: 'admin', // or NIP
-        passwordHash: simpleHash('admin123'),
-        recoveryAnswer: 'pematangsiantar' // Default recovery answer
-    };
-
-    // Load user and credentials from localStorage on mount
+    // Restore session dari sessionStorage saat app dibuka
     useEffect(() => {
-        const initializeAuth = () => {
-            try {
-                // Check if we have credentials stored, if not set default
-                let storedCreds = localStorage.getItem('auth_credentials');
-                if (!storedCreds) {
-                    localStorage.setItem('auth_credentials', JSON.stringify(DEFAULT_CREDENTIALS));
-                    storedCreds = JSON.stringify(DEFAULT_CREDENTIALS);
-                }
-
-                // AUTO-LOGIN LOGIC (Requested by User)
-                // Always ensure user is logged in as admin/stored user
-                const creds = JSON.parse(storedCreds);
-                const userData = {
-                    id: 1,
-                    username: creds.username,
-                    role: 'admin',
-                    name: 'Administrator'
-                };
-
-                // Set user immediately
-                setUser(userData);
-                localStorage.setItem('auth_user', JSON.stringify(userData));
-
-            } catch (error) {
-                console.error("Auth initialization error:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        initializeAuth();
+        const stored = sessionStorage.getItem('horas_user');
+        if (stored) {
+            try { setUser(JSON.parse(stored)); } catch { /* ignore */ }
+        }
+        setIsLoading(false);
     }, []);
 
-    const login = async (username, password) => {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+    // ----------------------------------------------------------------
+    // LOGIN: query ke app_users, bandingkan hash password
+    // ----------------------------------------------------------------
+    const login = async (email, password) => {
+        try {
+            const hash = await sha256(password);
 
-        const storedCreds = JSON.parse(localStorage.getItem('auth_credentials') || JSON.stringify(DEFAULT_CREDENTIALS));
+            const { data, error } = await supabase
+                .from('app_users')
+                .select(`
+                    id, nama, email, role, is_active,
+                    seksi_id,
+                    sections:seksi_id ( id, name, alias, urutan_penggabungan )
+                `)
+                .eq('email', email.trim().toLowerCase())
+                .eq('password_hash', hash)
+                .eq('is_active', true)
+                .single();
 
-        // Check username (case insensitive) and password hash
-        if (
-            username.toLowerCase() === storedCreds.username.toLowerCase() &&
-            simpleHash(password) === storedCreds.passwordHash
-        ) {
+            if (error || !data) {
+                return { success: false, message: 'Email atau password salah. Silakan coba lagi.' };
+            }
+
             const userData = {
-                id: 1,
-                username: storedCreds.username,
-                role: 'admin',
-                name: 'Administrator'
+                id: data.id,
+                nama: data.nama,
+                email: data.email,
+                role: data.role,           // 'super_admin' | 'admin_seksi'
+                seksiId: data.seksi_id,
+                seksi: data.sections,       // {id, name, alias, urutan_penggabungan}
             };
 
             setUser(userData);
-            localStorage.setItem('auth_user', JSON.stringify(userData));
-            return { success: true };
-        }
+            sessionStorage.setItem('horas_user', JSON.stringify(userData));
 
-        return {
-            success: false,
-            message: 'Username atau password salah. Silakan coba lagi.'
-        };
+            // Log aktivitas login
+            await supabase.from('activity_logs').insert({
+                user_id: userData.id,
+                user_name: userData.nama,
+                action: 'login',
+                detail: `Login berhasil sebagai ${userData.role}`,
+            });
+
+            // Update last_login
+            await supabase
+                .from('app_users')
+                .update({ last_login: new Date().toISOString() })
+                .eq('id', userData.id);
+
+            return { success: true, user: userData };
+
+        } catch (err) {
+            console.error('Login error:', err);
+            return { success: false, message: 'Terjadi kesalahan. Silakan coba lagi.' };
+        }
     };
 
-    const logout = () => {
+    // ----------------------------------------------------------------
+    // LOGOUT
+    // ----------------------------------------------------------------
+    const logout = async () => {
+        if (user) {
+            await supabase.from('activity_logs').insert({
+                user_id: user.id,
+                user_name: user.nama,
+                action: 'logout',
+                detail: 'User logout',
+            });
+        }
         setUser(null);
-        localStorage.removeItem('auth_user');
+        sessionStorage.removeItem('horas_user');
     };
 
-    const updateUsername = async (newUsername) => {
-        try {
-            const storedCreds = JSON.parse(localStorage.getItem('auth_credentials'));
-            const updatedCreds = { ...storedCreds, username: newUsername };
-            localStorage.setItem('auth_credentials', JSON.stringify(updatedCreds));
+    // ----------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------
+    const isSuperAdmin = () => user?.role === 'super_admin';
+    const isAdminSeksi = () => user?.role === 'admin_seksi';
+    const getSeksiId = () => user?.seksiId ?? null;
 
-            // Update current user if logged in
-            if (user) {
-                const updatedUser = { ...user, username: newUsername };
-                setUser(updatedUser);
-                localStorage.setItem('auth_user', JSON.stringify(updatedUser));
-            }
-            return { success: true };
-        } catch (error) {
-            return { success: false, message: error.message };
-        }
-    };
-
+    // ----------------------------------------------------------------
+    // Ganti password
+    // ----------------------------------------------------------------
     const updatePassword = async (currentPassword, newPassword) => {
-        const storedCreds = JSON.parse(localStorage.getItem('auth_credentials'));
+        try {
+            const currentHash = await sha256(currentPassword);
+            const { data } = await supabase
+                .from('app_users')
+                .select('id')
+                .eq('id', user.id)
+                .eq('password_hash', currentHash)
+                .single();
 
-        // Verify current password first
-        if (simpleHash(currentPassword) !== storedCreds.passwordHash) {
-            return { success: false, message: 'Password saat ini salah.' };
+            if (!data) return { success: false, message: 'Password saat ini salah.' };
+
+            const newHash = await sha256(newPassword);
+            await supabase
+                .from('app_users')
+                .update({ password_hash: newHash, updated_at: new Date().toISOString() })
+                .eq('id', user.id);
+
+            return { success: true };
+        } catch (err) {
+            return { success: false, message: err.message };
         }
-
-        // Update to new password
-        const updatedCreds = { ...storedCreds, passwordHash: simpleHash(newPassword) };
-        localStorage.setItem('auth_credentials', JSON.stringify(updatedCreds));
-        return { success: true };
-    };
-
-    const resetPassword = async (username, recoveryAnswer, newPassword) => {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const storedCreds = JSON.parse(localStorage.getItem('auth_credentials'));
-
-        // Verify username
-        if (username.toLowerCase() !== storedCreds.username.toLowerCase()) {
-            return { success: false, message: 'Username tidak ditemukan.' };
-        }
-
-        // Verify recovery answer (simple check for demo)
-        // In real app, this would be more robust
-        if (recoveryAnswer.toLowerCase() !== storedCreds.recoveryAnswer.toLowerCase() && recoveryAnswer !== 'bypass-demo') {
-            return { success: false, message: 'Jawaban keamanan salah.' };
-        }
-
-        const updatedCreds = { ...storedCreds, passwordHash: simpleHash(newPassword) };
-        localStorage.setItem('auth_credentials', JSON.stringify(updatedCreds));
-        return { success: true };
     };
 
     const value = {
@@ -160,9 +142,10 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         login,
         logout,
-        updateUsername,
         updatePassword,
-        resetPassword
+        isSuperAdmin,
+        isAdminSeksi,
+        getSeksiId,
     };
 
     return (

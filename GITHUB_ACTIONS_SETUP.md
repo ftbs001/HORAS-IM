@@ -5,8 +5,8 @@
 
 ## 📋 Langkah Selanjutnya
 
-### LANGKAH 1: Setup Git di Folder HORAS-IM
-### LANGKAH 2: Hubungkan dengan GitHub
+### LANGKAH 1: Setup Git di Folder HORAS-IM ✅ (SELESAI)
+### LANGKAH 2: Hubungkan dengan GitHub ⬅️ (SEKARANG)
 ### LANGKAH 3: Setup GitHub Secrets
 ### LANGKAH 4: Push Workflow File
 ### LANGKAH 5: Test Workflow
