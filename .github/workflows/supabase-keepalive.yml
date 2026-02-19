@@ -1,71 +1,73 @@
 name: Supabase Keepalive
 
-# Jalankan setiap 5 hari untuk menjaga project Supabase tetap aktif
-# Supabase free tier akan pause project setelah 7 hari tidak ada aktivitas
+# ============================================================
+# Otomatis: Berjalan setiap 4 hari (Supabase pause setelah 7 hari)
+# Tidak perlu trigger manual - semua otomatis!
+# ============================================================
 on:
   schedule:
-    # Setiap 5 hari pada jam 00:00 UTC (07:00 WIB)
-    - cron: '0 0 */5 * *'
-
-  # Izinkan manual trigger untuk testing
-  workflow_dispatch:
+    # Setiap 4 hari pada jam 08:00 WIB (01:00 UTC)
+    # Lebih aman daripada 5 hari karena ada buffer 3 hari
+    - cron: '0 1 */4 * *'
 
 jobs:
   keepalive:
+    name: Ping Supabase Database
     runs-on: ubuntu-latest
 
     steps:
-      - name: Run keepalive heartbeat via Supabase REST API
+      - name: Ping Supabase REST API
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          echo "🔄 Running Supabase keepalive at $(date)"
-          echo "📍 Supabase URL: $SUPABASE_URL"
+          echo "================================================"
+          echo "  Supabase Keepalive - $(date '+%Y-%m-%d %H:%M')"
+          echo "================================================"
 
-          # Coba query ke table monthly_reports via REST API
-          HTTP_STATUS=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
-            -X GET "$SUPABASE_URL/rest/v1/monthly_reports?select=count&limit=1" \
-            -H "apikey: $SUPABASE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_KEY" \
-            -H "Content-Type: application/json")
-
-          echo "HTTP Status: $HTTP_STATUS"
-          echo "Response: $(cat /tmp/response.txt)"
-
-          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 206 ]; then
-            echo "✅ Supabase keepalive berhasil! Database tetap aktif."
-            exit 0
-          else
-            echo "⚠️ monthly_reports gagal, mencoba table lain..."
-
-            # Coba table lain sebagai fallback
-            HTTP_STATUS2=$(curl -s -o /tmp/response2.txt -w "%{http_code}" \
-              -X GET "$SUPABASE_URL/rest/v1/sections?select=count&limit=1" \
-              -H "apikey: $SUPABASE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_KEY" \
-              -H "Content-Type: application/json")
-
-            echo "HTTP Status 2: $HTTP_STATUS2"
-            echo "Response 2: $(cat /tmp/response2.txt)"
-
-            if [ "$HTTP_STATUS2" -eq 200 ] || [ "$HTTP_STATUS2" -eq 206 ]; then
-              echo "✅ Supabase keepalive berhasil via fallback table!"
-              exit 0
-            else
-              echo "❌ Semua keepalive attempts gagal."
-              echo "Status codes: $HTTP_STATUS, $HTTP_STATUS2"
-              exit 1
-            fi
+          # Validasi secrets tidak kosong
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "❌ ERROR: Secrets VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY belum diset!"
+            echo "   Buka: Settings > Secrets and variables > Actions"
+            exit 1
           fi
 
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "⚠️ Supabase keepalive GAGAL!"
-          echo "Kemungkinan penyebab:"
-          echo "1. Secrets belum di-set dengan benar"
-          echo "2. Supabase project sudah di-pause"
-          echo "3. Nama table tidak ada"
+          echo "📍 URL: $SUPABASE_URL"
           echo ""
-          echo "Silakan cek dashboard Supabase Anda."
+
+          # Coba 3 table berbeda sebagai fallback
+          TABLES="monthly_reports sections members"
+          SUCCESS=0
+
+          for TABLE in $TABLES; do
+            echo -n "   Mencoba table '$TABLE'... "
+
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              -X GET "$SUPABASE_URL/rest/v1/$TABLE?select=count&limit=1" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY")
+
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "206" ]; then
+              echo "✅ Berhasil! (HTTP $STATUS)"
+              SUCCESS=1
+              break
+            else
+              echo "⏭ Skip (HTTP $STATUS)"
+            fi
+          done
+
+          echo ""
+          if [ "$SUCCESS" = "1" ]; then
+            echo "✅ KEEPALIVE SUKSES! Database Supabase tetap aktif."
+            echo "   Project tidak akan di-pause."
+            exit 0
+          else
+            echo "❌ KEEPALIVE GAGAL! Semua table tidak ada atau tidak bisa diakses."
+            echo ""
+            echo "Kemungkinan penyebab:"
+            echo "  1. Secrets salah - cek VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY"
+            echo "  2. Nama table berbeda - update daftar TABLES di workflow"
+            echo "  3. Supabase project sudah di-pause - buka dashboard untuk restore"
+            exit 1
+          fi
