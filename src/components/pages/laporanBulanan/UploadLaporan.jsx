@@ -170,11 +170,16 @@ export default function UploadLaporan() {
             );
             if (dbErr) throw dbErr;
 
-            supabase.from('activity_logs').insert({
-                user_id: user?.id, user_name: user?.nama || resolvedSeksiName,
-                action: 'upload', entity_type: 'laporan_bulanan',
-                detail: `Upload laporan ${resolvedSeksiName || 'Seksi'} ${BULAN_NAMES[selectedBulan]} ${selectedTahun} (${ext.toUpperCase()})`,
-            }).catch(() => { });
+            // Log aktivitas (fire-and-forget dengan cara yang benar)
+            void (async () => {
+                try {
+                    await supabase.from('activity_logs').insert({
+                        user_id: user?.id, user_name: user?.nama || resolvedSeksiName,
+                        action: 'upload', entity_type: 'laporan_bulanan',
+                        detail: `Upload laporan ${resolvedSeksiName || 'Seksi'} ${BULAN_NAMES[selectedBulan]} ${selectedTahun} (${ext.toUpperCase()})`,
+                    });
+                } catch { /* log gagal, tidak masalah */ }
+            })();
 
             showMsg('success', `File ${ext.toUpperCase()} berhasil di-upload!`);
             setSelectedFile(null);
@@ -201,11 +206,16 @@ export default function UploadLaporan() {
                 .eq('id', laporanBulanIni.id);
             if (error) throw error;
 
-            supabase.from('activity_logs').insert({
-                user_id: user?.id, user_name: user?.nama,
-                action: 'submit', entity_type: 'laporan_bulanan', entity_id: laporanBulanIni.id,
-                detail: `Submit laporan ${BULAN_NAMES[selectedBulan]} ${selectedTahun}`,
-            }).catch(() => { });
+            // Log aktivitas (fire-and-forget)
+            void (async () => {
+                try {
+                    await supabase.from('activity_logs').insert({
+                        user_id: user?.id, user_name: user?.nama,
+                        action: 'submit', entity_type: 'laporan_bulanan', entity_id: laporanBulanIni.id,
+                        detail: `Submit laporan ${BULAN_NAMES[selectedBulan]} ${selectedTahun}`,
+                    });
+                } catch { /* log gagal, tidak masalah */ }
+            })();
 
             showMsg('success', 'Laporan berhasil dikirim untuk di-review!');
             await loadLaporan(resolvedSeksiId);
