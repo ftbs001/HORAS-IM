@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -15,13 +15,7 @@ const STATUS_COLOR = {
     'Final': { bg: '#f3e8ff', text: '#7e22ce' },
 };
 
-// Validasi tipe file yang diizinkan
-const ALLOWED_TYPES = {
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-    'application/msword': 'doc',
-    'application/pdf': 'pdf',
-};
-const ALLOWED_EXTENSIONS = ['.docx', '.doc', '.pdf'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc'];
 
 export default function UploadLaporan() {
     const { user } = useAuth();
@@ -33,57 +27,66 @@ export default function UploadLaporan() {
     const [selectedBulan, setSelectedBulan] = useState(new Date().getMonth() + 1);
     const [selectedTahun, setSelectedTahun] = useState(new Date().getFullYear());
     const [selectedFile, setSelectedFile] = useState(null);
+    const [resolvedSeksiId, setResolvedSeksiId] = useState(null);
+    const [resolvedSeksiName, setResolvedSeksiName] = useState('');
     const fileRef = useRef();
 
-    const seksiId = user?.seksiId;
-    const seksiNama = user?.seksi?.name || 'Seksi Anda';
-
-    // Fallback: jika user pakai akun fallback (seksi dari hardcode)
-    // cari seksi_id yang cocok dari database
-    const [resolvedSeksiId, setResolvedSeksiId] = useState(null);
-
+    // ---- Resolve seksiId sekali saat mount ----
+    // Prioritas: user.seksiId dari DB (string dgn angka) → query DB berdasarkan alias
     useEffect(() => {
-        const resolveSeksi = async () => {
-            if (seksiId) {
-                setResolvedSeksiId(seksiId);
-                return;
+        let cancelled = false;
+        const resolve = async () => {
+            // Cek apakah user.seksiId adalah angka valid
+            const directId = parseInt(user?.seksiId);
+            if (!isNaN(directId) && directId > 0) {
+                // Verifikasi ID ini memang ada di DB
+                const { data } = await supabase.from('sections').select('id, name').eq('id', directId).single();
+                if (!cancelled && data) {
+                    setResolvedSeksiId(data.id);
+                    setResolvedSeksiName(data.name);
+                    return;
+                }
             }
-            // Cari berdasarkan nama seksi dari akun fallback
-            if (user?.seksi?.alias) {
+            // Fallback: cari berdasarkan alias seksi
+            const alias = user?.seksi?.alias || user?.seksi?.name || '';
+            if (alias) {
                 const { data } = await supabase
                     .from('sections')
-                    .select('id')
-                    .ilike('name', `%${user.seksi.alias}%`)
-                    .single();
-                if (data) setResolvedSeksiId(data.id);
+                    .select('id, name')
+                    .or(`name.ilike.%${alias}%,alias.ilike.%${alias}%`)
+                    .limit(1);
+                if (!cancelled && data?.length) {
+                    setResolvedSeksiId(data[0].id);
+                    setResolvedSeksiName(data[0].name);
+                }
             }
         };
-        resolveSeksi();
-    }, [seksiId, user]);
+        if (user?.role === 'admin_seksi') resolve();
+        else setLoading(false);
+        return () => { cancelled = true; };
+    }, [user]);
 
-    const effectiveSeksiId = resolvedSeksiId || seksiId;
-
-    const loadLaporan = async () => {
-        if (!effectiveSeksiId) return;
+    // ---- Load laporan setelah resolvedSeksiId tersedia ----
+    const loadLaporan = useCallback(async (sid) => {
+        if (!sid) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('laporan_bulanan')
             .select('*')
-            .eq('seksi_id', effectiveSeksiId)
+            .eq('seksi_id', sid)
             .order('tahun', { ascending: false })
             .order('bulan', { ascending: false });
         if (!error) setLaporan(data || []);
         setLoading(false);
-    };
+    }, []);
 
     useEffect(() => {
-        if (effectiveSeksiId) loadLaporan();
-        else setLoading(false);
-    }, [effectiveSeksiId]);
+        if (resolvedSeksiId) loadLaporan(resolvedSeksiId);
+    }, [resolvedSeksiId, loadLaporan]);
 
     const showMsg = (type, text) => {
         setMsg({ type, text });
-        setTimeout(() => setMsg(null), 5000);
+        setTimeout(() => setMsg(null), 6000);
     };
 
     const laporanBulanIni = laporan.find(
@@ -95,10 +98,9 @@ export default function UploadLaporan() {
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
         if (!file) { setSelectedFile(null); return; }
-
         const ext = '.' + file.name.split('.').pop().toLowerCase();
         if (!ALLOWED_EXTENSIONS.includes(ext)) {
-            showMsg('error', `Format tidak didukung. Gunakan file .pdf, .docx, atau .doc`);
+            showMsg('error', `Format tidak didukung. Gunakan: PDF, DOCX, atau DOC`);
             e.target.value = '';
             setSelectedFile(null);
             return;
@@ -112,79 +114,72 @@ export default function UploadLaporan() {
         setSelectedFile(file);
     };
 
-    // ---- Upload file ----
+    // ---- Upload (pakai UPSERT agar aman jika sudah ada record) ----
     const handleUpload = async () => {
         if (!selectedFile) return showMsg('error', 'Pilih file terlebih dahulu.');
         if (isLocked) return showMsg('error', 'Laporan ini sudah dikunci (Final).');
-        if (!effectiveSeksiId) return showMsg('error', 'Seksi tidak ditemukan. Hubungi Super Admin.');
+        if (!resolvedSeksiId) return showMsg('error', 'Seksi belum terdeteksi. Coba refresh halaman.');
 
         setUploading(true);
         try {
             const ext = selectedFile.name.split('.').pop().toLowerCase();
-            const fileName = `seksi${effectiveSeksiId}_${selectedTahun}_${String(selectedBulan).padStart(2, '0')}_${Date.now()}.${ext}`;
+            const fileName = `seksi${resolvedSeksiId}_${selectedTahun}_${String(selectedBulan).padStart(2, '0')}_${Date.now()}.${ext}`;
             const filePath = `uploads/${fileName}`;
 
-            // Upload ke Supabase Storage
+            // Hapus file lama jika ada
+            if (laporanBulanIni?.file_path) {
+                await supabase.storage.from('laporan-bulanan').remove([laporanBulanIni.file_path]);
+            }
+
+            // Upload ke Storage
             const { error: uploadErr } = await supabase.storage
                 .from('laporan-bulanan')
-                .upload(filePath, selectedFile, {
-                    upsert: true,
-                    contentType: selectedFile.type,
-                });
+                .upload(filePath, selectedFile, { upsert: true, contentType: selectedFile.type });
 
             if (uploadErr) {
-                // Jika bucket tidak ada, beri pesan yang lebih jelas
-                if (uploadErr.message?.includes('Bucket not found') || uploadErr.statusCode === '404') {
-                    throw new Error(
-                        'Storage bucket "laporan-bulanan" belum dibuat di Supabase.\n' +
-                        'Silakan jalankan file supabase_complete_setup.sql di Supabase SQL Editor terlebih dahulu.'
-                    );
+                if (uploadErr.message?.toLowerCase().includes('bucket') || uploadErr.statusCode === '404') {
+                    throw new Error('Storage bucket belum dibuat.\nJalankan supabase_complete_setup.sql di SQL Editor Supabase terlebih dahulu.');
                 }
                 throw uploadErr;
             }
 
-            const { data: urlData } = supabase.storage
-                .from('laporan-bulanan')
-                .getPublicUrl(filePath);
+            const { data: urlData } = supabase.storage.from('laporan-bulanan').getPublicUrl(filePath);
 
-            // Simpan ke database
-            const payload = {
-                seksi_id: effectiveSeksiId,
-                bulan: selectedBulan,
-                tahun: selectedTahun,
-                file_name: selectedFile.name,
-                file_path: filePath,
-                file_url: urlData.publicUrl,
-                file_size: selectedFile.size,
-                file_type: ext,
-                status: laporanBulanIni?.status === 'Disetujui' ? 'Disetujui' : 'Draft',
-                catatan_revisi: null,
-                updated_at: new Date().toISOString(),
-            };
+            // Status: jika sebelumnya Draft/Perlu Revisi/belum ada → jadi Draft
+            // Jika sebelumnya Disetujui, pertahankan (tidak turunkan status)
+            const prevStatus = laporanBulanIni?.status;
+            const newStatus = (prevStatus === 'Disetujui' || prevStatus === 'Final') ? prevStatus : 'Draft';
 
-            let dbErr;
-            if (laporanBulanIni) {
-                const res = await supabase.from('laporan_bulanan').update(payload).eq('id', laporanBulanIni.id);
-                dbErr = res.error;
-            } else {
-                const res = await supabase.from('laporan_bulanan').insert({ ...payload, submitted_by: user?.id });
-                dbErr = res.error;
-            }
+            // *** UPSERT — tidak akan error duplicate key ***
+            const { error: dbErr } = await supabase.from('laporan_bulanan').upsert(
+                {
+                    seksi_id: resolvedSeksiId,
+                    bulan: selectedBulan,
+                    tahun: selectedTahun,
+                    file_name: selectedFile.name,
+                    file_path: filePath,
+                    file_url: urlData.publicUrl,
+                    file_size: selectedFile.size,
+                    file_type: ext,
+                    status: newStatus,
+                    catatan_revisi: newStatus === 'Draft' ? null : laporanBulanIni?.catatan_revisi,
+                    submitted_by: user?.id || null,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'seksi_id,bulan,tahun' }  // conflict → UPDATE otomatis
+            );
             if (dbErr) throw dbErr;
 
-            // Log aktivitas (tidak blocking)
             supabase.from('activity_logs').insert({
-                user_id: user?.id,
-                user_name: user?.nama || seksiNama,
-                action: 'upload',
-                entity_type: 'laporan_bulanan',
-                detail: `Upload laporan ${seksiNama} ${BULAN_NAMES[selectedBulan]} ${selectedTahun} (${ext.toUpperCase()})`,
+                user_id: user?.id, user_name: user?.nama || resolvedSeksiName,
+                action: 'upload', entity_type: 'laporan_bulanan',
+                detail: `Upload laporan ${resolvedSeksiName || 'Seksi'} ${BULAN_NAMES[selectedBulan]} ${selectedTahun} (${ext.toUpperCase()})`,
             }).catch(() => { });
 
             showMsg('success', `File ${ext.toUpperCase()} berhasil di-upload!`);
             setSelectedFile(null);
             if (fileRef.current) fileRef.current.value = '';
-            await loadLaporan();
+            await loadLaporan(resolvedSeksiId);
         } catch (err) {
             showMsg('error', `Upload gagal: ${err.message}`);
         } finally {
@@ -207,13 +202,13 @@ export default function UploadLaporan() {
             if (error) throw error;
 
             supabase.from('activity_logs').insert({
-                user_id: user?.id, user_name: user?.nama || seksiNama,
+                user_id: user?.id, user_name: user?.nama,
                 action: 'submit', entity_type: 'laporan_bulanan', entity_id: laporanBulanIni.id,
                 detail: `Submit laporan ${BULAN_NAMES[selectedBulan]} ${selectedTahun}`,
             }).catch(() => { });
 
             showMsg('success', 'Laporan berhasil dikirim untuk di-review!');
-            await loadLaporan();
+            await loadLaporan(resolvedSeksiId);
         } catch (err) {
             showMsg('error', `Gagal kirim: ${err.message}`);
         } finally {
@@ -222,6 +217,7 @@ export default function UploadLaporan() {
     };
 
     const tahunOptions = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+    const seksiNama = resolvedSeksiName || user?.seksi?.name || 'Seksi Anda';
 
     return (
         <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
@@ -231,15 +227,15 @@ export default function UploadLaporan() {
                     📄 Upload Laporan Bulanan
                 </h1>
                 <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>
-                    {seksiNama} — Hanya laporan seksi Anda yang dapat diakses.
+                    {seksiNama} — Hanya laporan seksi Anda yang dapat diakses dan diedit.
                 </p>
             </div>
 
-            {/* Notifikasi error/sukses */}
+            {/* Notifikasi */}
             {msg && (
                 <div style={{
-                    padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px',
-                    whiteSpace: 'pre-line',
+                    padding: '12px 16px', borderRadius: '8px', marginBottom: '20px',
+                    fontSize: '14px', whiteSpace: 'pre-line',
                     background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
                     color: msg.type === 'success' ? '#15803d' : '#b91c1c',
                     border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
@@ -248,15 +244,15 @@ export default function UploadLaporan() {
                 </div>
             )}
 
-            {/* Warning jika belum ada seksi */}
-            {!effectiveSeksiId && !loading && (
+            {/* Warning: seksi belum resolve */}
+            {!resolvedSeksiId && !loading && (
                 <div style={{
                     padding: '14px 16px', borderRadius: '8px', marginBottom: '20px',
                     background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '14px', color: '#9a3412'
                 }}>
-                    ⚠️ <strong>Akun Anda belum terhubung ke seksi.</strong><br />
-                    Pastikan SQL setup sudah dijalankan dan akun ini sudah memiliki <code>seksi_id</code>.
-                    Hubungi Super Admin jika perlu bantuan.
+                    ⚠️ <strong>Seksi belum terdeteksi.</strong><br />
+                    Pastikan SQL setup sudah dijalankan dan akun Anda sudah memiliki seksi_id yang valid.
+                    Coba logout dan login ulang, atau hubungi Super Admin.
                 </div>
             )}
 
@@ -269,7 +265,7 @@ export default function UploadLaporan() {
                     Upload Laporan Baru
                 </h2>
 
-                {/* Pilih Bulan & Tahun */}
+                {/* Bulan & Tahun */}
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
                     <div>
                         <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '6px' }}>Bulan</label>
@@ -307,8 +303,10 @@ export default function UploadLaporan() {
                                 📎 {laporanBulanIni.file_name}
                                 {laporanBulanIni.file_type && (
                                     <span style={{
-                                        marginLeft: '6px', background: '#e0f2fe', color: '#0369a1',
-                                        padding: '1px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 700
+                                        marginLeft: '6px', padding: '1px 6px', borderRadius: '4px',
+                                        fontSize: '11px', fontWeight: 700,
+                                        background: laporanBulanIni.file_type === 'pdf' ? '#fee2e2' : '#dbeafe',
+                                        color: laporanBulanIni.file_type === 'pdf' ? '#b91c1c' : '#1d4ed8',
                                     }}>
                                         {laporanBulanIni.file_type.toUpperCase()}
                                     </span>
@@ -339,17 +337,17 @@ export default function UploadLaporan() {
                         ref={fileRef}
                         type="file"
                         accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
-                        disabled={isLocked}
+                        disabled={isLocked || !resolvedSeksiId}
                         onChange={handleFileChange}
                         style={{
                             display: 'block', padding: '8px', border: '1px dashed #cbd5e1',
                             borderRadius: '8px', width: '100%', fontSize: '14px',
-                            background: isLocked ? '#f1f5f9' : '#fff',
+                            background: (isLocked || !resolvedSeksiId) ? '#f1f5f9' : '#fff',
                             boxSizing: 'border-box',
                         }}
                     />
                     {selectedFile && (
-                        <div style={{ marginTop: '8px', fontSize: '13px', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ marginTop: '8px', fontSize: '13px', color: '#0369a1', display: 'flex', gap: '6px', alignItems: 'center' }}>
                             <span>📎</span>
                             <span>{selectedFile.name}</span>
                             <span style={{ color: '#94a3b8' }}>({(selectedFile.size / 1024).toFixed(0)} KB)</span>
@@ -366,25 +364,27 @@ export default function UploadLaporan() {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <button
                         onClick={handleUpload}
-                        disabled={uploading || isLocked || !selectedFile}
+                        disabled={uploading || isLocked || !selectedFile || !resolvedSeksiId}
                         style={{
-                            padding: '10px 20px', borderRadius: '8px', border: 'none',
-                            background: uploading || isLocked || !selectedFile ? '#94a3b8' : '#2563eb',
-                            color: '#fff', fontWeight: 600, fontSize: '14px',
-                            cursor: uploading || isLocked || !selectedFile ? 'not-allowed' : 'pointer',
+                            padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 600,
+                            fontSize: '14px',
+                            background: (uploading || isLocked || !selectedFile || !resolvedSeksiId) ? '#94a3b8' : '#2563eb',
+                            color: '#fff',
+                            cursor: (uploading || isLocked || !selectedFile || !resolvedSeksiId) ? 'not-allowed' : 'pointer',
                         }}
                     >
                         {uploading ? '⏳ Mengupload...' : '⬆️ Upload File'}
                     </button>
 
-                    {laporanBulanIni && ['Draft', 'Perlu Revisi'].includes(laporanBulanIni.status) && (
+                    {laporanBulanIni && ['Draft', 'Perlu Revisi'].includes(laporanBulanIni.status) && !isLocked && (
                         <button
                             onClick={handleSubmit}
-                            disabled={submitting || isLocked}
+                            disabled={submitting}
                             style={{
-                                padding: '10px 20px', borderRadius: '8px', border: 'none',
+                                padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 600,
+                                fontSize: '14px',
                                 background: submitting ? '#94a3b8' : '#16a34a',
-                                color: '#fff', fontWeight: 600, fontSize: '14px',
+                                color: '#fff',
                                 cursor: submitting ? 'not-allowed' : 'pointer',
                             }}
                         >
@@ -414,15 +414,11 @@ export default function UploadLaporan() {
                 padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
             }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>
-                    📋 Riwayat Laporan
+                    📋 Riwayat Laporan — {seksiNama}
                 </h2>
 
                 {loading ? (
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>Memuat...</p>
-                ) : !effectiveSeksiId ? (
-                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
-                        Silakan hubungkan akun ke seksi melalui Super Admin.
-                    </p>
                 ) : laporan.length === 0 ? (
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
                         Belum ada laporan yang diupload.
@@ -432,7 +428,7 @@ export default function UploadLaporan() {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
-                                    {['Bulan', 'Tahun', 'File', 'Tipe', 'Status', 'Catatan', 'Aksi'].map(h => (
+                                    {['Bulan', 'Tahun', 'File', 'Tipe', 'Status', 'Catatan Revisi', 'Aksi'].map(h => (
                                         <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, borderBottom: '1px solid #e2e8f0' }}>
                                             {h}
                                         </th>
@@ -466,15 +462,32 @@ export default function UploadLaporan() {
                                                 {l.status}
                                             </span>
                                         </td>
-                                        <td style={{ padding: '10px 12px', maxWidth: '150px', fontSize: '12px', color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <td style={{ padding: '10px 12px', maxWidth: '160px', fontSize: '12px', color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {l.catatan_revisi || '-'}
                                         </td>
-                                        <td style={{ padding: '10px 12px' }}>
+                                        <td style={{ padding: '10px 12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                                             {l.file_url && (
                                                 <a href={l.file_url} target="_blank" rel="noreferrer"
                                                     style={{ color: '#2563eb', fontSize: '13px', textDecoration: 'none' }}>
                                                     👁️ Lihat
                                                 </a>
+                                            )}
+                                            {/* Hanya bisa re-upload jika Draft/Perlu Revisi dan tidak terkunci */}
+                                            {['Draft', 'Perlu Revisi'].includes(l.status) && !l.final_locked && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedBulan(l.bulan);
+                                                        setSelectedTahun(l.tahun);
+                                                        setTimeout(() => fileRef.current?.click(), 100);
+                                                    }}
+                                                    style={{
+                                                        padding: '3px 10px', borderRadius: '6px', border: 'none',
+                                                        background: '#f1f5f9', color: '#64748b', fontSize: '12px',
+                                                        cursor: 'pointer', fontWeight: 600
+                                                    }}
+                                                >
+                                                    🔄 Ganti
+                                                </button>
                                             )}
                                         </td>
                                     </tr>
