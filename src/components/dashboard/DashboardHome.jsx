@@ -75,7 +75,7 @@ const DashboardHome = ({ onNavigate }) => {
                             {getGreeting()}, <span className="text-imigrasi-gold">Administrator</span>
                         </h1>
                         <p className="text-blue-100 leading-relaxed text-sm md:text-base">
-                            Selamat datang di <strong className="text-white">HORAS-IM</strong> (Harmonisasi Organisasi & Arsip Sistem Imigrasi).
+                            Selamat datang di <strong className="text-white">HORAS-IM</strong> (Himpunan Operasional Laporan Aktivitas Imigrasi).
                             Pantau kinerja seksi dan status laporan terkini secara real-time.
                         </p>
                     </div>
