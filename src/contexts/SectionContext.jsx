@@ -76,12 +76,31 @@ export const SectionProvider = ({ children }) => {
                 console.warn('Supabase error, using fallback data:', error);
                 setSections(defaultSections);
             } else if (data && data.length > 0) {
-                // Deduplicate data from Supabase based on ID
-                // Map automatically handles deduplication by key (item.id)
-                // We convert to Map and back to Array to ensure uniqueness
-                const uniqueData = Array.from(new Map(data.map(item => [item.id, item])).values());
-                console.log('Fetched sections from Supabase:', uniqueData.length);
-                setSections(uniqueData);
+                // Deduplicate by normalized name — keep the row with the most complete data
+                // This handles cases where the DB has duplicate rows with different IDs
+                // but the same section name (e.g. "Seksi Inteldakim" vs "INTELDAKIM")
+                const nameMap = new Map();
+                const normalize = (name) => (name || '').toLowerCase().trim()
+                    .replace(/^seksi\s+/i, '').replace(/^subbag(ian)?\s+/i, '');
+                const dataScore = (r) => (Number(r.staff) || 0) + (Number(r.programs) || 0) + (Number(r.performance) || 0);
+
+                data.forEach(row => {
+                    const key = normalize(row.name);
+                    const existing = nameMap.get(key);
+                    if (!existing || dataScore(row) > dataScore(existing)) {
+                        nameMap.set(key, row);
+                    }
+                });
+
+                const uniqueData = Array.from(nameMap.values());
+                console.log(`Fetched ${data.length} rows, deduplicated to ${uniqueData.length} unique sections`);
+
+                // If after dedup we still have no useful data, fall back to defaults
+                if (uniqueData.length === 0) {
+                    setSections(defaultSections);
+                } else {
+                    setSections(uniqueData);
+                }
             } else {
                 // Empty result, use fallback
                 console.log('No data in Supabase, using fallback sections');

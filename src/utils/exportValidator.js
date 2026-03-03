@@ -195,45 +195,183 @@ export const validateContentNotEmpty = (chapters) => {
     return { pass: true, message: 'All chapters have content' };
 };
 
-// ==================== MAIN VALIDATION ====================
+// ==================== NEW: STRICT FORMAT CHECKS ====================
 
 /**
- * Run all pre-export validations
+ * Validate no non-Arial font families found in content HTML.
+ * (Detects residual inline font-family that may override Arial)
+ */
+export const validateFontConsistency = (chapters) => {
+    if (!chapters) return { pass: true, message: 'No chapters to check' };
+
+    const nonArialPattern = /font-family\s*:\s*(?!Arial|sans-serif)[^;"']+/gi;
+    const issues = [];
+
+    chapters.forEach((chapter, ci) => {
+        chapter.sections?.forEach((section, si) => {
+            const content = section.content || '';
+            if (nonArialPattern.test(content)) {
+                issues.push(`Chapter ${ci + 1}, Section ${si + 1}`);
+            }
+            nonArialPattern.lastIndex = 0;  // Reset regex state
+        });
+    });
+
+    if (issues.length > 0) {
+        return { pass: false, message: `Non-Arial fonts detected in: ${issues.join(', ')}` };
+    }
+    return { pass: true, message: 'Font consistency OK — all Arial' };
+};
+
+/**
+ * Validate no custom margin styles override the global 2cm setting.
+ */
+export const validateMarginConsistency = (chapters) => {
+    if (!chapters) return { pass: true, message: 'No chapters to check' };
+
+    const marginPattern = /margin\s*:\s*(?!0|auto)[^;"']+/gi;
+    const issues = [];
+
+    chapters.forEach((chapter, ci) => {
+        chapter.sections?.forEach((section, si) => {
+            const content = section.content || '';
+            if (marginPattern.test(content)) {
+                issues.push(`Chapter ${ci + 1}, Section ${si + 1}`);
+            }
+            marginPattern.lastIndex = 0;
+        });
+    });
+
+    if (issues.length > 0) {
+        return {
+            pass: false,
+            message: `Inline margin overrides detected in: ${issues.join(', ')} — AUTO CORRECT: stripped by cleanHtmlContent`
+        };
+    }
+    return { pass: true, message: 'Margin consistency OK' };
+};
+
+/**
+ * Validate no duplicate heading titles across BAB or Sub-BAB.
+ */
+export const validateNoDuplicateHeadings = (chapters) => {
+    if (!chapters) return { pass: true, message: 'No chapters to check' };
+
+    const babTitles = [];
+    const subTitles = [];
+    const dupBab = [];
+    const dupSub = [];
+
+    chapters.forEach(chapter => {
+        const babKey = (chapter.title || '').trim().toUpperCase();
+        if (babTitles.includes(babKey)) {
+            dupBab.push(babKey);
+        } else {
+            babTitles.push(babKey);
+        }
+
+        chapter.sections?.forEach(section => {
+            const subKey = (section.title || '').trim().toUpperCase();
+            if (subTitles.includes(subKey)) {
+                dupSub.push(subKey);
+            } else {
+                subTitles.push(subKey);
+            }
+        });
+    });
+
+    const allDups = [...dupBab, ...dupSub];
+    if (allDups.length > 0) {
+        return { pass: false, message: `Duplicate headings: ${allDups.join('; ')}` };
+    }
+    return { pass: true, message: 'No duplicate headings' };
+};
+
+/**
+ * Validate no orphan BAB headings (each BAB must have at least one sub-section).
+ */
+export const validateNoOrphanHeadings = (chapters) => {
+    if (!chapters) return { pass: true, message: 'No chapters to check' };
+
+    const orphans = chapters
+        .filter(ch => !ch.sections || ch.sections.length === 0)
+        .map(ch => ch.title || 'Untitled BAB');
+
+    if (orphans.length > 0) {
+        return { pass: false, message: `Orphan BAB (no sub-sections): ${orphans.join(', ')}` };
+    }
+    return { pass: true, message: 'No orphan headings' };
+};
+
+/**
+ * Validate no empty paragraph nodes in chapter content HTML.
+ * Detects <p></p>, <p> </p>, <p>&nbsp;</p> — these corrupt DOCX spacing.
+ */
+export const validateNoEmptyParagraphs = (chapters) => {
+    if (!chapters) return { pass: true, message: 'No chapters to check' };
+
+    const emptyParaPattern = /<p[^>]*>\s*(&nbsp;)?\s*<\/p>/gi;
+    const found = [];
+
+    chapters.forEach(ch => {
+        (ch.sections || []).forEach(sec => {
+            const html = sec.content || '';
+            const matches = html.match(emptyParaPattern);
+            if (matches && matches.length > 2) {  // Allow up to 2 (structural)
+                found.push(`${ch.title} › ${sec.title || 'section'} (${matches.length} empty nodes)`);
+            }
+        });
+    });
+
+    if (found.length > 0) {
+        return { pass: false, message: `Empty paragraphs found: ${found.join('; ')}` };
+    }
+    return { pass: true, message: 'No empty paragraph nodes' };
+};
+
+
+
+
+import { validateAllImages } from './imageValidator';
+
+/**
+ * Run all pre-export validations (12-point QC checklist).
  * @param {Object} document - Document to validate
+ * @param {Array}  laporanList - Array of laporan objects with content_json (for image check)
  * @returns {Object} { valid: boolean, results: Array }
  */
-export const validateBeforeExport = (document) => {
+export const validateBeforeExport = (document, laporanList = []) => {
     const { chapters, tocItems, imageRegistry, rawContent } = document;
 
+    // Check 12: image validation against content_json
+    const imgCheck = validateAllImages(laporanList);
+
     const results = [
+        { name: 'Chapters Present', ...validateChaptersPresent(chapters) },
+        { name: 'No Illegal Page Breaks', ...validateNoIllegalPageBreaks(rawContent) },
+        { name: 'Heading Hierarchy', ...validateHeadingHierarchy(chapters) },
+        { name: 'Images Valid (registry)', ...validateImages(chapters, imageRegistry) },
+        { name: 'TOC Matches Content', ...validateTOC(tocItems, chapters) },
+        { name: 'Content Not Empty', ...validateContentNotEmpty(chapters) },
+        // Strict format enforcement checks
+        { name: 'Font Consistency (Arial)', ...validateFontConsistency(chapters) },
+        { name: 'Margin Consistency (2cm)', ...validateMarginConsistency(chapters) },
+        { name: 'No Duplicate Headings', ...validateNoDuplicateHeadings(chapters) },
+        { name: 'No Orphan Headings', ...validateNoOrphanHeadings(chapters) },
+        // v3: Structure integrity
+        { name: 'No Empty Paragraphs', ...validateNoEmptyParagraphs(chapters) },
+        // v4: Image-safe export (base64 validation)
         {
-            name: 'Chapters Present',
-            ...validateChaptersPresent(chapters)
-        },
-        {
-            name: 'No Illegal Page Breaks',
-            ...validateNoIllegalPageBreaks(rawContent)
-        },
-        {
-            name: 'Heading Hierarchy',
-            ...validateHeadingHierarchy(chapters)
-        },
-        {
-            name: 'Images Valid',
-            ...validateImages(chapters, imageRegistry)
-        },
-        {
-            name: 'TOC Matches Content',
-            ...validateTOC(tocItems, chapters)
-        },
-        {
-            name: 'Content Not Empty',
-            ...validateContentNotEmpty(chapters)
+            name: 'Gambar Aman untuk Export',
+            pass: imgCheck.valid,
+            message: imgCheck.summary +
+                (imgCheck.errors.length > 0
+                    ? '\n' + imgCheck.errors.slice(0, 5).map(e => '  • ' + e.message).join('\n')
+                    : ''),
         },
     ];
 
     const valid = results.every(r => r.pass);
-
     return { valid, results };
 };
 
@@ -266,4 +404,9 @@ export default {
     validateImages,
     validateTOC,
     validateContentNotEmpty,
+    validateFontConsistency,
+    validateMarginConsistency,
+    validateNoDuplicateHeadings,
+    validateNoOrphanHeadings,
+    validateNoEmptyParagraphs,
 };

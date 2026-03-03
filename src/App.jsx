@@ -43,6 +43,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
+  const [navParams, setNavParams] = useState({});
   const { user, logout, isSuperAdmin, isAdminSeksi } = useAuth();
   const { showNotification } = useNotification();
   const isLoggedIn = !!user;
@@ -53,12 +54,13 @@ function AppContent() {
     showNotification('Logout Berhasil! Sampai jumpa 👋', 'info');
   };
 
-  const handleNavigate = (view) => {
+  const handleNavigate = (view, params = {}) => {
     const viewName = getViewDisplayName(view) || view;
-    if (currentView === view) {
+    if (currentView === view && !Object.keys(params).length) {
       showNotification(`Anda sudah berada di halaman ini`, 'warning');
       return;
     }
+    setNavParams(params);
     setCurrentView(view);
     showNotification(`Membuka ${viewName}`, 'info');
   };
@@ -86,7 +88,10 @@ function AppContent() {
       case 'gabung-laporan':
         return (
           <ProtectedRoute allowedRoles={['super_admin']}>
-            <GabungLaporan />
+            <GabungLaporan
+              initialBulan={navParams.bulan}
+              initialTahun={navParams.tahun}
+            />
           </ProtectedRoute>
         );
 
@@ -96,7 +101,7 @@ function AppContent() {
       case 'activity-log': return <ActivityLog />;
       case 'report-history': return <ReportHistory />;
       case 'add-report-type': return <AddReportType />;
-      case 'members': return <Members />;
+      case 'members': return <Members onNavigate={handleNavigate} />;
 
       // ---- Phase 2: Data Seksi ----
       case 'section-data': return <SectionData onNavigate={handleNavigate} />;

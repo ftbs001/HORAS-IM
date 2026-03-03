@@ -274,9 +274,17 @@ function SuperAdminMembers({ user }) {
 // SUB-KOMPONEN: ADMIN SEKSI — Profil diri + Tim seksi
 // ─────────────────────────────────────────────────────────────
 function AdminSeksiMembers({ user, onNavigate }) {
+    const { updateProfile } = useAuth();
     const [teamMembers, setTeamMembers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [msgProfile, setMsgProfile] = useState(null);
+    const [msg, setMsg] = useState(null);
+
+    // Modal edit profil sendiri
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({ nama: '', nip: '', phone: '' });
+    const [saving, setSaving] = useState(false);
+
+    const showMsg = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4500); };
 
     const loadTeam = useCallback(async () => {
         if (!user?.seksiId) { setLoading(false); return; }
@@ -285,13 +293,39 @@ function AdminSeksiMembers({ user, onNavigate }) {
             .from('app_users')
             .select('id, nama, email, nip, role, last_login, phone, sections(name, alias)')
             .eq('seksi_id', user.seksiId)
-            .neq('id', user.id)   // tidak tampilkan diri sendiri (sudah di kartu profil)
+            .neq('id', user.id)
             .order('nama');
         setTeamMembers(data || []);
         setLoading(false);
     }, [user]);
 
     useEffect(() => { loadTeam(); }, [loadTeam]);
+
+    const openEditModal = () => {
+        setEditForm({ nama: user?.nama || '', nip: user?.nip || '', phone: user?.phone || '' });
+        setShowEditModal(true);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!editForm.nama.trim()) return showMsg('error', 'Nama tidak boleh kosong.');
+        setSaving(true);
+        try {
+            const result = await updateProfile({ nama: editForm.nama, nip: editForm.nip, phone: editForm.phone });
+            if (result?.success) {
+                showMsg('success', result?.source === 'local'
+                    ? '💾 Profil disimpan (lokal). Hubungkan ke Supabase untuk sinkronisasi penuh.'
+                    : '✅ Profil berhasil disimpan!'
+                );
+                setShowEditModal(false);
+            } else {
+                showMsg('error', 'Gagal menyimpan: ' + (result?.message || 'Unknown error'));
+            }
+        } catch (err) {
+            showMsg('error', 'Error: ' + err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const initials = (name) => (name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -314,9 +348,14 @@ function AdminSeksiMembers({ user, onNavigate }) {
                 <p style={{ color: '#93c5fd', marginTop: '4px', fontSize: '14px' }}>{user?.seksi?.name || 'Seksi Anda'}</p>
             </div>
 
-            {msgProfile && (
-                <div style={{ padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
-                    {msgProfile}
+            {msg && (
+                <div style={{
+                    padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px',
+                    background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
+                    color: msg.type === 'success' ? '#15803d' : '#b91c1c',
+                    border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`
+                }}>
+                    {msg.text}
                 </div>
             )}
 
@@ -340,7 +379,7 @@ function AdminSeksiMembers({ user, onNavigate }) {
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
                     {[
                         { label: 'NIP', value: user?.nip || '—', icon: '🪪' },
                         { label: 'No. Telepon', value: user?.phone || '—', icon: '📱' },
@@ -353,10 +392,16 @@ function AdminSeksiMembers({ user, onNavigate }) {
                     ))}
                 </div>
 
-                <button onClick={() => onNavigate && onNavigate('profile')}
-                    style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
-                    ✏️ Edit Profil Saya
-                </button>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button onClick={openEditModal}
+                        style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}>
+                        ✏️ Edit Profil Saya
+                    </button>
+                    <button onClick={() => onNavigate && onNavigate('profile')}
+                        style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>
+                        🔑 Kelola Akun & Password
+                    </button>
+                </div>
             </div>
 
             {/* Tim Seksi */}
@@ -409,10 +454,87 @@ function AdminSeksiMembers({ user, onNavigate }) {
                 <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', background: '#eff6ff', display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <span style={{ fontSize: '16px' }}>ℹ️</span>
                     <p style={{ margin: 0, fontSize: '12px', color: '#1d4ed8' }}>
-                        Untuk menambah atau mengubah data anggota, hubungi <strong>Super Admin</strong> sistem HORAS-IM.
+                        Untuk menambah atau mengubah data anggota lain, hubungi <strong>Super Admin</strong> sistem HORAS-IM.
                     </p>
                 </div>
             </div>
+
+            {/* ── Modal Edit Profil ── */}
+            {showEditModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div style={{ background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '460px', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
+                        {/* Header Modal */}
+                        <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2563eb)', padding: '20px 24px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontWeight: 700, fontSize: '16px' }}>✏️ Edit Profil Saya</h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#93c5fd' }}>{user?.seksi?.name || 'Seksi Anda'}</p>
+                            </div>
+                            <button onClick={() => setShowEditModal(false)}
+                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '18px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Body Modal */}
+                        <div style={{ padding: '24px' }}>
+                            <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '18px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                ℹ️ Perubahan NIP dan No. Telepon akan disimpan ke profil Anda. Email dan Seksi tidak dapat diubah.
+                            </p>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+                                {[
+                                    { label: 'Nama Lengkap *', key: 'nama', type: 'text', placeholder: 'Nama lengkap Anda' },
+                                    { label: 'NIP', key: 'nip', type: 'text', placeholder: '19XXXXXXXXXX' },
+                                    { label: 'No. Telepon / WhatsApp', key: 'phone', type: 'tel', placeholder: '08xx-xxxx-xxxx' },
+                                ].map(f => (
+                                    <div key={f.key}>
+                                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                            {f.label}
+                                        </label>
+                                        <input
+                                            type={f.type}
+                                            value={editForm[f.key]}
+                                            placeholder={f.placeholder}
+                                            onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+                                            onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                                            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
+                                ))}
+
+                                {/* Email (read-only) */}
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        Email (tidak dapat diubah)
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={user?.email || ''}
+                                        disabled
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #f1f5f9', fontSize: '14px', background: '#f8fafc', color: '#94a3b8', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Tombol aksi */}
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    onClick={() => setShowEditModal(false)}
+                                    style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleSaveProfile}
+                                    disabled={saving}
+                                    style={{ flex: 2, padding: '12px', borderRadius: '10px', border: 'none', background: saving ? '#94a3b8' : '#2563eb', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer', boxShadow: saving ? 'none' : '0 2px 8px rgba(37,99,235,0.3)' }}>
+                                    {saving ? '⏳ Menyimpan...' : '💾 Simpan Perubahan'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -431,3 +553,4 @@ const Members = ({ onNavigate }) => {
 };
 
 export default Members;
+

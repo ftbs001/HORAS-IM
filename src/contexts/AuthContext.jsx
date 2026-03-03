@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
                 .from('app_users')
                 .select(`
                     id, nama, email, role, is_active,
-                    seksi_id,
+                    seksi_id, nip, phone,
                     sections:seksi_id ( id, name, alias, urutan_penggabungan )
                 `)
                 .eq('email', emailNorm)
@@ -90,6 +90,7 @@ export const AuthProvider = ({ children }) => {
                 const userData = {
                     id: data.id, nama: data.nama, email: data.email,
                     role: data.role, seksiId: data.seksi_id, seksi: data.sections,
+                    nip: data.nip || '', phone: data.phone || '',
                     source: 'supabase',
                 };
                 setUser(userData);
@@ -165,6 +166,40 @@ export const AuthProvider = ({ children }) => {
     const getSeksiId = () => user?.seksiId ?? null;
 
     // ----------------------------------------------------------------
+    // Update profil (nama, NIP, telepon)
+    // ----------------------------------------------------------------
+    const updateProfile = async ({ nama, nip, phone }) => {
+        if (!user?.id || user?.source === 'fallback') {
+            // Fallback: simpan ke sessionStorage saja
+            const updated = { ...user, nama, nip, phone };
+            setUser(updated);
+            sessionStorage.setItem('horas_user', JSON.stringify(updated));
+            return { success: true, source: 'local' };
+        }
+        try {
+            const { error } = await supabase
+                .from('app_users')
+                .update({ nama, nip, phone, updated_at: new Date().toISOString() })
+                .eq('id', user.id);
+            if (error) throw error;
+            const updated = { ...user, nama, nip, phone };
+            setUser(updated);
+            sessionStorage.setItem('horas_user', JSON.stringify(updated));
+            return { success: true };
+        } catch (err) {
+            return { success: false, message: err.message };
+        }
+    };
+
+    // ----------------------------------------------------------------
+    // Ganti username (nama tampilan akun)
+    // ----------------------------------------------------------------
+    const updateUsername = async (newUsername) => {
+        if (!newUsername) return { success: false, message: 'Username tidak boleh kosong' };
+        return updateProfile({ nama: newUsername, nip: user?.nip, phone: user?.phone });
+    };
+
+    // ----------------------------------------------------------------
     // Ganti password
     // ----------------------------------------------------------------
     const updatePassword = async (currentPassword, newPassword) => {
@@ -196,6 +231,8 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         login,
         logout,
+        updateProfile,
+        updateUsername,
         updatePassword,
         isSuperAdmin,
         isAdminSeksi,

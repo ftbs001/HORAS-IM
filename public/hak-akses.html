@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hak Akses Sistem HORAS-IM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .header .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #7c3aed, #1a56db);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 6px 18px;
+            border-radius: 50px;
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #f8fafc, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        /* ── ROLE GRID ── */
+        .roles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .role-card {
+            border-radius: 20px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .role-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Super Admin – Gold */
+        .super-admin .role-header {
+            background: linear-gradient(135deg, #b45309, #d97706, #f59e0b);
+            padding: 28px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .super-admin .role-header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.15), transparent 60%);
+        }
+
+        /* Admin Seksi – Blue */
+        .admin-seksi .role-header {
+            background: linear-gradient(135deg, #1e40af, #2563eb, #3b82f6);
+            padding: 28px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .admin-seksi .role-header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.15), transparent 60%);
+        }
+
+        .role-avatar {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .role-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: white;
+            position: relative;
+        }
+
+        .role-sub {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 4px;
+            position: relative;
+        }
+
+        .role-level {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            position: relative;
+        }
+
+        .super-admin .role-level {
+            background: rgba(255, 255, 255, 0.25);
+            color: #fef3c7;
+        }
+
+        .admin-seksi .role-level {
+            background: rgba(255, 255, 255, 0.2);
+            color: #dbeafe;
+        }
+
+        /* Permissions list */
+        .perms-list {
+            padding: 20px 24px 24px;
+        }
+
+        .perm-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 11px 14px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+
+        .perm-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .perm-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .super-admin .perm-item {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .admin-seksi .perm-item {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .perm-icon {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .super-admin .perm-icon {
+            background: rgba(245, 158, 11, 0.15);
+        }
+
+        .admin-seksi .perm-icon {
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        .perm-text .perm-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .perm-text .perm-desc {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        /* ── COMPARISON TABLE ── */
+        .compare-section {
+            margin-top: 8px;
+        }
+
+        .compare-section h3 {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #cbd5e1;
+            margin-bottom: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .compare-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .compare-table thead th {
+            padding: 14px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .compare-table thead th:first-child {
+            text-align: left;
+            color: #94a3b8;
+        }
+
+        .compare-table thead th:nth-child(2) {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+        }
+
+        .compare-table thead th:nth-child(3) {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+        }
+
+        .compare-table tbody tr {
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .compare-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .compare-table tbody td {
+            padding: 12px 20px;
+            font-size: 13px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .compare-table tbody td:first-child {
+            text-align: left;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .check {
+            color: #4ade80;
+            font-size: 18px;
+        }
+
+        .cross {
+            color: #f87171;
+            font-size: 18px;
+        }
+
+        /* ── FOOTER SUMMARY ── */
+        .summary-bar {
+            margin-top: 32px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 22px 32px;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .sum-item {
+            text-align: center;
+        }
+
+        .sum-num {
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #fbbf24, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .sum-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 640px) {
+            .roles-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="badge">🔐 Manajemen Hak Akses</div>
+            <h1>Struktur Hak Akses Sistem</h1>
+            <p>HORAS-IM — Pembagian peran dan izin pengguna dalam sistem</p>
+        </div>
+
+        <!-- ROLE CARDS -->
+        <div class="roles-grid">
+
+            <!-- SUPER ADMIN -->
+            <div class="role-card super-admin">
+                <div class="role-header">
+                    <div class="role-avatar">👑</div>
+                    <div class="role-name">Super Administrator</div>
+                    <div class="role-sub">Akses penuh ke seluruh sistem</div>
+                    <div class="role-level">Level Tertinggi</div>
+                </div>
+                <div class="perms-list">
+                    <div class="perm-item">
+                        <div class="perm-icon">📋</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Kelola Seluruh Laporan</div>
+                            <div class="perm-desc">Akses semua laporan dari semua seksi</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">📊</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Monitoring Status</div>
+                            <div class="perm-desc">Pantau progress laporan secara real-time</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">✅</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Verifikasi & Validasi</div>
+                            <div class="perm-desc">Terima atau tolak laporan dengan catatan</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">🔗</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Gabungkan Laporan</div>
+                            <div class="perm-desc">Merge semua seksi menjadi satu dokumen</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">📤</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Export Word / PDF</div>
+                            <div class="perm-desc">Unduh dokumen final siap cetak</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">👥</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Kelola Seksi & Anggota</div>
+                            <div class="perm-desc">Tambah, edit, hapus data seksi & user</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN SEKSI -->
+            <div class="role-card admin-seksi">
+                <div class="role-header">
+                    <div class="role-avatar">🏢</div>
+                    <div class="role-name">Admin Seksi</div>
+                    <div class="role-sub">Akses terbatas pada seksi sendiri</div>
+                    <div class="role-level">Level Seksi</div>
+                </div>
+                <div class="perms-list">
+                    <div class="perm-item">
+                        <div class="perm-icon">📝</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Input Laporan Seksi</div>
+                            <div class="perm-desc">Buat dan isi laporan untuk seksinya</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">📎</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Upload Dokumen Pendukung</div>
+                            <div class="perm-desc">Lampirkan file DOCX atau PDF</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">✏️</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Edit Laporan</div>
+                            <div class="perm-desc">Revisi laporan sebelum dikirim</div>
+                        </div>
+                    </div>
+                    <div class="perm-item">
+                        <div class="perm-icon">👁️</div>
+                        <div class="perm-text">
+                            <div class="perm-title">Lihat Status Laporan</div>
+                            <div class="perm-desc">Pantau status: draf / terkirim / diverifikasi</div>
+                        </div>
+                    </div>
+                    <div class="perm-item" style="opacity:0.35;">
+                        <div class="perm-icon" style="background:rgba(100,116,139,0.15);">🚫</div>
+                        <div class="perm-text">
+                            <div class="perm-title" style="color:#64748b;">Verifikasi</div>
+                            <div class="perm-desc">Tidak memiliki akses</div>
+                        </div>
+                    </div>
+                    <div class="perm-item" style="opacity:0.35;">
+                        <div class="perm-icon" style="background:rgba(100,116,139,0.15);">🚫</div>
+                        <div class="perm-text">
+                            <div class="perm-title" style="color:#64748b;">Gabung & Export Final</div>
+                            <div class="perm-desc">Tidak memiliki akses</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COMPARISON TABLE -->
+        <div class="compare-section">
+            <h3>📊 Perbandingan Hak Akses</h3>
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>Fitur / Akses</th>
+                        <th>👑 Super Admin</th>
+                        <th>🏢 Admin Seksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Input laporan seksi sendiri</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Upload dokumen (DOCX/PDF)</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Edit laporan sebelum submit</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Lihat status laporan sendiri</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Monitoring semua laporan</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                    </tr>
+                    <tr>
+                        <td>Verifikasi & validasi laporan</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                    </tr>
+                    <tr>
+                        <td>Gabungkan seluruh laporan</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                    </tr>
+                    <tr>
+                        <td>Export Word & PDF final</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                    </tr>
+                    <tr>
+                        <td>Kelola seksi & anggota</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SUMMARY -->
+        <div class="summary-bar">
+            <div class="sum-item">
+                <div class="sum-num">2</div>
+                <div class="sum-label">Peran Pengguna</div>
+            </div>
+            <div class="sum-item">
+                <div class="sum-num">9</div>
+                <div class="sum-label">Total Fitur</div>
+            </div>
+            <div class="sum-item">
+                <div class="sum-num">9/9</div>
+                <div class="sum-label">Akses Super Admin</div>
+            </div>
+            <div class="sum-item">
+                <div class="sum-num">4/9</div>
+                <div class="sum-label">Akses Admin Seksi</div>
+            </div>
+        </div>
+
+        <div style="text-align:center;margin-top:24px;color:#334155;font-size:12px;">
+            HORAS-IM &copy; 2025 — Sistem Informasi Manajemen Imigrasi
+        </div>
+
+    </div>
+</body>
+
+</html>

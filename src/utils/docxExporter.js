@@ -1,8 +1,22 @@
 /**
- * DOCX Exporter - Professional Government Report Layout
- * 
- * Uses style-based formatting and proper page break control
- * Based on Kementerian Imigrasi dan Pemasyarakatan RI standards
+ * DOCX Exporter — TEMPLATE ARCHITECTURE v3
+ *
+ * Indonesian Government Monthly Report (.docx)
+ *
+ * v3 Changes:
+ *   - Named Word styles (GovernmentBAB/Heading 1, GovernmentSubBAB/Heading 2, etc.)
+ *     embedded in styles.xml via PARAGRAPH_STYLES — no inline overrides
+ *   - TableOfContents auto-generated from Heading 1–3 (updateFields: true)
+ *   - Two-section model kept for split page numbering (roman → arabic)
+ *
+ * LOCKED:
+ *   Paper  : A4
+ *   Margin : 2cm all sides
+ *   Font   : Arial (enforced via named styles)
+ *   Body   : 11pt Normal style
+ *   BAB    : 14pt Heading 1 — page break before, thick border
+ *   Sub-BAB: 12pt Heading 2
+ *   Spacing: 1.5 lines, 6pt paragraph-after
  */
 
 import {
@@ -10,24 +24,25 @@ import {
     Packer,
     Paragraph,
     TextRun,
-    Table,
-    TableRow,
-    TableCell,
+    TableOfContents,
     BorderStyle,
     AlignmentType,
     PageBreak,
-    WidthType,
+    PageNumber,
     UnderlineType,
     HeadingLevel,
     TabStopType,
     LeaderType,
     ImageRun,
-    VerticalAlign,
-    TableLayoutType,
+    SectionType,
+    Footer,
+    NumberFormat,
+    LevelFormat,
+    convertInchesToTwip,
 } from 'docx';
+
 import { saveAs } from 'file-saver';
 
-// Import centralized styles
 import {
     CM,
     MARGINS,
@@ -36,82 +51,77 @@ import {
     INDENT,
     PAGE_WIDTH,
     GOVERNMENT_STYLES,
-    PAGE_SETUP,
-    TOC_STYLES,
+    PARAGRAPH_STYLES,
+    STYLE_ID,
 } from '../styles/governmentStyles';
 
-// Import image handler
-import { fetchImageAsArrayBuffer, loadLogo } from './imageHandler';
-
-// Import global letterhead generator
+import { fetchImageAsArrayBuffer, base64ToArrayBuffer, getMimeFromBase64, scaleToMaxWidth } from './imageHandler';
 import { generateLetterhead } from './letterheadGenerator';
 
 // ==================== PARAGRAPH HELPERS ====================
 
-const createTextRun = (text, options = {}) => {
-    return new TextRun({
+/**
+ * Body TextRun — only font lock needed; size/bold comes from named style.
+ */
+const tr = (text, opts = {}) =>
+    new TextRun({
         text: text || '',
         font: FONT.NAME,
-        size: options.size || FONT.SIZE.BODY,
-        bold: options.bold || false,
-        italics: options.italics || false,
-        underline: options.underline,
-        allCaps: options.allCaps || false,
+        size: opts.size ?? FONT.SIZE.BODY,
+        bold: opts.bold ?? false,
+        italics: opts.italics ?? false,
+        underline: opts.underline,
+        allCaps: opts.allCaps ?? false,
+        color: '000000',
     });
-};
 
-const createParagraph = (text, options = {}) => {
-    return new Paragraph({
-        children: [createTextRun(text, options)],
-        alignment: options.alignment || AlignmentType.JUSTIFIED,
+/**
+ * Body paragraph — references GovernmentNormal style.
+ * No inline size/bold/align needed (inherits from style definition).
+ */
+const para = (text, opts = {}) =>
+    new Paragraph({
+        style: STYLE_ID.NORMAL,
+        children: opts.children || [tr(text, opts)],
+        alignment: opts.alignment ?? AlignmentType.JUSTIFIED,
         spacing: {
-            before: options.spaceBefore || 0,
-            after: options.spaceAfter || 0,  // No spacing after (per user requirements)
-            line: SPACING.LINE_1,  // Single spacing (240 twips)
+            before: opts.spaceBefore ?? 0,
+            after: opts.spaceAfter ?? SPACING.PARA_SPACING_PT,
+            line: SPACING.LINE_1_5,
         },
-        indent: options.indent ? { firstLine: INDENT.FIRST_LINE } : undefined,
-        // Prevent orphan headings - keep with next paragraph
-        keepNext: options.keepNext || false,
-        keepLines: options.keepLines || false,
+        indent: opts.indent ? { firstLine: INDENT.FIRST_LINE } : undefined,
+        keepNext: opts.keepNext ?? false,
+        keepLines: opts.keepLines ?? false,
     });
-};
 
-const createCenteredParagraph = (text, options = {}) => {
-    return createParagraph(text, { ...options, alignment: AlignmentType.CENTER });
-};
+const centerPara = (text, opts = {}) =>
+    para(text, { ...opts, alignment: AlignmentType.CENTER });
 
-const createEmptyParagraph = (count = 1) => {
-    return Array(count).fill(null).map(() =>
-        new Paragraph({ children: [], spacing: { after: 200 } })
-    );
-};
+const emptyLine = () =>
+    new Paragraph({
+        style: STYLE_ID.NORMAL,
+        children: [],
+        spacing: { before: 0, after: 0, line: SPACING.LINE_1_5 },
+    });
 
-const createPageBreak = () => {
-    return new Paragraph({ children: [new PageBreak()] });
-};
+const pageBreak = () =>
+    new Paragraph({ children: [new PageBreak()] });
 
 // ==================== HTML CONTENT CLEANER ====================
 
-const cleanHtmlContent = (html) => {
+const removePageBreakStyles = (html) => {
     if (!html) return '';
-
-    // Remove page break styles that cause "liar" page breaks
-    let cleaned = html
+    return html
         .replace(/<div[^>]*style="[^"]*page-break[^"]*"[^>]*>/gi, '<div>')
         .replace(/page-break-before:\s*always;?/gi, '')
         .replace(/page-break-after:\s*always;?/gi, '')
         .replace(/break-before:\s*page;?/gi, '')
         .replace(/break-after:\s*page;?/gi, '');
-
-    return cleaned;
 };
 
 const stripHtml = (html) => {
     if (!html) return '';
-
-    const cleaned = cleanHtmlContent(html);
-
-    return cleaned
+    return removePageBreakStyles(html)
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n\n')
         .replace(/<p[^>]*>/gi, '')
@@ -125,392 +135,427 @@ const stripHtml = (html) => {
         .trim();
 };
 
-// ==================== COVER LETTER (SURAT PENGANTAR) ====================
+// ==================== PAGE NUMBER FOOTER ====================
 
-const createCoverLetter = async (data, logoPath) => {
-    if (!data || !data.nomor) return [];
-
-    const elements = [];
-
-    // Use global letterhead generator
-    const letterheadElements = await generateLetterhead(logoPath);
-    elements.push(...letterheadElements);
-
-    // Date (right-aligned, after letterhead)
-    elements.push(
-        new Paragraph({
-            children: [createTextRun(data.tanggal || '')],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 200 },
-        })
-    );
-
-    // Metadata
-    const metaRows = [
-        ['Nomor', data.nomor],
-        ['Sifat', data.sifat],
-        ['Lampiran', data.lampiran],
-        ['Hal', data.hal],
-    ];
-
-    metaRows.forEach(([label, value]) => {
-        elements.push(
+const buildPageFooter = () =>
+    new Footer({
+        children: [
             new Paragraph({
+                style: STYLE_ID.NORMAL,
                 children: [
-                    createTextRun(label),
-                    createTextRun('\\t: ' + (value || '-')),
+                    new TextRun({
+                        children: [PageNumber.CURRENT],
+                        font: FONT.NAME,
+                        size: FONT.SIZE.BODY,
+                        color: '000000',
+                    }),
                 ],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 0, line: SPACING.LINE_1 },
+            }),
+        ],
+    });
+
+// ==================== COVER LETTER ====================
+
+const buildCoverLetter = async (data, logoPath) => {
+    if (!data || !data.nomor) return [];
+    const elems = [];
+
+    const letterheadElems = await generateLetterhead(logoPath);
+    elems.push(...letterheadElems);
+
+    elems.push(new Paragraph({
+        style: STYLE_ID.NORMAL,
+        children: [tr(data.tanggal || '')],
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 200, line: SPACING.LINE_1_5 },
+    }));
+
+    [['Nomor', data.nomor], ['Sifat', data.sifat], ['Lampiran', data.lampiran], ['Hal', data.hal]]
+        .forEach(([label, value]) => {
+            elems.push(new Paragraph({
+                style: STYLE_ID.NORMAL,
+                children: [tr(label), tr('\t: ' + (value || '-'))],
                 tabStops: [{ type: TabStopType.LEFT, position: 2 * CM }],
-                spacing: { after: 40 },
-            })
-        );
+                spacing: { after: 40, line: SPACING.LINE_1_5 },
+            }));
+        });
+
+    elems.push(emptyLine());
+    if (data.tujuan) elems.push(para(data.tujuan, { spaceAfter: 300 }));
+
+    (data.isi || '').split('\n\n').forEach(p => {
+        if (p.trim()) elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
     });
 
-    elements.push(...createEmptyParagraph(1));
+    elems.push(emptyLine());
+    elems.push(emptyLine());
+    elems.push(new Paragraph({
+        style: STYLE_ID.NORMAL,
+        children: [tr('Kepala Kantor,')],
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 0, line: SPACING.LINE_1_5 },
+    }));
+    for (let i = 0; i < 4; i++) elems.push(emptyLine());
+    elems.push(new Paragraph({
+        style: STYLE_ID.NORMAL,
+        children: [tr(data.penandatangan || '', { bold: true, underline: { type: UnderlineType.SINGLE } })],
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 0, line: SPACING.LINE_1_5 },
+    }));
+    elems.push(emptyLine());
+    elems.push(emptyLine());
+    elems.push(new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Tembusan:', { bold: true, size: FONT.SIZE.XSMALL })], spacing: { after: 0, line: SPACING.LINE_1_5 } }));
+    elems.push(new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('1. Sekretaris Direktorat Jenderal Imigrasi Kemenkumham RI', { size: FONT.SIZE.XSMALL })], indent: { left: INDENT.SUB_BAB }, spacing: { after: 0, line: SPACING.LINE_1_5 } }));
 
-    // Recipient
-    if (data.tujuan) {
-        elements.push(
-            new Paragraph({
-                children: [createTextRun(data.tujuan)],
-                spacing: { after: 300 },
-            })
-        );
-    }
-
-    // Content
-    const paragraphs = (data.isi || '').split('\n\n');
-    paragraphs.forEach(p => {
-        if (p.trim()) {
-            elements.push(createParagraph(p.replace(/\n/g, ' '), { indent: true }));
-        }
-    });
-
-    elements.push(...createEmptyParagraph(2));
-
-    // Signature
-    elements.push(
-        new Paragraph({
-            children: [createTextRun('Kepala Kantor,')],
-            alignment: AlignmentType.RIGHT,
-        })
-    );
-
-    elements.push(...createEmptyParagraph(4));
-
-    elements.push(
-        new Paragraph({
-            children: [
-                createTextRun(data.penandatangan || '', { bold: true, underline: { type: UnderlineType.SINGLE } }),
-            ],
-            alignment: AlignmentType.RIGHT,
-        })
-    );
-
-    elements.push(...createEmptyParagraph(2));
-
-    // Tembusan
-    elements.push(
-        new Paragraph({
-            children: [createTextRun('Tembusan:', { size: FONT.SIZE.XSMALL, bold: true })],
-        })
-    );
-    elements.push(
-        new Paragraph({
-            children: [createTextRun('1. Sekretaris Direktorat Jenderal Imigrasi Kemenkumham RI', { size: FONT.SIZE.XSMALL })],
-            indent: { left: INDENT.SUB_BAB },
-        })
-    );
-
-    elements.push(createPageBreak());
-
-    return elements;
+    elems.push(pageBreak());
+    return elems;
 };
 
 // ==================== COVER PAGE ====================
 
-const createCoverPage = async (data, logoPath) => {
+const buildCoverPage = async (data, logoPath) => {
     if (!data) return [];
+    const elems = [];
+    for (let i = 0; i < 4; i++) elems.push(emptyLine());
 
-    const elements = [];
+    elems.push(centerPara('KANTOR IMIGRASI KELAS II TPI', { size: FONT.SIZE.BAB, bold: true, spaceAfter: 0 }));
+    elems.push(centerPara('PEMATANG SIANTAR', { size: FONT.SIZE.BAB, bold: true, spaceAfter: SPACING.PARA_SPACING_PT * 2 }));
+    elems.push(centerPara(data.reportTitle || 'LAPORAN BULANAN', { size: FONT.SIZE.BAB, bold: true, spaceAfter: SPACING.PARA_SPACING_PT }));
+    elems.push(centerPara(`${data.month || ''} ${data.year || ''}`, { size: FONT.SIZE.LARGE, bold: true, spaceAfter: SPACING.PARA_SPACING_PT * 2 }));
 
-    elements.push(...createEmptyParagraph(4));
-
-    elements.push(createCenteredParagraph('KANTOR IMIGRASI KELAS II TPI', { size: FONT.SIZE.TITLE, bold: true, spaceAfter: 0 }));
-    elements.push(createCenteredParagraph('PEMATANG SIANTAR', { size: FONT.SIZE.TITLE, bold: true, spaceAfter: 600 }));
-
-    elements.push(createCenteredParagraph(data.reportTitle || 'LAPORAN BULANAN', { size: FONT.SIZE.XLARGE, bold: true, spaceAfter: 300 }));
-    elements.push(createCenteredParagraph(`${data.month || ''} ${data.year || ''}`, { size: FONT.SIZE.LARGE, bold: true, spaceAfter: 800 }));
-
-    // Logo
     if (logoPath) {
         const logoData = await fetchImageAsArrayBuffer(logoPath);
         if (logoData) {
-            elements.push(
-                new Paragraph({
-                    children: [
-                        new ImageRun({
-                            data: logoData,
-                            transformation: { width: 100, height: 100 },
-                        }),
-                    ],
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 800 },
-                })
-            );
+            elems.push(new Paragraph({
+                children: [new ImageRun({ data: logoData, transformation: { width: 100, height: 100 } })],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: SPACING.PARA_SPACING_PT * 2, line: SPACING.LINE_1 },
+            }));
         }
     } else {
-        elements.push(createCenteredParagraph('[LOGO KEMENTERIAN]', { size: FONT.SIZE.XSMALL, spaceAfter: 800 }));
+        elems.push(centerPara('[LOGO KEMENTERIAN]', { size: FONT.SIZE.XSMALL, spaceAfter: SPACING.PARA_SPACING_PT * 2 }));
     }
 
-    elements.push(...createEmptyParagraph(4));
+    for (let i = 0; i < 4; i++) elems.push(emptyLine());
 
-    const footerLines = [
-        'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN',
-        'REPUBLIK INDONESIA',
-        'DIREKTORAT JENDERAL IMIGRASI',
-        data.year || new Date().getFullYear().toString(),
-    ];
+    ['KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN', 'REPUBLIK INDONESIA',
+        'DIREKTORAT JENDERAL IMIGRASI', data.year || String(new Date().getFullYear())]
+        .forEach(line => elems.push(centerPara(line, { bold: true, spaceAfter: 40 })));
 
-    footerLines.forEach(line => {
-        elements.push(createCenteredParagraph(line, { bold: true, spaceAfter: 40 }));
-    });
-
-    elements.push(createPageBreak());
-
-    return elements;
+    return elems;
 };
 
-// ==================== FOREWORD ====================
+// ==================== KATA PENGANTAR ====================
 
-const createForeword = (data) => {
+const buildForeword = (data) => {
     if (!data || !data.content) return [];
+    const elems = [];
 
-    const elements = [];
+    elems.push(new Paragraph({
+        style: STYLE_ID.HEADING_1,
+        children: [tr('KATA PENGANTAR', { size: FONT.SIZE.BAB, bold: true })],
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: SPACING.PARA_SPACING_PT * 2, line: SPACING.LINE_1_5 },
+        // Override to prevent page break on first element of this section
+        pageBreakBefore: false,
+    }));
 
-    elements.push(createCenteredParagraph('KATA PENGANTAR', { size: FONT.SIZE.TITLE, bold: true, spaceAfter: 400 }));
-    elements.push(...createEmptyParagraph(1));
-
-    const paragraphs = stripHtml(data.content).split('\n\n');
-    paragraphs.forEach(p => {
-        if (p.trim()) {
-            elements.push(createParagraph(p.replace(/\n/g, ' '), { indent: true }));
-        }
+    stripHtml(data.content).split('\n\n').forEach(p => {
+        if (p.trim()) elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
     });
 
-    elements.push(createPageBreak());
-
-    return elements;
+    elems.push(pageBreak());
+    return elems;
 };
 
-// ==================== TABLE OF CONTENTS ====================
+// ==================== AUTO TABLE OF CONTENTS ====================
 
 /**
- * Creates professional Table of Contents
- * - 4 levels: BAB (H1), Sub BAB (H2), Sub-Sub BAB (H3), Point (H4)
- * - Single spacing for compact 1-page layout
- * - Precise dot leader with right-aligned page numbers
- * - No manual spacing - uses tab stops only
+ * Generates a Word-native auto-TOC.
+ *
+ * Word will populate the page numbers when:
+ *  a) The document is opened (updateFields: true triggers auto-update)
+ *  b) The user presses F9 on the TOC
+ *
+ * Headings detected: GovernmentBAB (H1), GovernmentSubBAB (H2), GovernmentSubSubBAB (H3)
  */
-const createTableOfContents = (items) => {
-    const elements = [];
+const buildAutoTOC = () => {
+    const elems = [];
 
-    // Title
-    elements.push(
-        new Paragraph({
-            children: [createTextRun('DAFTAR ISI', { bold: true, size: FONT.SIZE.TITLE })],
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 400, line: 240 }, // Single spacing
+    // TOC title
+    elems.push(new Paragraph({
+        children: [
+            new TextRun({ text: 'DAFTAR ISI', font: FONT.NAME, size: FONT.SIZE.BAB, bold: true, color: '000000' }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 240, line: SPACING.LINE_1 },
+    }));
+
+    // Word-native TableOfContents field
+    elems.push(
+        new TableOfContents('Daftar Isi', {
+            headingStyleRange: '1-3',
+            stylesWithLevels: [
+                { styleName: 'GovernmentBAB', level: 1 },
+                { styleName: 'GovernmentSubBAB', level: 2 },
+                { styleName: 'GovernmentSubSubBAB', level: 3 },
+            ],
+            hyperlink: true,
+            headingStyleRange: '1-3',
+            preserveTabInEntries: true,
+            preserveNewLineInEntries: false,
         })
     );
 
-    // TOC indentation per level (in cm converted to twips)
-    const TOC_INDENT = {
-        0: 0,           // Heading 1 (BAB) - 0 cm
-        1: 0.75 * CM,   // Heading 2 (Sub BAB) - 0.75 cm
-        2: 1.25 * CM,   // Heading 3 (Sub-Sub BAB) - 1.25 cm
-        3: 1.75 * CM,   // Heading 4 (Point) - 1.75 cm
-    };
-
-    // TOC bold rules
-    const isBold = (level) => level === 0; // Only BAB is bold
-
-    if (items && Array.isArray(items)) {
-        items.forEach((item) => {
-            const level = Math.min(item.level || 0, 3); // Cap at level 3
-            const indent = TOC_INDENT[level] || 0;
-
-            elements.push(
-                new Paragraph({
-                    children: [
-                        // Title text
-                        new TextRun({
-                            text: item.title || '',
-                            font: FONT.NAME,
-                            size: FONT.SIZE.BODY,
-                            bold: isBold(level),
-                        }),
-                        // Tab for dot leader
-                        new TextRun({ text: '\t' }),
-                        // Page number
-                        new TextRun({
-                            text: item.page ? item.page.toString() : '',
-                            font: FONT.NAME,
-                            size: FONT.SIZE.BODY,
-                        }),
-                    ],
-                    tabStops: [{
-                        type: TabStopType.RIGHT,
-                        position: PAGE_WIDTH,
-                        leader: LeaderType.DOT,
-                    }],
-                    indent: { left: indent },
-                    spacing: {
-                        before: 0,
-                        after: 0,  // No extra spacing - compact
-                        line: 240, // Single spacing (240 = 1.0)
-                    },
-                })
-            );
-        });
-    }
-
-    // Add some space before page break
-    elements.push(new Paragraph({ children: [], spacing: { after: 200 } }));
-    elements.push(createPageBreak());
-
-    return elements;
+    return elems;
 };
 
+// ==================== BAB HEADER (Heading 1) ====================
 
-// ==================== CHAPTER (BAB) ====================
-
-const createBabHeader = (text, addPageBreak = false) => {
-    const elements = [];
-
-    if (addPageBreak) {
-        elements.push(createPageBreak());
-    }
-
-    elements.push(
-        new Paragraph({
-            children: [createTextRun(text.toUpperCase(), { bold: true, size: FONT.SIZE.TITLE })],  // 14pt
-            heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: SPACING.AFTER_HEADING * 2, line: SPACING.LINE_1 },  // Single spacing
-            // Keep heading with next content to prevent orphan
-            keepNext: true,
-        })
-    );
-
-    return elements;
-};
-
-const createSubBabHeader = (text) => {
-    return new Paragraph({
-        children: [createTextRun(text, { bold: true })],
-        heading: HeadingLevel.HEADING_2,
-        alignment: AlignmentType.LEFT,
-        spacing: { before: SPACING.BEFORE_HEADING, after: SPACING.AFTER_HEADING, line: SPACING.LINE_1 },  // Single spacing
-        keepNext: true,  // Stay with next paragraph
-        keepLines: true, // Don't split this paragraph
-    });
-};
-
-const createSubSubBabHeader = (text) => {
-    return new Paragraph({
-        children: [createTextRun(text)],
-        heading: HeadingLevel.HEADING_3,
-        alignment: AlignmentType.LEFT,
-        indent: { left: INDENT.SUB_BAB },
-        spacing: { before: SPACING.BEFORE_HEADING / 2, after: SPACING.AFTER_PARA, line: SPACING.LINE_1 },  // Single spacing
+/**
+ * Creates a BAB heading using the GovernmentBAB named style.
+ * Style definition handles: Uppercase, Bold, Center, 14pt, page-break-before, border-bottom.
+ */
+const buildBabHeader = (text, isFirstBab = false) =>
+    new Paragraph({
+        style: STYLE_ID.HEADING_1,
+        children: [tr(text.toUpperCase(), { bold: true, size: FONT.SIZE.BAB })],
+        // First BAB doesn't need extra page break (section break already moves to new page)
+        pageBreakBefore: !isFirstBab,
         keepNext: true,
     });
-};
 
-const createChapter = (title, sections, isFirst = false) => {
-    const elements = [];
+// ==================== SUB-BAB HEADER (Heading 2) ====================
 
-    // BAB header with page break (except first BAB)
-    elements.push(...createBabHeader(title, !isFirst));
+const buildSubBabHeader = (text) =>
+    new Paragraph({
+        style: STYLE_ID.HEADING_2,
+        children: [tr(text, { bold: true, size: FONT.SIZE.SUB_BAB })],
+        keepNext: true,
+        keepLines: true,
+    });
 
-    if (sections && Array.isArray(sections)) {
-        sections.forEach(section => {
-            // Section header based on level
-            if (section.level === 2) {
-                elements.push(createSubBabHeader(section.title));
-            } else if (section.level === 3) {
-                elements.push(createSubSubBabHeader(section.title));
-            } else if (section.title) {
-                elements.push(createSubBabHeader(section.title));
-            }
+// ==================== SUB-SUB-BAB HEADER (Heading 3) ====================
 
-            // Section content
-            if (section.content) {
-                const text = stripHtml(section.content);
-                const paragraphs = text.split('\n\n');
-                paragraphs.forEach(p => {
-                    if (p.trim() && !p.includes('[Belum ada konten]')) {
-                        elements.push(createParagraph(p.replace(/\n/g, ' '), { indent: true }));
-                    }
-                });
-            }
-        });
+const buildSubSubBabHeader = (text) =>
+    new Paragraph({
+        style: STYLE_ID.HEADING_3,
+        children: [tr(text, { bold: true })],
+        indent: { left: INDENT.SUB_BAB },
+        keepNext: true,
+    });
+
+// ==================== CHAPTER BUILDER ====================
+
+// Max image width in EMU: 14 cm × 914400 EMU/m ÷ 100 = content area width
+const MAX_IMG_W_EMU = Math.round(14 / 2.54 * 914400); // 14cm in EMU
+
+/**
+ * Build a block paragraph or image from a content_json block object.
+ * Called from buildChapter when section.blocks is available.
+ */
+const buildContentBlock = async (block, { Paragraph, ImageRun, AlignmentType }) => {
+    if (!block) return [];
+
+    if (block.type === 'paragraph' || block.type === 'text') {
+        if (!block.text?.trim()) return [];
+        return [para(block.text.trim(), { indent: true })];
     }
 
-    return elements;
+    if (block.type === 'heading') {
+        if (block.level === 2) return [buildSubBabHeader(block.text)];
+        return [buildSubSubBabHeader(block.text)];
+    }
+
+    if (block.type === 'image') {
+        if (!block.base64) {
+            // Placeholder paragraph for missing image — visible in document
+            return [para(`[⚠️ Gambar tidak tersedia: ${block.id || 'unknown'}]`, { alignment: AlignmentType.CENTER })];
+        }
+        try {
+            const imgBuf = base64ToArrayBuffer(block.base64);
+            if (!imgBuf) return [para(`[⚠️ Gagal memuat gambar: ${block.id}]`, { alignment: AlignmentType.CENTER })];
+
+            const mime = getMimeFromBase64(block.base64);
+            const origW = block.metadata?.width_px || MAX_IMG_W_EMU;
+            const origH = block.metadata?.height_px || Math.round(MAX_IMG_W_EMU * 0.75);
+            const { width: scaledW, height: scaledH } = scaleToMaxWidth(origW, origH, MAX_IMG_W_EMU);
+
+            const imgPara = new Paragraph({
+                children: [
+                    new ImageRun({
+                        data: imgBuf,
+                        type: mime,
+                        transformation: { width: scaledW, height: scaledH },
+                    }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 120, after: 120 },
+            });
+
+            const elems = [imgPara];
+            if (block.caption) {
+                elems.push(para(block.caption, {
+                    alignment: AlignmentType.CENTER,
+                    size: FONT?.SIZE?.XSMALL || 20,
+                    italics: true,
+                    spaceAfter: 200,
+                    noIndent: true,
+                }));
+            }
+            return elems;
+        } catch (err) {
+            console.warn('[docxExporter] Image embed error:', err);
+            return [para(`[⚠️ Error memuat gambar: ${block.id}]`, { alignment: AlignmentType.CENTER })];
+        }
+    }
+
+    if (block.type === 'list') {
+        return (block.items || []).map(item =>
+            new Paragraph({
+                style: STYLE_ID.NORMAL,
+                children: [tr('• ' + item)],
+                indent: { left: INDENT?.SUB_BAB || 720 },
+                spacing: { before: 0, after: 60 },
+            })
+        );
+    }
+
+    return [];
+};
+
+const buildChapter = async (title, sections, isFirst = false) => {
+    const elems = [];
+    elems.push(buildBabHeader(title, isFirst));
+
+    // Import docx symbols once for reuse inside this async function
+    const { Paragraph, ImageRun, AlignmentType } = await import('docx').catch(() => ({}));
+
+    for (const section of (sections || [])) {
+        if (section.level === 3) {
+            elems.push(buildSubSubBabHeader(section.title));
+        } else if (section.title) {
+            elems.push(buildSubBabHeader(section.title));
+        }
+
+        // Priority 1: content_json blocks (rich content with images)
+        if (section.blocks && section.blocks.length > 0) {
+            for (const block of section.blocks) {
+                const blockElems = await buildContentBlock(block, { Paragraph, ImageRun, AlignmentType });
+                elems.push(...blockElems);
+            }
+        }
+        // Priority 2: legacy HTML content (plain text fallback)
+        else if (section.content) {
+            stripHtml(section.content).split('\n\n').forEach(p => {
+                if (p.trim() && !p.includes('[Belum ada konten]')) {
+                    elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
+                }
+            });
+        }
+    }
+
+    return elems;
 };
 
 // ==================== MAIN EXPORT FUNCTION ====================
 
+/**
+ * Generates and downloads a government monthly report .docx.
+ *
+ * Document structure (two-section, required for split page numbering):
+ *
+ *  Section 1 — Front matter (roman: i, ii, iii — bottom center)
+ *    Cover Letter  → Cover Page  → Kata Pengantar  → Daftar Isi (auto-TOC)
+ *
+ *  Section 2 — Chapters (arabic: 1, 2, 3 — bottom center)
+ *    BAB I … BAB V
+ *
+ * Named styles embedded in PARAGRAPH_STYLES prevent any inline-override drift.
+ * updateFields: true causes Word to auto-populate TOC on open.
+ */
 export const generateDocx = async ({
     coverLetterData,
     coverPageData,
     forewordData,
-    tocItems,
+    tocItems,          // kept for fallback, but auto-TOC is primary
     chapters,
     filename,
     logoPath,
     coverLogoPath,
 }) => {
-    const allElements = [];
+    // ── Section 1: Front matter ──────────────────────────────────────────────
+    const sec1 = [];
 
-    // 1. Cover Letter
-    const coverLetterElements = await createCoverLetter(coverLetterData, logoPath);
-    allElements.push(...coverLetterElements);
+    const coverLetterElems = await buildCoverLetter(coverLetterData, logoPath);
+    sec1.push(...coverLetterElems);
 
-    // 2. Cover Page
-    const coverPageElements = await createCoverPage(coverPageData, coverLogoPath);
-    allElements.push(...coverPageElements);
+    const coverPageElems = await buildCoverPage(coverPageData, coverLogoPath);
+    sec1.push(...coverPageElems);
+    sec1.push(pageBreak());
 
-    // 3. Foreword
-    allElements.push(...createForeword(forewordData));
+    sec1.push(...buildForeword(forewordData));
+    sec1.push(...buildAutoTOC());
 
-    // 4. Table of Contents
-    allElements.push(...createTableOfContents(tocItems));
-
-    // 5. Chapters
-    if (chapters && Array.isArray(chapters)) {
-        chapters.forEach((chapter, idx) => {
-            allElements.push(...createChapter(chapter.title, chapter.sections, idx === 0));
-        });
+    // ── Section 2: Chapters (await each — buildChapter is now async for image embedding) ─
+    const sec2 = [];
+    for (const [idx, chapter] of (chapters || []).entries()) {
+        const chapElems = await buildChapter(chapter.title, chapter.sections, idx === 0);
+        sec2.push(...chapElems);
     }
 
-    // Create document with government styles
+    // ── Assemble document ────────────────────────────────────────────────────
     const doc = new Document({
-        styles: GOVERNMENT_STYLES,
-        sections: [{
-            properties: {
-                page: PAGE_SETUP,
+        // v3: Named styles embedded — single source of formatting truth
+        styles: {
+            ...GOVERNMENT_STYLES,
+            paragraphStyles: PARAGRAPH_STYLES,
+        },
+
+        // Word auto-updates TOC page numbers on open
+        features: { updateFields: true },
+
+        sections: [
+            // Section 1: roman page numbers (i, ii, iii)
+            {
+                properties: {
+                    type: SectionType.NEXT_PAGE,
+                    page: {
+                        size: { width: 11906, height: 16838 },
+                        margin: MARGINS,
+                        pageNumbers: { start: 1, formatType: NumberFormat.LOWER_ROMAN },
+                    },
+                    titlePage: true,
+                },
+                footers: {
+                    default: buildPageFooter(),
+                    first: new Footer({ children: [new Paragraph({ children: [] })] }),
+                },
+                children: sec1,
             },
-            children: allElements,
-        }],
+
+            // Section 2: arabic page numbers (1, 2, 3)
+            {
+                properties: {
+                    type: SectionType.NEXT_PAGE,
+                    page: {
+                        size: { width: 11906, height: 16838 },
+                        margin: MARGINS,
+                        pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL },
+                    },
+                },
+                footers: {
+                    default: buildPageFooter(),
+                },
+                children: sec2,
+            },
+        ],
     });
 
-    // Generate and save
     const blob = await Packer.toBlob(doc);
     saveAs(blob, filename || 'Laporan_Bulanan.docx');
-
     return true;
 };
 

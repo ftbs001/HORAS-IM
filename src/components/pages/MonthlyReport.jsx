@@ -160,7 +160,7 @@ const CoverLetterPreview = () => {
     if (!coverLetterData || Object.keys(coverLetterData).length === 0) return null;
 
     return (
-        <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Times New Roman, serif' }}>
+        <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Arial, sans-serif' }}>
             {/* Kop Surat */}
             <div className="flex items-start gap-4 border-b-2 border-black pb-4 mb-6">
                 {/* Logo Kementerian Imigrasi dan Pemasyarakatan */}
@@ -232,7 +232,7 @@ const CoverPagePreview = () => {
     if (!coverPageData || Object.keys(coverPageData).length === 0) {
         // Show default values if no data
         return (
-            <div className="mb-16 pb-16 border-b-4 border-black page-break-after flex flex-col items-center justify-between min-h-[900px]" style={{ fontFamily: 'Times New Roman, serif' }}>
+            <div className="mb-16 pb-16 border-b-4 border-black page-break-after flex flex-col items-center justify-between min-h-[900px]" style={{ fontFamily: 'Arial, sans-serif' }}>
                 {/* Header */}
                 <div className="w-full text-center pt-12">
                     <h1 className="text-xl font-bold" style={{ letterSpacing: '0.5px' }}>
@@ -277,7 +277,7 @@ const CoverPagePreview = () => {
     }
 
     return (
-        <div className="mb-16 pb-16 border-b-4 border-black page-break-after flex flex-col items-center justify-between min-h-[900px]" style={{ fontFamily: 'Times New Roman, serif' }}>
+        <div className="mb-16 pb-16 border-b-4 border-black page-break-after flex flex-col items-center justify-between min-h-[900px]" style={{ fontFamily: 'Arial, sans-serif' }}>
             {/* Header */}
             <div className="w-full text-center pt-12">
                 <h1 className="text-xl font-bold" style={{ letterSpacing: '0.5px' }}>
@@ -334,7 +334,7 @@ Laporan ini diharapkan dapat memberikan informasi yang berguna kepada para pemak
     const content = forewordData?.content || defaultContent;
 
     return (
-        <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Times New Roman, serif' }}>
+        <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Arial, sans-serif' }}>
             <h2 className="text-2xl font-bold text-center mb-8">KATA PENGANTAR</h2>
             <div style={{ textAlign: 'justify', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
                 {content}
@@ -353,7 +353,7 @@ const TableOfContentsPreview = () => {
     if (!tocContent) return null;
 
     return (
-        <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Times New Roman, serif' }}>
+        <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Arial, sans-serif' }}>
             <div
                 className="toc-preview"
                 dangerouslySetInnerHTML={{ __html: tocContent }}

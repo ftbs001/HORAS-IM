@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alur Kerja Sistem HORAS-IM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --blue: #1a56db;
+            --blue-light: #dbeafe;
+            --orange: #f97316;
+            --orange-light: #fff7ed;
+            --green: #16a34a;
+            --green-light: #dcfce7;
+            --purple: #7c3aed;
+            --purple-light: #ede9fe;
+            --red: #dc2626;
+            --gray: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .header .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #1a56db, #7c3aed);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 6px 18px;
+            border-radius: 50px;
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            font-size: 38px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 15px;
+        }
+
+        /* ── STAGE CARD ── */
+        .stage {
+            position: relative;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            backdrop-filter: blur(12px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: default;
+        }
+
+        .stage:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 28px;
+            color: white;
+        }
+
+        .stage-1 .stage-header {
+            background: linear-gradient(135deg, #1a56db, #2563eb);
+        }
+
+        .stage-2 .stage-header {
+            background: linear-gradient(135deg, #ea580c, #f97316);
+        }
+
+        .stage-3 .stage-header {
+            background: linear-gradient(135deg, #15803d, #16a34a);
+        }
+
+        .stage-4 .stage-header {
+            background: linear-gradient(135deg, #6d28d9, #7c3aed);
+        }
+
+        .stage-icon {
+            width: 52px;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .stage-title {
+            flex: 1;
+        }
+
+        .stage-title .num {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .stage-title h2 {
+            font-size: 20px;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        .stage-badge {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 50px;
+            padding: 4px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .stage-body {
+            padding: 24px 28px;
+        }
+
+        /* Steps row */
+        .steps-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .step {
+            flex: 1;
+            min-width: 140px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+            transition: background 0.2s;
+        }
+
+        .step:hover {
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .step .step-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .step .step-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .step .step-sub {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        /* Arrow between steps */
+        .step-arrow {
+            display: flex;
+            align-items: center;
+            color: #475569;
+            font-size: 22px;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
+        /* Verifikasi branches */
+        .verify-center {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .verify-center .admin-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(249, 115, 22, 0.15);
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .branches {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .branch {
+            border-radius: 14px;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .branch.accept {
+            background: rgba(22, 163, 74, 0.12);
+            border: 2px solid rgba(22, 163, 74, 0.4);
+        }
+
+        .branch.reject {
+            background: rgba(220, 38, 38, 0.12);
+            border: 2px solid rgba(220, 38, 38, 0.4);
+        }
+
+        .branch .branch-icon {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .branch .branch-title {
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .branch.accept .branch-title {
+            color: #4ade80;
+        }
+
+        .branch.reject .branch-title {
+            color: #f87171;
+        }
+
+        .branch .branch-sub {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .branch .redirect {
+            display: inline-block;
+            margin-top: 10px;
+            background: rgba(220, 38, 38, 0.2);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #fca5a5;
+        }
+
+        /* Merge features grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(22, 163, 74, 0.08);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .feature-item .fi-icon {
+            width: 36px;
+            height: 36px;
+            background: rgba(22, 163, 74, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .feature-item .fi-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: #d1fae5;
+        }
+
+        .feature-item .fi-sub {
+            font-size: 11px;
+            color: #6ee7b7;
+            margin-top: 2px;
+        }
+
+        /* Export outputs */
+        .export-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .export-card {
+            border-radius: 14px;
+            padding: 22px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .export-card:hover {
+            transform: scale(1.03);
+        }
+
+        .export-card.word {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0.05));
+            border: 2px solid rgba(96, 165, 250, 0.4);
+        }
+
+        .export-card.pdf {
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.2), rgba(220, 38, 38, 0.05));
+            border: 2px solid rgba(248, 113, 113, 0.4);
+        }
+
+        .export-card .ec-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+
+        .export-card .ec-title {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .export-card.word .ec-title {
+            color: #93c5fd;
+        }
+
+        .export-card.pdf .ec-title {
+            color: #fca5a5;
+        }
+
+        .export-card .ec-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .export-card .ec-tag {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #cbd5e1;
+        }
+
+        /* Connector arrow between stages */
+        .connector {
+            text-align: center;
+            margin: 4px 0;
+            font-size: 28px;
+            color: #475569;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.5;
+                transform: scaleY(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scaleY(1.1);
+            }
+        }
+
+        /* Footer summary bar */
+        .summary-bar {
+            margin-top: 40px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-item .si-num {
+            font-size: 32px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .summary-item .si-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .steps-row {
+                flex-direction: column;
+            }
+
+            .step-arrow {
+                transform: rotate(90deg);
+                align-self: center;
+            }
+
+            .branches,
+            .features-grid,
+            .export-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <!-- ─── HEADER ─── -->
+        <div class="header">
+            <div class="badge">🏛️ Sistem Manajemen Laporan</div>
+            <h1>Alur Kerja HORAS-IM</h1>
+            <p>Proses otomatis dari input laporan hingga dokumen siap cetak</p>
+        </div>
+
+        <!-- ─── TAHAP 1 ─── -->
+        <div class="stage stage-1">
+            <div class="stage-header">
+                <div class="stage-icon">👤</div>
+                <div class="stage-title">
+                    <div class="num">Tahap 1</div>
+                    <h2>Input oleh Seksi</h2>
+                </div>
+                <div class="stage-badge">Seksi</div>
+            </div>
+            <div class="stage-body">
+                <div class="steps-row">
+                    <div class="step">
+                        <div class="step-icon">🔐</div>
+                        <div class="step-label">Login Sistem</div>
+                        <div class="step-sub">Autentikasi akun</div>
+                    </div>
+                    <div class="step-arrow">→</div>
+                    <div class="step">
+                        <div class="step-icon">📝</div>
+                        <div class="step-label">Input Laporan</div>
+                        <div class="step-sub">Isi konten seksi</div>
+                    </div>
+                    <div class="step-arrow">→</div>
+                    <div class="step">
+                        <div class="step-icon">📎</div>
+                        <div class="step-label">Upload Dokumen</div>
+                        <div class="step-sub">DOCX / PDF</div>
+                    </div>
+                    <div class="step-arrow">→</div>
+                    <div class="step">
+                        <div class="step-icon">📤</div>
+                        <div class="step-label">Submit</div>
+                        <div class="step-sub">Kirim ke sistem</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="connector">↓</div>
+
+        <!-- ─── TAHAP 2 ─── -->
+        <div class="stage stage-2">
+            <div class="stage-header">
+                <div class="stage-icon">🔍</div>
+                <div class="stage-title">
+                    <div class="num">Tahap 2</div>
+                    <h2>Verifikasi</h2>
+                </div>
+                <div class="stage-badge">Super Admin</div>
+            </div>
+            <div class="stage-body">
+                <div class="verify-center">
+                    <div class="admin-box">
+                        🛡️ &nbsp;Super Admin melakukan pengecekan laporan
+                    </div>
+                </div>
+                <div class="branches">
+                    <div class="branch accept">
+                        <div class="branch-icon">✅</div>
+                        <div class="branch-title">DITERIMA</div>
+                        <div class="branch-sub">Laporan sesuai standar<br />Lanjut ke Tahap 3</div>
+                    </div>
+                    <div class="branch reject">
+                        <div class="branch-icon">❌</div>
+                        <div class="branch-title">DITOLAK</div>
+                        <div class="branch-sub">Tidak memenuhi standar</div>
+                        <div class="redirect">↩ Kembali ke Tahap 1 + Catatan Revisi</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="connector">↓</div>
+
+        <!-- ─── TAHAP 3 ─── -->
+        <div class="stage stage-3">
+            <div class="stage-header">
+                <div class="stage-icon">🔗</div>
+                <div class="stage-title">
+                    <div class="num">Tahap 3</div>
+                    <h2>Penggabungan Laporan</h2>
+                </div>
+                <div class="stage-badge">Otomatis</div>
+            </div>
+            <div class="stage-body">
+                <div class="features-grid">
+                    <div class="feature-item">
+                        <div class="fi-icon">📋</div>
+                        <div>
+                            <div class="fi-text">Gabung Semua Laporan</div>
+                            <div class="fi-sub">Seluruh seksi digabung otomatis</div>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="fi-icon">🅷</div>
+                        <div>
+                            <div class="fi-text">Heading Otomatis</div>
+                            <div class="fi-sub">BAB I, II, III tersusun rapi</div>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="fi-icon">📑</div>
+                        <div>
+                            <div class="fi-text">Daftar Isi Auto-Generate</div>
+                            <div class="fi-sub">TOC dibuat secara otomatis</div>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="fi-icon">🔢</div>
+                        <div>
+                            <div class="fi-text">Nomor Halaman Otomatis</div>
+                            <div class="fi-sub">Penomoran presisi di setiap halaman</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="connector">↓</div>
+
+        <!-- ─── TAHAP 4 ─── -->
+        <div class="stage stage-4">
+            <div class="stage-header">
+                <div class="stage-icon">📤</div>
+                <div class="stage-title">
+                    <div class="num">Tahap 4</div>
+                    <h2>Export Dokumen</h2>
+                </div>
+                <div class="stage-badge">Siap Cetak</div>
+            </div>
+            <div class="stage-body">
+                <div class="export-grid">
+                    <div class="export-card word">
+                        <div class="ec-icon">📄</div>
+                        <div class="ec-title">File Word Profesional</div>
+                        <div style="font-size:12px;color:#94a3b8;">Format .docx siap edit</div>
+                        <div class="ec-tags">
+                            <span class="ec-tag">Times New Roman 12pt</span>
+                            <span class="ec-tag">Margin Presisi</span>
+                            <span class="ec-tag">1.5 Spacing</span>
+                        </div>
+                    </div>
+                    <div class="export-card pdf">
+                        <div class="ec-icon">🖨️</div>
+                        <div class="ec-title">PDF Siap Cetak</div>
+                        <div style="font-size:12px;color:#94a3b8;">Format .pdf siap print</div>
+                        <div class="ec-tags">
+                            <span class="ec-tag">A4 Portrait</span>
+                            <span class="ec-tag">Layout Terkunci</span>
+                            <span class="ec-tag">Kualitas Tinggi</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:center;margin-top:16px;">
+                    <span
+                        style="background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;color:#c4b5fd;">
+                        ✨ Struktur Rapi & Presisi — Standar Dokumen Resmi Pemerintah
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── SUMMARY BAR ─── -->
+        <div class="summary-bar">
+            <div class="summary-item">
+                <div class="si-num">4</div>
+                <div class="si-label">Tahapan Alur</div>
+            </div>
+            <div class="summary-item">
+                <div class="si-num">2</div>
+                <div class="si-label">Peran Pengguna</div>
+            </div>
+            <div class="summary-item">
+                <div class="si-num">100%</div>
+                <div class="si-label">Otomatis</div>
+            </div>
+            <div class="summary-item">
+                <div class="si-num">2</div>
+                <div class="si-label">Format Export</div>
+            </div>
+        </div>
+
+        <div style="text-align:center;margin-top:24px;color:#475569;font-size:12px;">
+            HORAS-IM &copy; 2025 — Sistem Informasi Manajemen Imigrasi
+        </div>
+
+    </div>
+</body>
+
+</html>

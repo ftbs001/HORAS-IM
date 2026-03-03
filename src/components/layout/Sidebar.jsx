@@ -97,51 +97,73 @@ const Sidebar = ({ onNavigate, currentView, onLogout }) => {
         )}
 
 
-        {/* 4. Laporan Bulanan (Detailed) */}
-        <div
-          className={`${menuItemClass} justify-between ${currentView.includes('report-input') || currentView === 'monthly-report' ? activeClass : ''}`}
-          onClick={() => setReportOpen(!reportOpen)}
-        >
-          <div className="flex items-center gap-3">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            <span>Laporan Bulanan</span>
-          </div>
-          <svg className={`w-4 h-4 transition-transform ${reportOpen ? 'rotate-180 text-imigrasi-gold' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-        </div>
-        {reportOpen && (
-          <div className="bg-[#0f2440] py-2">
-            <div
-              className={`${subMenuItemClass} ${currentView === 'monthly-report' ? subMenuActive : ''}`}
-              onClick={() => onNavigate('monthly-report')}
-            >
-              <span>Semua Laporan (Master)</span>
-            </div>
-            <div
-              className={`${subMenuItemClass} ${currentView === 'report-input-inteldakim' ? subMenuActive : ''}`}
-              onClick={() => onNavigate('report-input-inteldakim')}
-            >
-              <span>Input Inteldakim</span>
-            </div>
-            <div
-              className={`${subMenuItemClass} ${currentView === 'report-input-lalintalkim' ? subMenuActive : ''}`}
-              onClick={() => onNavigate('report-input-lalintalkim')}
-            >
-              <span>Input Lalintalkim</span>
-            </div>
-            <div
-              className={`${subMenuItemClass} ${currentView === 'report-input-tikim' ? subMenuActive : ''}`}
-              onClick={() => onNavigate('report-input-tikim')}
-            >
-              <span>Input Tikim</span>
-            </div>
-            <div
-              className={`${subMenuItemClass} ${currentView === 'report-input-tu' ? subMenuActive : ''}`}
-              onClick={() => onNavigate('report-input-tu')}
-            >
-              <span>Input Tata Usaha</span>
-            </div>
-          </div>
-        )}
+        {/* 4. Laporan Bulanan (Detailed) — role-aware */}
+        {(() => {
+          // Pemetaan alias seksi → view route
+          const SEKSI_MENU = [
+            { label: 'Input Inteldakim', view: 'report-input-inteldakim', aliases: ['inteldakim'] },
+            { label: 'Input Lalintalkim', view: 'report-input-lalintalkim', aliases: ['lalintalkim'] },
+            { label: 'Input Tikim', view: 'report-input-tikim', aliases: ['tikim'] },
+            { label: 'Input Tata Usaha', view: 'report-input-tu', aliases: ['tu', 'tata usaha', 'tatausaha'] },
+          ];
+
+          // Tentukan sub-menu yang terlihat berdasarkan role
+          let visibleMenus;
+          if (isSuperAdmin) {
+            // Super admin: lihat semua
+            visibleMenus = SEKSI_MENU;
+          } else if (isAdminSeksi) {
+            // Admin seksi: hanya seksinya sendiri
+            const alias = (user?.seksi?.alias || user?.seksi?.name || '').toLowerCase();
+            visibleMenus = SEKSI_MENU.filter(m => m.aliases.some(a => alias.includes(a)));
+          } else {
+            visibleMenus = [];
+          }
+
+          const isReportActive = currentView.includes('report-input') || currentView === 'monthly-report';
+
+          return (
+            <>
+              <div
+                className={`${menuItemClass} justify-between ${isReportActive ? activeClass : ''}`}
+                onClick={() => setReportOpen(!reportOpen)}
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <span>Laporan Bulanan</span>
+                </div>
+                <svg className={`w-4 h-4 transition-transform ${reportOpen ? 'rotate-180 text-imigrasi-gold' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+              {reportOpen && (
+                <div className="bg-[#0f2440] py-2">
+                  {/* "Semua Laporan (Master)" hanya untuk Super Admin */}
+                  {isSuperAdmin && (
+                    <div
+                      className={`${subMenuItemClass} ${currentView === 'monthly-report' ? subMenuActive : ''}`}
+                      onClick={() => onNavigate('monthly-report')}
+                    >
+                      <span>Semua Laporan (Master)</span>
+                    </div>
+                  )}
+                  {visibleMenus.map(m => (
+                    <div
+                      key={m.view}
+                      className={`${subMenuItemClass} ${currentView === m.view ? subMenuActive : ''}`}
+                      onClick={() => onNavigate(m.view)}
+                    >
+                      <span>{m.label}</span>
+                    </div>
+                  ))}
+                  {visibleMenus.length === 0 && (
+                    <div className={`${subMenuItemClass} opacity-50 cursor-default`}>
+                      <span>Tidak ada menu tersedia</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* RBAC: Laporan Bulanan (BARU) */}
         <p className={menuHeaderClass}>Laporan Bulanan</p>

@@ -29,67 +29,119 @@ export const generateProfessionalWordDocument = async ({
 </xml>
 <![endif]-->
 <style>
+/* =====================================================
+   STRICT FORMAT ENFORCEMENT — LOCKED v2
+   Font   : Arial
+   Margin : 2cm all sides
+   Body   : 11pt, 1.5 line-height, justify, black
+   BAB    : 14pt bold center uppercase, thick underline
+   Sub-BAB: 12pt bold left
+   Para   : 6pt after spacing
+   ===================================================== */
 @page { size: A4; margin: 2cm 2cm 2cm 2cm; }
+@page :first { margin: 2cm 2cm 2cm 2cm; }
+
+* { font-family: Arial, sans-serif !important; color: #000 !important; }
 
 body {
-    font-family: 'Arial', sans-serif;
-    font-size: 12pt;
-    line-height: 1.0;
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
     color: #000;
+    text-align: justify;
 }
 
-/* Page breaks */
-.page-break { page-break-after: always; }
+/* ---- Page breaks ---- */
+.page-break { page-break-after: always; clear: both; }
 
-/* Cover Letter - Letterhead Styles */
+/* ---- Letterhead ---- */
 .letterhead-container { font-family: Arial, sans-serif; }
-.letterhead-line-1-3 { font-size: 10pt; font-weight: normal; line-height: 1.3; text-align: center; }
-.letterhead-line-4 { font-size: 11pt; font-weight: bold; line-height: 1.3; text-align: center; }
-.letterhead-line-5 { font-size: 9pt; font-weight: normal; line-height: 1.3; text-align: center; }
-.letterhead-line-6 { font-size: 8pt; font-weight: normal; line-height: 1.3; text-align: center; }
-.letterhead-border { border-bottom: 0.5pt solid #000; margin-bottom: 15pt; }
+.letterhead-line-1-3  { font-size: 10pt; font-weight: normal; line-height: 1.3; text-align: center; }
+.letterhead-line-4    { font-size: 11pt; font-weight: bold;   line-height: 1.3; text-align: center; }
+.letterhead-line-5    { font-size:  9pt; font-weight: normal; line-height: 1.3; text-align: center; }
+.letterhead-line-6    { font-size:  8pt; font-weight: normal; line-height: 1.3; text-align: center; }
+.letterhead-border    { border-bottom: 1pt solid #000; margin-bottom: 15pt; }
 
-.surat-info td { padding: 2pt 0; vertical-align: top; }
-.surat-info .label { width: 80px; }
-.surat-info .colon { width: 10px; }
+.surat-info td        { padding: 2pt 0; vertical-align: top; font-size: 12pt; }
+.surat-info .label    { width: 80px; }
+.surat-info .colon    { width: 10px; }
 
-/* Cover Page */
-.cover-page { text-align: center; padding-top: 80pt; }
-.cover-page .judul-kantor { font-size: 14pt; font-weight: bold; margin-bottom: 50pt; }
-.cover-page .judul-laporan { font-size: 24pt; font-weight: bold; margin-bottom: 20pt; }
-.cover-page .periode { font-size: 18pt; font-weight: bold; margin-bottom: 80pt; }
-.cover-page .footer-instansi { font-size: 11pt; font-weight: bold; line-height: 1.5; margin-top: 100pt; }
+/* ---- Cover Page ---- */
+.cover-page               { text-align: center; padding-top: 80pt; }
+.cover-page .judul-kantor { font-size: 14pt; font-weight: bold; margin-bottom: 50pt; line-height: 1.5; }
+.cover-page .judul-laporan{ font-size: 20pt; font-weight: bold; margin-bottom: 20pt; line-height: 1.5; }
+.cover-page .periode      { font-size: 16pt; font-weight: bold; margin-bottom: 80pt; line-height: 1.5; }
+.cover-page .footer-instansi { font-size: 12pt; font-weight: bold; line-height: 1.5; margin-top: 80pt; }
 
-/* Kata Pengantar */
-.kata-pengantar .judul { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20pt; }
-.kata-pengantar .isi { text-align: justify; text-indent: 40pt; line-height: 1.5; }
+/* ---- Kata Pengantar ---- */
+.kata-pengantar .judul  { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20pt; line-height: 1.5; }
+.kata-pengantar .isi    { text-align: justify; text-indent: 1.25cm; line-height: 1.5; }
 .kata-pengantar .paragraf { margin-bottom: 12pt; }
 
-/* Daftar Isi - COMPACT */
-.daftar-isi { font-size: 12pt; line-height: 1.0; }
-.daftar-isi .judul { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 15pt; }
-.daftar-isi .item { margin: 0; padding: 0; line-height: 1.15; }
-.daftar-isi .level-0 { font-weight: bold; }
-.daftar-isi .level-1 { padding-left: 20px; }
-.daftar-isi .level-2 { padding-left: 40px; }
-.daftar-isi .level-3 { padding-left: 60px; }
-.daftar-isi .level-4 { padding-left: 80px; }
+/* ---- Daftar Isi ---- */
+.daftar-isi            { font-size: 12pt; line-height: 1.2; }
+.daftar-isi .judul     { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 12pt; }
+.daftar-isi .item      { margin: 0; padding: 1pt 0; line-height: 1.2; }
+.daftar-isi .level-0   { font-weight: bold; }
+.daftar-isi .level-1   { padding-left: 1.5em; }
+.daftar-isi .level-2   { padding-left: 3.0em; }
+.daftar-isi .level-3   { padding-left: 4.5em; }
+.daftar-isi .level-4   { padding-left: 6.0em; }
 
-/* Isi Laporan */
-.bab-title { font-weight: bold; font-size: 14pt; text-align: center; margin: 24pt 0 18pt 0; text-transform: uppercase; }
-.section-a { font-weight: bold; font-size: 12pt; margin: 18pt 0 12pt 0; }
-.section-num { font-weight: bold; font-size: 12pt; margin: 12pt 0 8pt 0; }
-.section-alpha { font-size: 12pt; margin: 8pt 0 6pt 0; }
-.content { text-align: justify; margin-bottom: 0; line-height: 1.0; }
-.content p { margin: 0; text-align: justify; line-height: 1.0; }
+/* ---- BAB Title (Heading 1) ---- */
+/* 14pt, Bold, Uppercase, Center, thick bottom border, page-break before */
+.bab-title {
+    font-weight: bold;
+    font-size: 14pt;
+    text-align: center;
+    text-transform: uppercase;
+    border-bottom: 3px solid #000;
+    padding-bottom: 4pt;
+    margin: 0 0 18pt 0;
+    line-height: 1.5;
+    page-break-before: always;
+}
+.bab-title:first-of-type { page-break-before: avoid; }
 
-/* Tanda Tangan */
-.ttd { text-align: right; margin-top: 40pt; }
+/* ---- Sub-BAB (Heading 2) A., B., C. ---- */
+.section-a {
+    font-weight: bold;
+    font-size: 12pt;
+    text-align: left;
+    margin: 12pt 0 4pt 0;
+    line-height: 1.5;
+}
+
+
+/* ---- Sub-Sub-BAB (Heading 3) 1., 2., 3. ---- */
+.section-num {
+    font-weight: bold;
+    font-size: 12pt;
+    text-align: left;
+    margin: 12pt 0 4pt 0;
+    line-height: 1.5;
+}
+
+/* ---- Detail point a., b., c. ---- */
+.section-alpha {
+    font-size: 12pt;
+    text-align: left;
+    margin: 8pt 0 4pt 0;
+    line-height: 1.5;
+}
+
+/* ---- Body content ---- */
+.content    { text-align: justify; margin-bottom: 6pt; line-height: 1.5; text-indent: 1.25cm; }
+.content p  { margin: 0 0 6pt 0; text-align: justify; line-height: 1.5; text-indent: 1.25cm; }
+
+
+/* ---- Signature ---- */
+.ttd          { text-align: right; margin-top: 40pt; }
 .ttd .jabatan { margin-bottom: 60pt; }
-.ttd .nama { font-weight: bold; }
+.ttd .nama    { font-weight: bold; }
 
-table { border-collapse: collapse; }
-td, th { padding: 3pt; vertical-align: top; }
+table  { border-collapse: collapse; width: 100%; }
+td, th { padding: 4pt 6pt; vertical-align: top; font-size: 12pt; }
 </style>
 </head>
 <body>`;

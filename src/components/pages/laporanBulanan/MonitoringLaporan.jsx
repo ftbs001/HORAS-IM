@@ -7,6 +7,27 @@ const BULAN_NAMES = [
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
 
+// ── Deduplicate sections by normalized name ──────────────────────────────────
+// Strips "Seksi" / "Subbag" prefix then groups by lowercased name.
+// Keeps the row with the highest data score (staff + programs + performance).
+const normalizeName = (name = '') =>
+    name.toLowerCase().trim()
+        .replace(/^seksi\s+/i, '')
+        .replace(/^subbag(ian)?\s+/i, '');
+
+const sectionScore = (r) =>
+    (Number(r.staff) || 0) + (Number(r.programs) || 0) + (Number(r.performance) || 0);
+
+const dedupSections = (rows = []) => {
+    const map = new Map();
+    rows.forEach(r => {
+        const key = normalizeName(r.name);
+        const prev = map.get(key);
+        if (!prev || sectionScore(r) > sectionScore(prev)) map.set(key, r);
+    });
+    return Array.from(map.values());
+};
+
 const STATUS_COLOR = {
     'Draft': { bg: '#dbeafe', text: '#1d4ed8' },
     'Dikirim': { bg: '#fef9c3', text: '#854d0e' },
@@ -41,7 +62,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                 .eq('bulan', bulan)
                 .eq('tahun', tahun)
         ]);
-        setSections(sec || []);
+        setSections(dedupSections(sec || []));
         setLaporan(lap || []);
         setLoading(false);
     }, [bulan, tahun]);
@@ -99,6 +120,79 @@ export default function MonitoringLaporan({ onNavigate }) {
         } finally {
             setProcessing(false);
         }
+    };
+
+    // ---- Paksa Submit (Draft → Dikirim) ----
+    const handlePaksaSubmit = async (l) => {
+        if (!window.confirm('Paksa status laporan ini menjadi "Dikirim" agar bisa di-review?')) return;
+        setProcessing(true);
+        try {
+            const { error } = await supabase.from('laporan_bulanan')
+                .update({ status: 'Dikirim', submitted_at: new Date().toISOString() })
+                .eq('id', l.id);
+            if (error) throw error;
+            showMsg('success', 'Laporan berhasil dipindah ke status Dikirim.');
+            await loadData();
+        } catch (err) {
+            showMsg('error', err.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    // ---- Render action buttons per status ----
+    const renderActions = (l) => {
+        if (!l || l.final_locked) {
+            return <span style={{ fontSize: '12px', color: '#7e22ce', fontWeight: 600 }}>🔒 Final</span>;
+        }
+        if (l.status === 'Draft') {
+            return (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => openReview(l, 'approve')}
+                        title="Setujui langsung meski masih Draft"
+                        style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        ✅ Setujui
+                    </button>
+                    <button
+                        onClick={() => handlePaksaSubmit(l)}
+                        title="Ubah status menjadi Dikirim"
+                        style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        📤 Submit
+                    </button>
+                </div>
+            );
+        }
+        if (l.status === 'Dikirim' || l.status === 'Perlu Revisi') {
+            return (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => openReview(l, 'approve')}
+                        style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        ✅ Setujui
+                    </button>
+                    <button
+                        onClick={() => openReview(l, 'revisi')}
+                        style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        🔄 Revisi
+                    </button>
+                </div>
+            );
+        }
+        if (l.status === 'Disetujui') {
+            return (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 600 }}>✅ Disetujui</span>
+                    <button
+                        onClick={() => openReview(l, 'revisi')}
+                        title="Batalkan persetujuan dan minta revisi"
+                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: '11px', cursor: 'pointer' }}>
+                        ↩ Revisi
+                    </button>
+                </div>
+            );
+        }
+        return <span style={{ fontSize: '12px', color: '#94a3b8' }}>—</span>;
     };
 
     // ---- Finalisasi ----
@@ -251,19 +345,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                                                 {l?.catatan_revisi || '-'}
                                             </td>
                                             <td style={{ padding: '12px' }}>
-                                                {l && l.status === 'Dikirim' && !l.final_locked && (
-                                                    <div style={{ display: 'flex', gap: '6px' }}>
-                                                        <button onClick={() => openReview(l, 'approve')}
-                                                            style={{ padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                                                            ✅ Setujui
-                                                        </button>
-                                                        <button onClick={() => openReview(l, 'revisi')}
-                                                            style={{ padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                                                            🔄 Revisi
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {l?.status === 'Final' && <span style={{ fontSize: '12px', color: '#7e22ce' }}>🔒 Final</span>}
+                                                {l ? renderActions(l) : <span style={{ fontSize: '12px', color: '#94a3b8' }}>Belum Upload</span>}
                                             </td>
                                         </tr>
                                     );
@@ -277,7 +359,7 @@ export default function MonitoringLaporan({ onNavigate }) {
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <button
-                    onClick={() => onNavigate('gabung-laporan')}
+                    onClick={() => onNavigate('gabung-laporan', { bulan, tahun })}
                     disabled={!semuaDisetujui || sudahFinal || sections.length === 0}
                     style={{
                         padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, fontSize: '15px',
@@ -313,9 +395,22 @@ export default function MonitoringLaporan({ onNavigate }) {
                         background: '#fff', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '480px',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
                     }}>
-                        <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 700 }}>
+                        <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700 }}>
                             {reviewModal.action === 'approve' ? '✅ Setujui Laporan' : '🔄 Minta Revisi'}
                         </h3>
+                        <div style={{ marginBottom: '16px', fontSize: '13px', color: '#64748b' }}>
+                            Seksi: <strong style={{ color: '#1e293b' }}>
+                                {sections.find(s => s.id === reviewModal.laporan.seksi_id)?.name || '—'}
+                            </strong>
+                            {' · '}Status saat ini:
+                            <span style={{
+                                marginLeft: '4px', padding: '1px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600,
+                                background: STATUS_COLOR[reviewModal.laporan.status]?.bg,
+                                color: STATUS_COLOR[reviewModal.laporan.status]?.text,
+                            }}>
+                                {reviewModal.laporan.status}
+                            </span>
+                        </div>
 
                         {reviewModal.action === 'revisi' && (
                             <div style={{ marginBottom: '16px' }}>
@@ -336,9 +431,9 @@ export default function MonitoringLaporan({ onNavigate }) {
                         )}
 
                         {reviewModal.action === 'approve' && (
-                            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px' }}>
-                                Laporan akan ditandai sebagai <strong>Disetujui</strong>.
-                                Pastikan Anda sudah mereviw isi laporan sebelum menyetujui.
+                            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px', lineHeight: '1.6' }}>
+                                Laporan akan ditandai sebagai <strong>Disetujui</strong>. Tindakan ini dapat dibatalkan
+                                dengan memilih <em>↩ Revisi</em> pada baris laporan jika diperlukan koreksi.
                             </p>
                         )}
 

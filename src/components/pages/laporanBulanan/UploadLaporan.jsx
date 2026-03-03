@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useNotification } from '../../../contexts/NotificationContext';
+import { processImageToBlock } from '../../../utils/imageUploadService';
+import { quickCheckContentJson } from '../../../utils/imageValidator';
 
 const BULAN_NAMES = [
     '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -19,6 +22,7 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc'];
 
 export default function UploadLaporan() {
     const { user } = useAuth();
+    const { fetchLaporanNotifs } = useNotification();
     const [laporan, setLaporan] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -30,6 +34,13 @@ export default function UploadLaporan() {
     const [resolvedSeksiId, setResolvedSeksiId] = useState(null);
     const [resolvedSeksiName, setResolvedSeksiName] = useState('');
     const fileRef = useRef();
+    const imageRef = useRef();
+    const uploadSectionRef = useRef();
+
+    // ── content_json state (stores images as base64 blocks) ──────────────────
+    const [contentJson, setContentJson] = useState({ version: '2.0', blocks: [] });
+    const [imageCaption, setImageCaption] = useState('');
+    const [addingImage, setAddingImage] = useState(false);
 
     // ---- Resolve seksiId sekali saat mount ----
     // Prioritas: user.seksiId dari DB (string dgn angka) → query DB berdasarkan alias
@@ -114,6 +125,31 @@ export default function UploadLaporan() {
         setSelectedFile(file);
     };
 
+    // ── Add image to content_json ────────────────────────────────────────────
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setAddingImage(true);
+        const { block, error } = await processImageToBlock(file, resolvedSeksiName, imageCaption);
+        if (error) {
+            showMsg('error', `❌ Gambar gagal: ${error}`);
+        } else {
+            setContentJson(prev => ({ ...prev, blocks: [...prev.blocks, block] }));
+            setImageCaption('');
+            showMsg('success', `✅ Gambar "${file.name}" ditambahkan ke laporan.`);
+        }
+        e.target.value = '';
+        setAddingImage(false);
+    };
+
+    // ── Remove image block by index ─────────────────────────────────────────
+    const handleRemoveImage = (idx) => {
+        setContentJson(prev => ({
+            ...prev,
+            blocks: prev.blocks.filter((_, i) => i !== idx),
+        }));
+    };
+
     // ---- Upload (pakai UPSERT agar aman jika sudah ada record) ----
     const handleUpload = async () => {
         if (!selectedFile) return showMsg('error', 'Pilih file terlebih dahulu.');
@@ -162,6 +198,7 @@ export default function UploadLaporan() {
                     file_size: selectedFile.size,
                     file_type: ext,
                     status: newStatus,
+                    content_json: contentJson,     // ← gambar base64 tersimpan permanen
                     catatan_revisi: newStatus === 'Draft' ? null : laporanBulanIni?.catatan_revisi,
                     submitted_by: user?.id || null,
                     updated_at: new Date().toISOString(),
@@ -185,11 +222,19 @@ export default function UploadLaporan() {
             setSelectedFile(null);
             if (fileRef.current) fileRef.current.value = '';
             await loadLaporan(resolvedSeksiId);
+            // Refresh notif bell setelah upload
+            if (user) fetchLaporanNotifs(user);
         } catch (err) {
             showMsg('error', `Upload gagal: ${err.message}`);
         } finally {
             setUploading(false);
         }
+    };
+
+    // ---- Scroll ke form upload & buka file picker ----
+    const handleRevisiSekarang = () => {
+        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => fileRef.current?.click(), 400);
     };
 
     // ---- Submit untuk review ----
@@ -219,6 +264,7 @@ export default function UploadLaporan() {
 
             showMsg('success', 'Laporan berhasil dikirim untuk di-review!');
             await loadLaporan(resolvedSeksiId);
+            if (user) fetchLaporanNotifs(user);
         } catch (err) {
             showMsg('error', `Gagal kirim: ${err.message}`);
         } finally {
@@ -266,13 +312,72 @@ export default function UploadLaporan() {
                 </div>
             )}
 
+            {/* ── Banner Revisi Mencolok ── */}
+            {laporanBulanIni?.status === 'Perlu Revisi' && laporanBulanIni.catatan_revisi && (
+                <div style={{
+                    padding: '20px 24px', borderRadius: '12px', marginBottom: '20px',
+                    background: 'linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%)',
+                    border: '2px solid #f87171',
+                    boxShadow: '0 4px 12px rgba(239,68,68,0.12)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                        <div style={{
+                            width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
+                            background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '22px',
+                        }}>🔄</div>
+                        <div style={{ flex: 1 }}>
+                            <p style={{ fontWeight: 700, fontSize: '15px', color: '#b91c1c', margin: '0 0 6px' }}>
+                                Laporan Memerlukan Revisi
+                            </p>
+                            <div style={{
+                                background: '#fff', border: '1px solid #fca5a5', borderRadius: '8px',
+                                padding: '12px 14px', marginBottom: '14px',
+                            }}>
+                                <p style={{ fontSize: '12px', color: '#9a3412', fontWeight: 600, margin: '0 0 4px' }}>📝 Catatan dari Super Admin:</p>
+                                <p style={{ fontSize: '14px', color: '#7f1d1d', lineHeight: 1.65, margin: 0 }}>
+                                    {laporanBulanIni.catatan_revisi}
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={handleRevisiSekarang}
+                                    style={{
+                                        padding: '10px 20px', borderRadius: '8px', border: 'none',
+                                        background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: '14px',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                                        boxShadow: '0 2px 8px rgba(220,38,38,0.3)',
+                                    }}
+                                >
+                                    ⬆️ Revisi &amp; Upload Ulang
+                                </button>
+                                {laporanBulanIni?.file_url && (
+                                    <a
+                                        href={laporanBulanIni.file_url}
+                                        target="_blank" rel="noreferrer"
+                                        style={{
+                                            padding: '10px 16px', borderRadius: '8px',
+                                            border: '1px solid #fca5a5', background: '#fff',
+                                            color: '#b91c1c', fontWeight: 600, fontSize: '14px',
+                                            textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'
+                                        }}
+                                    >
+                                        👁️ Lihat File Lama
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Form Upload */}
-            <div style={{
+            <div ref={uploadSectionRef} style={{
                 background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
                 padding: '24px', marginBottom: '28px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
             }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>
-                    Upload Laporan Baru
+                    {laporanBulanIni?.status === 'Perlu Revisi' ? '⬆️ Upload Revisi Laporan' : 'Upload Laporan Baru'}
                 </h2>
 
                 {/* Bulan & Tahun */}
@@ -326,14 +431,13 @@ export default function UploadLaporan() {
                     </div>
                 )}
 
-                {/* Catatan revisi */}
-                {laporanBulanIni?.status === 'Perlu Revisi' && laporanBulanIni.catatan_revisi && (
+                {/* Catatan revisi ringkas di dalam form */}
+                {laporanBulanIni?.status === 'Perlu Revisi' && (
                     <div style={{
-                        padding: '12px 16px', borderRadius: '8px', marginBottom: '16px',
-                        background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '14px', color: '#9a3412'
+                        padding: '10px 14px', borderRadius: '8px', marginBottom: '12px',
+                        background: '#fef2f2', border: '1px solid #fca5a5', fontSize: '13px', color: '#b91c1c'
                     }}>
-                        <strong>📝 Catatan Revisi dari Super Admin:</strong>
-                        <p style={{ margin: '6px 0 0', lineHeight: 1.6 }}>{laporanBulanIni.catatan_revisi}</p>
+                        ⚠️ Upload file revisi di bawah ini, lalu klik <strong>Kirim Ulang</strong> untuk mengirim kembali ke Super Admin.
                     </div>
                 )}
 
@@ -393,12 +497,13 @@ export default function UploadLaporan() {
                             style={{
                                 padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 600,
                                 fontSize: '14px',
-                                background: submitting ? '#94a3b8' : '#16a34a',
+                                background: submitting ? '#94a3b8' : laporanBulanIni.status === 'Perlu Revisi' ? '#dc2626' : '#16a34a',
                                 color: '#fff',
                                 cursor: submitting ? 'not-allowed' : 'pointer',
+                                boxShadow: laporanBulanIni.status === 'Perlu Revisi' ? '0 2px 8px rgba(220,38,38,0.3)' : 'none',
                             }}
                         >
-                            {submitting ? '⏳ Mengirim...' : '📨 Kirim untuk Review'}
+                            {submitting ? '⏳ Mengirim...' : laporanBulanIni.status === 'Perlu Revisi' ? '📨 Kirim Ulang Revisi' : '📨 Kirim untuk Review'}
                         </button>
                     )}
 
@@ -416,6 +521,131 @@ export default function UploadLaporan() {
                         </a>
                     )}
                 </div>
+            </div>
+
+            {/* ── Lampiran Foto / Gambar ─────────────────────────────────────── */}
+            <div style={{
+                background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
+                padding: '24px', marginBottom: '28px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                        🖼️ Lampiran Foto & Gambar
+                        {contentJson.blocks.length > 0 && (
+                            <span style={{
+                                marginLeft: '10px', padding: '2px 10px', borderRadius: '99px',
+                                background: '#dcfce7', color: '#15803d', fontSize: '12px', fontWeight: 700,
+                            }}>
+                                {contentJson.blocks.length} gambar
+                            </span>
+                        )}
+                    </h2>
+                    <button
+                        onClick={() => imageRef.current?.click()}
+                        disabled={addingImage || !resolvedSeksiId}
+                        style={{
+                            padding: '8px 16px', borderRadius: '8px', border: 'none',
+                            background: addingImage || !resolvedSeksiId ? '#e2e8f0' : '#2563eb',
+                            color: addingImage || !resolvedSeksiId ? '#94a3b8' : '#fff',
+                            fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                        }}>
+                        {addingImage ? '⏳ Memproses...' : '➕ Tambah Gambar'}
+                    </button>
+                </div>
+
+                {/* Hidden file input — image only */}
+                <input
+                    ref={imageRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                    style={{ display: 'none' }}
+                    onChange={handleImageUpload}
+                />
+
+                {/* Caption input — filled before clicking "Tambah Gambar" */}
+                <div style={{ marginBottom: '14px' }}>
+                    <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                        Keterangan gambar (opsional) — isi sebelum klik Tambah Gambar
+                    </label>
+                    <input
+                        type="text"
+                        value={imageCaption}
+                        onChange={e => setImageCaption(e.target.value)}
+                        placeholder="Contoh: Kegiatan razia WNA di Simalungun"
+                        style={{
+                            width: '100%', padding: '8px 12px', borderRadius: '8px',
+                            border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box',
+                        }}
+                    />
+                </div>
+
+                {/* Info */}
+                <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
+                    Format: PNG, JPG, WEBP, GIF · Maks. 5 MB per gambar ·
+                    Gambar disimpan permanen (base64) — tidak akan hilang saat export Word/PDF.
+                </p>
+
+                {/* Thumbnail grid */}
+                {contentJson.blocks.length === 0 ? (
+                    <div style={{
+                        border: '2px dashed #e2e8f0', borderRadius: '10px', padding: '28px',
+                        textAlign: 'center', color: '#94a3b8', fontSize: '13px',
+                    }}>
+                        📷 Belum ada gambar. Klik <strong>Tambah Gambar</strong> untuk menambahkan foto ke laporan.
+                    </div>
+                ) : (
+                    <div style={{
+                        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                        gap: '14px',
+                    }}>
+                        {contentJson.blocks.map((block, idx) => (
+                            <div key={block.id || idx} style={{
+                                border: '1px solid #e2e8f0', borderRadius: '10px',
+                                overflow: 'hidden', position: 'relative',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                            }}>
+                                <img
+                                    src={block.base64}
+                                    alt={block.caption || block.metadata?.filename || 'Gambar'}
+                                    style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }}
+                                />
+                                <div style={{ padding: '8px' }}>
+                                    {block.caption && (
+                                        <p style={{ fontSize: '11px', color: '#475569', margin: '0 0 4px', fontStyle: 'italic' }}>
+                                            {block.caption}
+                                        </p>
+                                    )}
+                                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: '0 0 6px', wordBreak: 'break-all' }}>
+                                        {block.metadata?.filename}
+                                        {' · '}
+                                        {block.metadata?.size_bytes
+                                            ? `${(block.metadata.size_bytes / 1024).toFixed(0)} KB`
+                                            : ''}
+                                    </p>
+                                    <button
+                                        onClick={() => handleRemoveImage(idx)}
+                                        style={{
+                                            width: '100%', padding: '4px', borderRadius: '6px',
+                                            border: '1px solid #fca5a5', background: '#fff1f2',
+                                            color: '#b91c1c', fontSize: '12px', fontWeight: 600,
+                                            cursor: 'pointer',
+                                        }}>
+                                        🗑️ Hapus
+                                    </button>
+                                </div>
+                                {/* Corner badge */}
+                                <div style={{
+                                    position: 'absolute', top: '6px', right: '6px',
+                                    background: '#16a34a', color: '#fff', borderRadius: '99px',
+                                    fontSize: '10px', fontWeight: 700, padding: '2px 7px',
+                                }}>
+                                    ✅ Tersimpan
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Riwayat Laporan */}
@@ -482,21 +712,23 @@ export default function UploadLaporan() {
                                                     👁️ Lihat
                                                 </a>
                                             )}
-                                            {/* Hanya bisa re-upload jika Draft/Perlu Revisi dan tidak terkunci */}
+                                            {/* Re-upload jika Draft/Perlu Revisi */}
                                             {['Draft', 'Perlu Revisi'].includes(l.status) && !l.final_locked && (
                                                 <button
                                                     onClick={() => {
                                                         setSelectedBulan(l.bulan);
                                                         setSelectedTahun(l.tahun);
-                                                        setTimeout(() => fileRef.current?.click(), 100);
+                                                        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                        setTimeout(() => fileRef.current?.click(), 400);
                                                     }}
                                                     style={{
-                                                        padding: '3px 10px', borderRadius: '6px', border: 'none',
-                                                        background: '#f1f5f9', color: '#64748b', fontSize: '12px',
-                                                        cursor: 'pointer', fontWeight: 600
+                                                        padding: '4px 12px', borderRadius: '6px', border: 'none',
+                                                        background: l.status === 'Perlu Revisi' ? '#fee2e2' : '#f1f5f9',
+                                                        color: l.status === 'Perlu Revisi' ? '#b91c1c' : '#64748b',
+                                                        fontSize: '12px', cursor: 'pointer', fontWeight: 700
                                                     }}
                                                 >
-                                                    🔄 Ganti
+                                                    {l.status === 'Perlu Revisi' ? '🔄 Revisi' : '🔄 Ganti'}
                                                 </button>
                                             )}
                                         </td>

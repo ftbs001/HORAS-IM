@@ -1,6 +1,10 @@
 /**
  * Image Handler for DOCX Export
  * Properly embeds images as ArrayBuffer for reliable display
+ *
+ * v2 additions:
+ *  - base64ToArrayBuffer(): converts content_json base64 → ArrayBuffer for ImageRun
+ *  - scaleToMaxWidth(): preserves aspect ratio with a max-width constraint (pixels)
  */
 
 import { ImageRun } from 'docx';
@@ -135,9 +139,59 @@ export const extractImagesFromHtml = async (htmlContent) => {
     return { text, images };
 };
 
+/**
+ * Convert a base64 data URL (from content_json) to ArrayBuffer.
+ * Used by docxExporter to embed image blocks as ImageRun.
+ *
+ * @param {string} base64DataUrl - e.g. "data:image/png;base64,iVBOR..."
+ * @returns {ArrayBuffer|null}
+ */
+export const base64ToArrayBuffer = (base64DataUrl) => {
+    if (!base64DataUrl || !base64DataUrl.includes(',')) return null;
+    try {
+        const base64 = base64DataUrl.split(',')[1];
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes.buffer;
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Extract MIME type from a base64 data URL.
+ * @param {string} base64DataUrl
+ * @returns {string} e.g. 'png', 'jpeg'
+ */
+export const getMimeFromBase64 = (base64DataUrl = '') => {
+    const m = base64DataUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
+    const raw = m ? m[1] : 'png';
+    return raw === 'jpg' ? 'jpeg' : raw; // normalize jpg → jpeg for ImageRun
+};
+
+/**
+ * Scale image dimensions to fit within a maximum pixel width,
+ * preserving the original aspect ratio.
+ *
+ * @param {number} origW  - Original width in pixels
+ * @param {number} origH  - Original height in pixels
+ * @param {number} maxW   - Maximum allowed width in EMU (from cm())
+ * @returns {{ width: number, height: number }} Scaled dimensions
+ */
+export const scaleToMaxWidth = (origW, origH, maxW) => {
+    if (!origW || !origH) return { width: maxW, height: Math.round(maxW * 0.75) }; // 4:3 fallback
+    if (origW <= maxW) return { width: origW, height: origH };
+    const ratio = origH / origW;
+    return { width: maxW, height: Math.round(maxW * ratio) };
+};
+
 export default {
     fetchImageAsArrayBuffer,
     createImageRun,
     loadLogo,
     extractImagesFromHtml,
+    base64ToArrayBuffer,
+    getMimeFromBase64,
+    scaleToMaxWidth,
 };
