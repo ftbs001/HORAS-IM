@@ -18,7 +18,7 @@ import Members from './components/pages/Members';
 import SectionData from './components/pages/SectionData';
 import WorkProgramInput from './components/pages/WorkProgramInput';
 import MonthlyReport from './components/pages/MonthlyReport';
-import PolicyBriefEditor from './components/pages/PolicyBriefEditor';
+
 import VerificationDashboard from './components/pages/VerificationDashboard';
 import Archive from './components/pages/Archive';
 
@@ -38,8 +38,9 @@ import { getViewDisplayName } from './utils/viewNameMap';
 import { ProgramProvider } from './contexts/ProgramContext';
 import { ReportProvider } from './contexts/ReportContext';
 import { SectionProvider } from './contexts/SectionContext';
-import { PolicyBriefProvider } from './contexts/PolicyBriefContext';
+
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LaporanProvider } from './contexts/LaporanContext';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -122,8 +123,6 @@ function AppContent() {
       case 'report-input-tu': return <MonthlyReport sectionFilter="tata_usaha" />;
 
       // ---- Lainnya ----
-      case 'policy-brief': return <PolicyBriefEditor />;
-      case 'write-report': return <PolicyBriefEditor />;
       case 'verification': return <VerificationDashboard onNavigate={handleNavigate} />;
       case 'archive': return <Archive />;
 
@@ -153,15 +152,15 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <NotificationProvider>
-          <SectionProvider>
-            <ProgramProvider>
-              <ReportProvider>
-                <PolicyBriefProvider>
+          <LaporanProvider>
+            <SectionProvider>
+              <ProgramProvider>
+                <ReportProvider>
                   <AppContent />
-                </PolicyBriefProvider>
-              </ReportProvider>
-            </ProgramProvider>
-          </SectionProvider>
+                </ReportProvider>
+              </ProgramProvider>
+            </SectionProvider>
+          </LaporanProvider>
         </NotificationProvider>
       </AuthProvider>
     </ErrorBoundary>

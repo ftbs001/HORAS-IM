@@ -2,9 +2,17 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNotification } from '../../../contexts/NotificationContext';
+import { useLaporan } from '../../../contexts/LaporanContext';
 import { processImageToBlock } from '../../../utils/imageUploadService';
-import { quickCheckContentJson } from '../../../utils/imageValidator';
+import { parseDocxFile } from '../../../utils/docxParser';
+import { validateDocxFile } from '../../../utils/docxValidator';
+import { parseDocxStructured } from '../../../utils/docxStructuredParser';
+import { parsePdfStructured } from '../../../utils/pdfStructuredParser';
+import DocxPreviewRenderer from '../../common/DocxPreviewRenderer';
+import PagedDocumentViewer from '../../common/PagedDocumentViewer';
+import PagedDocumentEditor from '../../common/PagedDocumentEditor';
 
+/* ── Constants ─────────────────────────────────────────────────────────────── */
 const BULAN_NAMES = [
     '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -18,58 +26,315 @@ const STATUS_COLOR = {
     'Final': { bg: '#f3e8ff', text: '#7e22ce' },
 };
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc'];
+/* ── Msg helper ─────────────────────────────────────────────────────────── */
+const useMsg = () => {
+    const [msg, setMsg] = useState(null);
+    const show = useCallback((type, text) => {
+        setMsg({ type, text });
+        setTimeout(() => setMsg(null), 7000);
+    }, []);
+    return [msg, show];
+};
 
+/* ── Modal Preview ───────────────────────────────────────────────────────── */
+function PreviewModal({ laporan, onClose }) {
+    const [tab, setTab] = useState('structured');
+    const isPdf = laporan?.file_type === 'pdf';
+    const isDocx = ['docx', 'doc'].includes(laporan?.file_type || '');
+    const hasStructured = !!laporan?.structured_json?.pages?.length;
+    const hasDocxHtml = !!laporan?.docx_html;
+
+    const tabBtn = (id, label, active) => (
+        <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+                padding: '6px 14px',
+                borderRadius: '6px 6px 0 0',
+                border: 'none',
+                borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
+                background: active ? '#eff6ff' : 'transparent',
+                color: active ? '#1d4ed8' : '#64748b',
+                fontWeight: active ? 700 : 500,
+                cursor: 'pointer',
+                fontSize: '13px',
+            }}
+        >
+            {label}
+        </button>
+    );
+
+    const tabs = [];
+    if (hasStructured) tabs.push({ id: 'structured', label: '🖥 Halaman' });
+    if (hasDocxHtml && isDocx) tabs.push({ id: 'html', label: '📄 HTML Preview' });
+    if (isPdf) tabs.push({ id: 'pdf', label: '📑 PDF' });
+    if (!tabs.length) tabs.push({ id: 'fallback', label: '⬇ Download' });
+
+    const activeTab = tabs.find(t => t.id === tab)?.id || tabs[0]?.id;
+
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 2000, padding: '16px',
+        }}>
+            <div style={{
+                background: '#fff', borderRadius: '16px', width: '100%',
+                maxWidth: '1200px', maxHeight: '94vh', display: 'flex',
+                flexDirection: 'column', overflow: 'hidden',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+            }}>
+                {/* Header */}
+                <div style={{
+                    padding: '14px 20px', borderBottom: '1px solid #e2e8f0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    flexWrap: 'wrap', gap: '8px',
+                }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
+                            👁️ Preview — {laporan?.judul_laporan || laporan?.file_name}
+                        </h3>
+                        <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#64748b' }}>
+                            {BULAN_NAMES[laporan?.bulan]} {laporan?.tahun} ·{' '}
+                            {laporan?.file_type?.toUpperCase()} ·{' '}
+                            {laporan?.file_size ? `${(laporan.file_size / 1024).toFixed(0)} KB` : ''}
+                            {hasStructured && ` · ${laporan.structured_json.pages.length} halaman`}
+                        </p>
+                    </div>
+                    <button onClick={onClose} style={{
+                        width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                        background: '#f8fafc', cursor: 'pointer', fontSize: '18px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>×</button>
+                </div>
+
+                {/* Tabs */}
+                {tabs.length > 1 && (
+                    <div style={{
+                        display: 'flex', gap: '4px', padding: '0 16px',
+                        borderBottom: '1px solid #e2e8f0', background: '#f8fafc',
+                    }}>
+                        {tabs.map(t => tabBtn(t.id, t.label, activeTab === t.id))}
+                    </div>
+                )}
+
+                {/* Body */}
+                <div style={{ flex: 1, overflow: 'auto' }}>
+                    {activeTab === 'structured' && hasStructured && (
+                        <div style={{ padding: '16px' }}>
+                            <PagedDocumentViewer
+                                structuredJson={laporan.structured_json}
+                                maxHeight="76vh"
+                                showPageNumbers={true}
+                            />
+                        </div>
+                    )}
+                    {activeTab === 'html' && hasDocxHtml && (
+                        <div style={{ padding: '16px' }}>
+                            <DocxPreviewRenderer
+                                html={laporan.docx_html}
+                                styleMetadata={laporan.docx_meta || {}}
+                                preserveLayout={laporan.preserve_layout !== false}
+                                maxHeight="76vh"
+                                showToolbar={true}
+                            />
+                        </div>
+                    )}
+                    {activeTab === 'pdf' && isPdf && (
+                        <iframe
+                            src={laporan.file_url}
+                            style={{ width: '100%', height: '78vh', border: 'none' }}
+                            title="Preview PDF"
+                        />
+                    )}
+                    {activeTab === 'fallback' && (
+                        <div style={{
+                            padding: '40px', textAlign: 'center',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+                        }}>
+                            <div style={{ fontSize: '64px' }}>📄</div>
+                            <p style={{ fontSize: '15px', color: '#475569', margin: 0 }}>
+                                File <strong>{laporan?.file_type?.toUpperCase()}</strong>
+                                {isDocx ? ' belum diparse untuk preview inline.' : ' tidak dapat di-preview langsung.'}
+                            </p>
+                            <a
+                                href={laporan?.file_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                    padding: '12px 24px', borderRadius: '10px', border: 'none',
+                                    background: '#2563eb', color: '#fff', fontWeight: 700,
+                                    fontSize: '14px', textDecoration: 'none', cursor: 'pointer',
+                                }}
+                            >
+                                ⬇️ Download &amp; Buka File
+                            </a>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+/* ── Modal Hapus Konfirmasi ───────────────────────────────────────────────── */
+function HapusModal({ laporan, onConfirm, onCancel, loading }) {
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000,
+        }}>
+            <div style={{
+                background: '#fff', borderRadius: '16px', padding: '28px',
+                maxWidth: '420px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}>
+                <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '12px' }}>🗑️</div>
+                <h3 style={{ textAlign: 'center', margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
+                    Hapus Laporan?
+                </h3>
+                <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px', marginBottom: '20px' }}>
+                    Laporan <strong>{laporan?.judul_laporan || laporan?.file_name}</strong><br />
+                    ({BULAN_NAMES[laporan?.bulan]} {laporan?.tahun}) akan dihapus permanent.<br />
+                    File di storage juga akan dihapus.
+                </p>
+                <div style={{
+                    background: '#fff7ed', border: '1px solid #fed7aa',
+                    borderRadius: '8px', padding: '10px 14px', marginBottom: '20px',
+                    fontSize: '13px', color: '#9a3412',
+                }}>
+                    ⚠️ Tindakan ini tidak dapat dibatalkan.
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={onCancel} style={{
+                        padding: '10px 20px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                        background: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '14px',
+                    }}>
+                        Batal
+                    </button>
+                    <button onClick={onConfirm} disabled={loading} style={{
+                        padding: '10px 20px', borderRadius: '8px', border: 'none',
+                        background: loading ? '#94a3b8' : '#dc2626', color: '#fff',
+                        fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontSize: '14px',
+                    }}>
+                        {loading ? '⏳ Menghapus...' : '🗑️ Ya, Hapus'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+══════════════════════════════════════════════════════════════════════════════ */
 export default function UploadLaporan() {
     const { user } = useAuth();
     const { fetchLaporanNotifs } = useNotification();
+    const {
+        uploadLaporan: ctxUpload,
+        editLaporan: ctxEdit,
+        hapusLaporan: ctxHapus,
+        submitLaporan: ctxSubmit,
+        loadLaporanBySeksi,
+        subscribe,
+    } = useLaporan();
+
+    /* ── Local state ─────────────────────────────────────────────────────── */
     const [laporan, setLaporan] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [msg, setMsg] = useState(null);
+    const [resolvedSeksiId, setResolvedSeksiId] = useState(null);
+    const [resolvedSeksiName, setResolvedSeksiName] = useState('');
     const [selectedBulan, setSelectedBulan] = useState(new Date().getMonth() + 1);
     const [selectedTahun, setSelectedTahun] = useState(new Date().getFullYear());
     const [selectedFile, setSelectedFile] = useState(null);
-    const [resolvedSeksiId, setResolvedSeksiId] = useState(null);
-    const [resolvedSeksiName, setResolvedSeksiName] = useState('');
-    const fileRef = useRef();
-    const imageRef = useRef();
-    const uploadSectionRef = useRef();
-
-    // ── content_json state (stores images as base64 blocks) ──────────────────
+    const [judulLaporan, setJudulLaporan] = useState('');
     const [contentJson, setContentJson] = useState({ version: '2.0', blocks: [] });
     const [imageCaption, setImageCaption] = useState('');
     const [addingImage, setAddingImage] = useState(false);
 
-    // ---- Resolve seksiId sekali saat mount ----
-    // Prioritas: user.seksiId dari DB (string dgn angka) → query DB berdasarkan alias
+    // Edit mode
+    const [editMode, setEditMode] = useState(false);  // id of laporan being edited
+    const [editFile, setEditFile] = useState(null);
+    const [editJudul, setEditJudul] = useState('');
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    // Modals
+    const [previewTarget, setPreviewTarget] = useState(null);
+    const [hapusTarget, setHapusTarget] = useState(null);
+    const [hapusLoading, setHapusLoading] = useState(false);
+
+    const [msg, showMsg] = useMsg();
+    const fileRef = useRef();
+    const editFileRef = useRef();
+    const [parsedDocx, setParsedDocx] = useState(null);
+    const [docxValidation, setDocxValidation] = useState(null);
+    const [parsingDocx, setParsingDocx] = useState(false);
+    const [showDocxPreview, setShowDocxPreview] = useState(false);
+    // Structured JSON — new single source of truth (pages[] format)
+    const [structuredJson, setStructuredJson] = useState(null);
+    const [docViewTab, setDocViewTab] = useState('preview'); // 'preview' | 'edit'
+    const imageRef = useRef();
+    const uploadSectionRef = useRef();
+
+
+    /* ── Resolve seksiId ─────────────────────────────────────────────────── */
     useEffect(() => {
         let cancelled = false;
         const resolve = async () => {
-            // Cek apakah user.seksiId adalah angka valid
-            const directId = parseInt(user?.seksiId);
-            if (!isNaN(directId) && directId > 0) {
-                // Verifikasi ID ini memang ada di DB
-                const { data } = await supabase.from('sections').select('id, name').eq('id', directId).single();
-                if (!cancelled && data) {
-                    setResolvedSeksiId(data.id);
-                    setResolvedSeksiName(data.name);
-                    return;
+            try {
+                const directId = parseInt(user?.seksiId);
+
+                // --- Coba resolve dari Supabase ---
+                if (!isNaN(directId) && directId > 0) {
+                    const { data, error } = await supabase
+                        .from('sections').select('id, name').eq('id', directId).single();
+                    if (!error && data && !cancelled) {
+                        setResolvedSeksiId(data.id);
+                        setResolvedSeksiName(data.name);
+                        return;
+                    }
+                    // Jika query gagal (misal RLS), gunakan langsung dari user data
+                    if (!cancelled && !isNaN(directId) && directId > 0) {
+                        console.warn('Supabase sections query gagal, pakai seksiId dari user:', directId, error?.message);
+                        setResolvedSeksiId(directId);
+                        setResolvedSeksiName(user?.seksi?.name || `Seksi ${directId}`);
+                        return;
+                    }
                 }
-            }
-            // Fallback: cari berdasarkan alias seksi
-            const alias = user?.seksi?.alias || user?.seksi?.name || '';
-            if (alias) {
-                const { data } = await supabase
-                    .from('sections')
-                    .select('id, name')
-                    .or(`name.ilike.%${alias}%,alias.ilike.%${alias}%`)
-                    .limit(1);
-                if (!cancelled && data?.length) {
-                    setResolvedSeksiId(data[0].id);
-                    setResolvedSeksiName(data[0].name);
+
+                // --- Fallback by alias ---
+                const alias = user?.seksi?.alias || user?.seksi?.name || '';
+                if (alias) {
+                    const { data, error } = await supabase
+                        .from('sections').select('id, name')
+                        .or(`name.ilike.%${alias}%,alias.ilike.%${alias}%`).limit(1);
+                    if (!error && data?.length && !cancelled) {
+                        setResolvedSeksiId(data[0].id);
+                        setResolvedSeksiName(data[0].name);
+                        return;
+                    }
                 }
+
+                // --- Fallback terakhir: pakai user.seksiId apa adanya ---
+                const fallbackId = parseInt(user?.seksiId);
+                if (!cancelled && !isNaN(fallbackId) && fallbackId > 0) {
+                    console.warn('Semua resolve gagal, fallback ke user.seksiId:', fallbackId);
+                    setResolvedSeksiId(fallbackId);
+                    setResolvedSeksiName(user?.seksi?.name || user?.seksi?.alias || `Seksi ${fallbackId}`);
+                }
+            } catch (err) {
+                console.error('resolve seksi error:', err);
+                // Bahkan jika terjadi exception, tetap coba pakai seksiId dari user
+                const fallbackId = parseInt(user?.seksiId);
+                if (!isNaN(fallbackId) && fallbackId > 0) {
+                    setResolvedSeksiId(fallbackId);
+                    setResolvedSeksiName(user?.seksi?.name || `Seksi ${fallbackId}`);
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
             }
         };
         if (user?.role === 'admin_seksi') resolve();
@@ -77,72 +342,139 @@ export default function UploadLaporan() {
         return () => { cancelled = true; };
     }, [user]);
 
-    // ---- Load laporan setelah resolvedSeksiId tersedia ----
-    const loadLaporan = useCallback(async (sid) => {
+    /* ── Load laporan ────────────────────────────────────────────────────── */
+    const reloadLaporan = useCallback(async (sid) => {
         if (!sid) return;
         setLoading(true);
-        const { data, error } = await supabase
-            .from('laporan_bulanan')
-            .select('*')
-            .eq('seksi_id', sid)
-            .order('tahun', { ascending: false })
-            .order('bulan', { ascending: false });
-        if (!error) setLaporan(data || []);
+        const data = await loadLaporanBySeksi(sid);
+        setLaporan(data);
         setLoading(false);
-    }, []);
+    }, [loadLaporanBySeksi]);
 
     useEffect(() => {
-        if (resolvedSeksiId) loadLaporan(resolvedSeksiId);
-    }, [resolvedSeksiId, loadLaporan]);
+        if (resolvedSeksiId) reloadLaporan(resolvedSeksiId);
+    }, [resolvedSeksiId, reloadLaporan]);
 
-    const showMsg = (type, text) => {
-        setMsg({ type, text });
-        setTimeout(() => setMsg(null), 6000);
-    };
+    // Subscribe to cross-component refresh
+    useEffect(() => {
+        const unsub = subscribe(() => {
+            if (resolvedSeksiId) reloadLaporan(resolvedSeksiId);
+        });
+        return unsub;
+    }, [subscribe, resolvedSeksiId, reloadLaporan]);
 
+    /* ── Derived ─────────────────────────────────────────────────────────── */
     const laporanBulanIni = laporan.find(
         l => l.bulan === selectedBulan && l.tahun === selectedTahun
     );
     const isLocked = laporanBulanIni?.final_locked;
 
-    // ---- Pilih file ----
-    const handleFileChange = (e) => {
+    /* ── File validation + DOCX parse ───────────────────────────────── */
+    const handleFileChange = async (e, setter) => {
         const file = e.target.files?.[0];
-        if (!file) { setSelectedFile(null); return; }
+        if (!file) { setter(null); return; }
         const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (!ALLOWED_EXTENSIONS.includes(ext)) {
-            showMsg('error', `Format tidak didukung. Gunakan: PDF, DOCX, atau DOC`);
+        if (!['.pdf', '.docx', '.doc'].includes(ext)) {
+            showMsg('error', `Format tidak didukung: ${ext}. Gunakan PDF / DOCX / DOC.`);
             e.target.value = '';
-            setSelectedFile(null);
             return;
         }
         if (file.size > 10 * 1024 * 1024) {
             showMsg('error', 'Ukuran file maksimal 10 MB.');
             e.target.value = '';
-            setSelectedFile(null);
             return;
         }
-        setSelectedFile(file);
+        setter(file);
+
+        // DOCX Fidelity Engine: validate & parse .docx files
+        if (ext === '.docx' || ext === '.doc') {
+            setParsedDocx(null);
+            setDocxValidation(null);
+            setShowDocxPreview(false);
+            setStructuredJson(null);
+            setParsingDocx(true);
+            try {
+                // Step 1: Validate file structure
+                const validation = await validateDocxFile(file);
+                setDocxValidation(validation);
+                if (!validation.valid) {
+                    showMsg('error', `❌ File tidak valid: ${validation.errors[0]}`);
+                    setParsingDocx(false);
+                    return;
+                }
+                // Step 2a: Parse to fidelity-preserved HTML (mammoth — for docx_html fallback)
+                const parsed = await parseDocxFile(file, { preserveLayout: true });
+                if (!parsed.error) {
+                    setParsedDocx(parsed);
+                    if ((validation.warnings.length > 0 || parsed.warnings.length > 0)) {
+                        setDocxValidation(prev => ({
+                            ...prev,
+                            warnings: [...(prev?.warnings || []), ...parsed.warnings],
+                        }));
+                    }
+                }
+                // Step 2b: Parse to structured pages[] JSON (new)
+                const structured = await parseDocxStructured(file);
+                if (!structured.error && structured.pages.length > 0) {
+                    setStructuredJson(structured);
+                    setShowDocxPreview(true);
+                    const pgCount = structured.pages.length;
+                    const orient = structured.metadata?.orientation || 'portrait';
+                    showMsg('success', `✅ DOCX berhasil diparse — ${pgCount} halaman, ${orient}.`);
+                } else if (parsed.error && structured.error) {
+                    showMsg('error', `❌ Parse DOCX gagal: ${structured.error}`);
+                }
+            } catch (err) {
+                showMsg('error', `❌ Gagal memproses DOCX: ${err.message}`);
+            } finally {
+                setParsingDocx(false);
+            }
+        } else if (ext === '.pdf') {
+            // PDF: run layout-aware parser
+            setParsedDocx(null);
+            setDocxValidation(null);
+            setShowDocxPreview(false);
+            setStructuredJson(null);
+            setParsingDocx(true);
+            try {
+                const structured = await parsePdfStructured(file);
+                if (!structured.error && structured.pages.length > 0) {
+                    setStructuredJson(structured);
+                    setShowDocxPreview(true);
+                    showMsg('success', `✅ PDF diparse — ${structured.pages.length} halaman.`);
+                } else {
+                    // PDF parse failed — just show file name, upload still works
+                    showMsg('info', 'ℹ️ PDF akan diupload tanpa structured preview.');
+                }
+            } catch (err) {
+                showMsg('info', 'ℹ️ PDF parser tidak tersedia, upload tetap berjalan.');
+            } finally {
+                setParsingDocx(false);
+            }
+        } else {
+            setParsedDocx(null);
+            setDocxValidation(null);
+            setShowDocxPreview(false);
+            setStructuredJson(null);
+        }
     };
 
-    // ── Add image to content_json ────────────────────────────────────────────
+    /* ── Add image to content_json ───────────────────────────────────────── */
     const handleImageUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         setAddingImage(true);
         const { block, error } = await processImageToBlock(file, resolvedSeksiName, imageCaption);
-        if (error) {
-            showMsg('error', `❌ Gambar gagal: ${error}`);
-        } else {
+        if (error) showMsg('error', `❌ Gambar gagal: ${error}`);
+        else {
             setContentJson(prev => ({ ...prev, blocks: [...prev.blocks, block] }));
             setImageCaption('');
-            showMsg('success', `✅ Gambar "${file.name}" ditambahkan ke laporan.`);
+            showMsg('success', `✅ Gambar "${file.name}" ditambahkan.`);
         }
         e.target.value = '';
         setAddingImage(false);
     };
 
-    // ── Remove image block by index ─────────────────────────────────────────
     const handleRemoveImage = (idx) => {
         setContentJson(prev => ({
             ...prev,
@@ -150,79 +482,51 @@ export default function UploadLaporan() {
         }));
     };
 
-    // ---- Upload (pakai UPSERT agar aman jika sudah ada record) ----
+    /* ── UPLOAD ────────────────────────────────────────────────── */
     const handleUpload = async () => {
         if (!selectedFile) return showMsg('error', 'Pilih file terlebih dahulu.');
         if (isLocked) return showMsg('error', 'Laporan ini sudah dikunci (Final).');
-        if (!resolvedSeksiId) return showMsg('error', 'Seksi belum terdeteksi. Coba refresh halaman.');
+        if (!resolvedSeksiId) return showMsg('error', 'Seksi belum terdeteksi. Coba refresh.');
+
+        // Block if DOCX validation failed
+        if (docxValidation && !docxValidation.valid) {
+            return showMsg('error', '❌ File tidak dapat diupload karena validasi gagal.');
+        }
 
         setUploading(true);
         try {
-            const ext = selectedFile.name.split('.').pop().toLowerCase();
-            const fileName = `seksi${resolvedSeksiId}_${selectedTahun}_${String(selectedBulan).padStart(2, '0')}_${Date.now()}.${ext}`;
-            const filePath = `uploads/${fileName}`;
+            const result = await ctxUpload({
+                seksiId: resolvedSeksiId,
+                bulan: selectedBulan,
+                tahun: selectedTahun,
+                file: selectedFile,
+                contentJson,
+                judul: judulLaporan || selectedFile.name,
+                userId: user?.id,
+                userName: user?.nama || resolvedSeksiName,
+                existingFilePath: laporanBulanIni?.file_path || null,
+                // DOCX Fidelity Engine data (HTML for backward compat)
+                docxHtml: parsedDocx?.html || null,
+                docxMeta: parsedDocx ? {
+                    ...parsedDocx.styleMetadata,
+                    ...(docxValidation?.info || {}),
+                    parsedAt: new Date().toISOString(),
+                } : null,
+                // NEW: Structured JSON pages[]
+                structuredJson: structuredJson || null,
+            });
 
-            // Hapus file lama jika ada
-            if (laporanBulanIni?.file_path) {
-                await supabase.storage.from('laporan-bulanan').remove([laporanBulanIni.file_path]);
-            }
+            if (result.error) throw new Error(result.error);
 
-            // Upload ke Storage
-            const { error: uploadErr } = await supabase.storage
-                .from('laporan-bulanan')
-                .upload(filePath, selectedFile, { upsert: true, contentType: selectedFile.type });
-
-            if (uploadErr) {
-                if (uploadErr.message?.toLowerCase().includes('bucket') || uploadErr.statusCode === '404') {
-                    throw new Error('Storage bucket belum dibuat.\nJalankan supabase_complete_setup.sql di SQL Editor Supabase terlebih dahulu.');
-                }
-                throw uploadErr;
-            }
-
-            const { data: urlData } = supabase.storage.from('laporan-bulanan').getPublicUrl(filePath);
-
-            // Status: jika sebelumnya Draft/Perlu Revisi/belum ada → jadi Draft
-            // Jika sebelumnya Disetujui, pertahankan (tidak turunkan status)
-            const prevStatus = laporanBulanIni?.status;
-            const newStatus = (prevStatus === 'Disetujui' || prevStatus === 'Final') ? prevStatus : 'Draft';
-
-            // *** UPSERT — tidak akan error duplicate key ***
-            const { error: dbErr } = await supabase.from('laporan_bulanan').upsert(
-                {
-                    seksi_id: resolvedSeksiId,
-                    bulan: selectedBulan,
-                    tahun: selectedTahun,
-                    file_name: selectedFile.name,
-                    file_path: filePath,
-                    file_url: urlData.publicUrl,
-                    file_size: selectedFile.size,
-                    file_type: ext,
-                    status: newStatus,
-                    content_json: contentJson,     // ← gambar base64 tersimpan permanen
-                    catatan_revisi: newStatus === 'Draft' ? null : laporanBulanIni?.catatan_revisi,
-                    submitted_by: user?.id || null,
-                    updated_at: new Date().toISOString(),
-                },
-                { onConflict: 'seksi_id,bulan,tahun' }  // conflict → UPDATE otomatis
-            );
-            if (dbErr) throw dbErr;
-
-            // Log aktivitas (fire-and-forget dengan cara yang benar)
-            void (async () => {
-                try {
-                    await supabase.from('activity_logs').insert({
-                        user_id: user?.id, user_name: user?.nama || resolvedSeksiName,
-                        action: 'upload', entity_type: 'laporan_bulanan',
-                        detail: `Upload laporan ${resolvedSeksiName || 'Seksi'} ${BULAN_NAMES[selectedBulan]} ${selectedTahun} (${ext.toUpperCase()})`,
-                    });
-                } catch { /* log gagal, tidak masalah */ }
-            })();
-
-            showMsg('success', `File ${ext.toUpperCase()} berhasil di-upload!`);
+            showMsg('success', `✅ File berhasil di-upload!${parsedDocx ? ' Preview DOCX tersedia.' : ''}`);
             setSelectedFile(null);
+            setJudulLaporan('');
+            setContentJson({ version: '2.0', blocks: [] });
+            setParsedDocx(null);
+            setDocxValidation(null);
+            setShowDocxPreview(false);
             if (fileRef.current) fileRef.current.value = '';
-            await loadLaporan(resolvedSeksiId);
-            // Refresh notif bell setelah upload
+            await reloadLaporan(resolvedSeksiId);
             if (user) fetchLaporanNotifs(user);
         } catch (err) {
             showMsg('error', `Upload gagal: ${err.message}`);
@@ -231,39 +535,25 @@ export default function UploadLaporan() {
         }
     };
 
-    // ---- Scroll ke form upload & buka file picker ----
-    const handleRevisiSekarang = () => {
-        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setTimeout(() => fileRef.current?.click(), 400);
-    };
-
-    // ---- Submit untuk review ----
+    /* ── SUBMIT untuk review ─────────────────────────────────────────────── */
     const handleSubmit = async () => {
         if (!laporanBulanIni) return showMsg('error', 'Upload file terlebih dahulu.');
         if (laporanBulanIni.status === 'Dikirim') return showMsg('error', 'Laporan sudah dikirim.');
         if (laporanBulanIni.status === 'Disetujui') return showMsg('error', 'Laporan sudah disetujui.');
-        if (isLocked) return showMsg('error', 'Laporan dikunci, tidak dapat dikirim.');
+        if (isLocked) return showMsg('error', 'Laporan dikunci.');
 
         setSubmitting(true);
         try {
-            const { error } = await supabase.from('laporan_bulanan')
-                .update({ status: 'Dikirim', submitted_at: new Date().toISOString() })
-                .eq('id', laporanBulanIni.id);
-            if (error) throw error;
-
-            // Log aktivitas (fire-and-forget)
-            void (async () => {
-                try {
-                    await supabase.from('activity_logs').insert({
-                        user_id: user?.id, user_name: user?.nama,
-                        action: 'submit', entity_type: 'laporan_bulanan', entity_id: laporanBulanIni.id,
-                        detail: `Submit laporan ${BULAN_NAMES[selectedBulan]} ${selectedTahun}`,
-                    });
-                } catch { /* log gagal, tidak masalah */ }
-            })();
-
+            const result = await ctxSubmit({
+                id: laporanBulanIni.id,
+                bulan: selectedBulan,
+                tahun: selectedTahun,
+                userId: user?.id,
+                userName: user?.nama,
+            });
+            if (result.error) throw new Error(result.error);
             showMsg('success', 'Laporan berhasil dikirim untuk di-review!');
-            await loadLaporan(resolvedSeksiId);
+            await reloadLaporan(resolvedSeksiId);
             if (user) fetchLaporanNotifs(user);
         } catch (err) {
             showMsg('error', `Gagal kirim: ${err.message}`);
@@ -272,18 +562,91 @@ export default function UploadLaporan() {
         }
     };
 
+    /* ── EDIT — open edit mode ────────────────────────────────────────────── */
+    const openEdit = (l) => {
+        setEditMode(l.id);
+        setEditJudul(l.judul_laporan || l.file_name || '');
+        setEditFile(null);
+        if (editFileRef.current) editFileRef.current.value = '';
+    };
+
+    const cancelEdit = () => {
+        setEditMode(false);
+        setEditFile(null);
+        setEditJudul('');
+    };
+
+    /* ── SIMPAN edit ──────────────────────────────────────────────────────── */
+    const handleSimpanEdit = async (l) => {
+        setSavingEdit(true);
+        try {
+            const result = await ctxEdit({
+                id: l.id,
+                seksiId: resolvedSeksiId,
+                bulan: l.bulan,
+                tahun: l.tahun,
+                judul: editJudul || l.file_name,
+                file: editFile || null,
+                userId: user?.id,
+                userName: user?.nama,
+            });
+            if (result.error) throw new Error(result.error);
+            showMsg('success', '✅ Laporan berhasil diperbarui!');
+            cancelEdit();
+            await reloadLaporan(resolvedSeksiId);
+        } catch (err) {
+            showMsg('error', `Gagal simpan: ${err.message}`);
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    /* ── HAPUS ────────────────────────────────────────────────────────────── */
+    const handleHapus = async () => {
+        if (!hapusTarget) return;
+        setHapusLoading(true);
+        try {
+            const result = await ctxHapus({
+                id: hapusTarget.id,
+                filePath: hapusTarget.file_path,
+                bulan: hapusTarget.bulan,
+                tahun: hapusTarget.tahun,
+                userId: user?.id,
+                userName: user?.nama,
+            });
+            if (result.error) throw new Error(result.error);
+            showMsg('success', '🗑️ Laporan berhasil dihapus.');
+            setHapusTarget(null);
+            await reloadLaporan(resolvedSeksiId);
+            if (user) fetchLaporanNotifs(user);
+        } catch (err) {
+            showMsg('error', `Hapus gagal: ${err.message}`);
+        } finally {
+            setHapusLoading(false);
+        }
+    };
+
+    /* ── Scroll to upload ─────────────────────────────────────────────────── */
+    const handleRevisiSekarang = () => {
+        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => fileRef.current?.click(), 400);
+    };
+
     const tahunOptions = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
     const seksiNama = resolvedSeksiName || user?.seksi?.name || 'Seksi Anda';
+    const canUpload = !isLocked && !!resolvedSeksiId && !!selectedFile && !uploading;
 
+    /* ── RENDER ──────────────────────────────────────────────────────────── */
     return (
-        <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
+        <div style={{ padding: '24px', maxWidth: '960px', margin: '0 auto' }}>
+
             {/* Header */}
             <div style={{ marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
                     📄 Upload Laporan Bulanan
                 </h1>
                 <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>
-                    {seksiNama} — Hanya laporan seksi Anda yang dapat diakses dan diedit.
+                    {seksiNama} — Hanya laporan seksi Anda yang dapat diakses.
                 </p>
             </div>
 
@@ -292,11 +655,11 @@ export default function UploadLaporan() {
                 <div style={{
                     padding: '12px 16px', borderRadius: '8px', marginBottom: '20px',
                     fontSize: '14px', whiteSpace: 'pre-line',
-                    background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
-                    color: msg.type === 'success' ? '#15803d' : '#b91c1c',
-                    border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+                    background: msg.type === 'success' ? '#dcfce7' : msg.type === 'info' ? '#eff6ff' : '#fee2e2',
+                    color: msg.type === 'success' ? '#15803d' : msg.type === 'info' ? '#1d4ed8' : '#b91c1c',
+                    border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : msg.type === 'info' ? '#bfdbfe' : '#fecaca'}`,
                 }}>
-                    {msg.type === 'success' ? '✅ ' : '❌ '}{msg.text}
+                    {msg.text}
                 </div>
             )}
 
@@ -307,101 +670,85 @@ export default function UploadLaporan() {
                     background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '14px', color: '#9a3412'
                 }}>
                     ⚠️ <strong>Seksi belum terdeteksi.</strong><br />
-                    Pastikan SQL setup sudah dijalankan dan akun Anda sudah memiliki seksi_id yang valid.
-                    Coba logout dan login ulang, atau hubungi Super Admin.
+                    Pastikan setup SQL sudah dijalankan dan akun Anda sudah memiliki seksi_id valid.
+                    Coba logout &amp; login ulang atau hubungi Super Admin.
                 </div>
             )}
 
-            {/* ── Banner Revisi Mencolok ── */}
+            {/* Banner Revisi */}
             {laporanBulanIni?.status === 'Perlu Revisi' && laporanBulanIni.catatan_revisi && (
                 <div style={{
                     padding: '20px 24px', borderRadius: '12px', marginBottom: '20px',
-                    background: 'linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%)',
-                    border: '2px solid #f87171',
-                    boxShadow: '0 4px 12px rgba(239,68,68,0.12)',
+                    background: 'linear-gradient(135deg,#fff1f2 0%,#fff7ed 100%)',
+                    border: '2px solid #f87171', boxShadow: '0 4px 12px rgba(239,68,68,.12)',
                 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
                         <div style={{
                             width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
-                            background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '22px',
+                            background: '#fee2e2', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', fontSize: '22px',
                         }}>🔄</div>
                         <div style={{ flex: 1 }}>
                             <p style={{ fontWeight: 700, fontSize: '15px', color: '#b91c1c', margin: '0 0 6px' }}>
                                 Laporan Memerlukan Revisi
                             </p>
                             <div style={{
-                                background: '#fff', border: '1px solid #fca5a5', borderRadius: '8px',
-                                padding: '12px 14px', marginBottom: '14px',
+                                background: '#fff', border: '1px solid #fca5a5',
+                                borderRadius: '8px', padding: '12px 14px', marginBottom: '14px',
                             }}>
-                                <p style={{ fontSize: '12px', color: '#9a3412', fontWeight: 600, margin: '0 0 4px' }}>📝 Catatan dari Super Admin:</p>
+                                <p style={{ fontSize: '12px', color: '#9a3412', fontWeight: 600, margin: '0 0 4px' }}>
+                                    📝 Catatan dari Super Admin:
+                                </p>
                                 <p style={{ fontSize: '14px', color: '#7f1d1d', lineHeight: 1.65, margin: 0 }}>
                                     {laporanBulanIni.catatan_revisi}
                                 </p>
                             </div>
-                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                <button
-                                    onClick={handleRevisiSekarang}
-                                    style={{
-                                        padding: '10px 20px', borderRadius: '8px', border: 'none',
-                                        background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: '14px',
-                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-                                        boxShadow: '0 2px 8px rgba(220,38,38,0.3)',
-                                    }}
-                                >
-                                    ⬆️ Revisi &amp; Upload Ulang
-                                </button>
-                                {laporanBulanIni?.file_url && (
-                                    <a
-                                        href={laporanBulanIni.file_url}
-                                        target="_blank" rel="noreferrer"
-                                        style={{
-                                            padding: '10px 16px', borderRadius: '8px',
-                                            border: '1px solid #fca5a5', background: '#fff',
-                                            color: '#b91c1c', fontWeight: 600, fontSize: '14px',
-                                            textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'
-                                        }}
-                                    >
-                                        👁️ Lihat File Lama
-                                    </a>
-                                )}
-                            </div>
+                            <button
+                                onClick={handleRevisiSekarang}
+                                style={{
+                                    padding: '10px 20px', borderRadius: '8px', border: 'none',
+                                    background: '#dc2626', color: '#fff', fontWeight: 700,
+                                    fontSize: '14px', cursor: 'pointer',
+                                }}
+                            >
+                                ⬆️ Upload Revisi Sekarang
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Form Upload */}
+            {/* ── Upload Form ─────────────────────────────────────────────── */}
             <div ref={uploadSectionRef} style={{
                 background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
-                padding: '24px', marginBottom: '28px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+                padding: '24px', marginBottom: '28px', boxShadow: '0 1px 4px rgba(0,0,0,.05)'
             }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>
-                    {laporanBulanIni?.status === 'Perlu Revisi' ? '⬆️ Upload Revisi Laporan' : 'Upload Laporan Baru'}
+                    {laporanBulanIni?.status === 'Perlu Revisi' ? '⬆️ Upload Revisi Laporan' : '⬆️ Upload Laporan Baru'}
                 </h2>
 
                 {/* Bulan & Tahun */}
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
                     <div>
                         <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '6px' }}>Bulan</label>
                         <select value={selectedBulan} onChange={e => setSelectedBulan(+e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#fff' }}>
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}>
                             {BULAN_NAMES.slice(1).map((b, i) => <option key={i + 1} value={i + 1}>{b}</option>)}
                         </select>
                     </div>
                     <div>
                         <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '6px' }}>Tahun</label>
                         <select value={selectedTahun} onChange={e => setSelectedTahun(+e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#fff' }}>
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}>
                             {tahunOptions.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                 </div>
 
-                {/* Status laporan saat ini */}
+                {/* Status saat ini */}
                 {laporanBulanIni && (
                     <div style={{
-                        padding: '10px 14px', borderRadius: '8px', marginBottom: '16px',
+                        padding: '10px 14px', borderRadius: '8px', marginBottom: '12px',
                         background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '14px',
                         display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap'
                     }}>
@@ -415,7 +762,7 @@ export default function UploadLaporan() {
                         </span>
                         {laporanBulanIni.file_name && (
                             <span style={{ color: '#64748b', fontSize: '13px' }}>
-                                📎 {laporanBulanIni.file_name}
+                                📎 {laporanBulanIni.judul_laporan || laporanBulanIni.file_name}
                                 {laporanBulanIni.file_type && (
                                     <span style={{
                                         marginLeft: '6px', padding: '1px 6px', borderRadius: '4px',
@@ -431,17 +778,26 @@ export default function UploadLaporan() {
                     </div>
                 )}
 
-                {/* Catatan revisi ringkas di dalam form */}
-                {laporanBulanIni?.status === 'Perlu Revisi' && (
-                    <div style={{
-                        padding: '10px 14px', borderRadius: '8px', marginBottom: '12px',
-                        background: '#fef2f2', border: '1px solid #fca5a5', fontSize: '13px', color: '#b91c1c'
-                    }}>
-                        ⚠️ Upload file revisi di bawah ini, lalu klik <strong>Kirim Ulang</strong> untuk mengirim kembali ke Super Admin.
-                    </div>
-                )}
+                {/* Judul laporan */}
+                <div style={{ marginBottom: '14px' }}>
+                    <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                        Judul Laporan <span style={{ color: '#94a3b8' }}>(opsional — default: nama file)</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={judulLaporan}
+                        onChange={e => setJudulLaporan(e.target.value)}
+                        placeholder={`Laporan Bulanan ${seksiNama} ${BULAN_NAMES[selectedBulan]} ${selectedTahun}`}
+                        disabled={isLocked || !resolvedSeksiId}
+                        style={{
+                            width: '100%', padding: '8px 12px', borderRadius: '8px',
+                            border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box',
+                            background: (isLocked || !resolvedSeksiId) ? '#f1f5f9' : '#fff',
+                        }}
+                    />
+                </div>
 
-                {/* Input file */}
+                {/* File input */}
                 <div style={{ marginBottom: '16px' }}>
                     <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '6px' }}>
                         File Laporan
@@ -450,9 +806,9 @@ export default function UploadLaporan() {
                     <input
                         ref={fileRef}
                         type="file"
-                        accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                        accept=".pdf,.docx,.doc"
                         disabled={isLocked || !resolvedSeksiId}
-                        onChange={handleFileChange}
+                        onChange={e => handleFileChange(e, setSelectedFile)}
                         style={{
                             display: 'block', padding: '8px', border: '1px dashed #cbd5e1',
                             borderRadius: '8px', width: '100%', fontSize: '14px',
@@ -461,7 +817,7 @@ export default function UploadLaporan() {
                         }}
                     />
                     {selectedFile && (
-                        <div style={{ marginTop: '8px', fontSize: '13px', color: '#0369a1', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <div style={{ marginTop: '8px', fontSize: '13px', color: '#0369a1', display: 'flex', gap: '6px' }}>
                             <span>📎</span>
                             <span>{selectedFile.name}</span>
                             <span style={{ color: '#94a3b8' }}>({(selectedFile.size / 1024).toFixed(0)} KB)</span>
@@ -469,22 +825,131 @@ export default function UploadLaporan() {
                     )}
                     {isLocked && (
                         <p style={{ fontSize: '12px', color: '#b91c1c', marginTop: '4px' }}>
-                            ⛔ Laporan ini sudah dikunci (Final). Tidak dapat diedit.
+                            ⛔ Laporan sudah dikunci (Final). Tidak dapat diedit.
                         </p>
                     )}
                 </div>
+
+                {/* ── DOCX Fidelity Engine: Parsing Indicator ─────────────── */}
+                {parsingDocx && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '12px 16px', borderRadius: '8px', marginBottom: '14px',
+                        background: '#eff6ff', border: '1px solid #bfdbfe',
+                        fontSize: '13px', color: '#1d4ed8',
+                    }}>
+                        <span style={{ fontSize: '18px', animation: 'spin 1s linear infinite' }}>⏳</span>
+                        <span>🔍 Menganalisis struktur DOCX — memvalidasi & mem-parse konten...</span>
+                    </div>
+                )}
+
+                {/* ── DOCX Fidelity Engine: Validation Result Panel ──────── */}
+                {!parsingDocx && docxValidation && (
+                    <div style={{ marginBottom: '14px' }}>
+                        {/* Valid banner */}
+                        {docxValidation.valid && parsedDocx && (
+                            <div style={{
+                                padding: '12px 16px', borderRadius: '8px',
+                                background: '#dcfce7', border: '1px solid #bbf7d0',
+                                fontSize: '13px', color: '#15803d', marginBottom: '8px',
+                            }}>
+                                <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                                    ✅ File DOCX valid — siap diupload dengan fidelity penuh
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                    {parsedDocx.styleMetadata?.paragraphCount > 0 && (
+                                        <span>📝 {parsedDocx.styleMetadata.paragraphCount} paragraf</span>
+                                    )}
+                                    {parsedDocx.styleMetadata?.tableCount > 0 && (
+                                        <span>📊 {parsedDocx.styleMetadata.tableCount} tabel</span>
+                                    )}
+                                    {parsedDocx.styleMetadata?.imageCount > 0 && (
+                                        <span>🖼️ {parsedDocx.styleMetadata.imageCount} gambar</span>
+                                    )}
+                                    {parsedDocx.styleMetadata?.hasLists && (
+                                        <span>📋 daftar / bullet</span>
+                                    )}
+                                    {parsedDocx.styleMetadata?.headingLevels?.length > 0 && (
+                                        <span>🔤 heading H{parsedDocx.styleMetadata.headingLevels.join('/H')}</span>
+                                    )}
+                                    {docxValidation.info?.sizeMb && (
+                                        <span style={{ color: '#166534' }}>💾 {docxValidation.info.sizeMb} MB</span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Errors */}
+                        {docxValidation.errors?.length > 0 && (
+                            <div style={{
+                                padding: '12px 16px', borderRadius: '8px',
+                                background: '#fee2e2', border: '1px solid #fecaca',
+                                fontSize: '13px', color: '#b91c1c', marginBottom: '8px',
+                            }}>
+                                <div style={{ fontWeight: 700, marginBottom: '6px' }}>❌ File tidak valid:</div>
+                                {docxValidation.errors.map((err, i) => (
+                                    <div key={i} style={{ marginBottom: '2px' }}>• {err}</div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Warnings */}
+                        {docxValidation.warnings?.length > 0 && (
+                            <div style={{
+                                padding: '12px 16px', borderRadius: '8px',
+                                background: '#fef3c7', border: '1px solid #fde68a',
+                                fontSize: '13px', color: '#92400e',
+                            }}>
+                                <div style={{ fontWeight: 700, marginBottom: '6px' }}>⚠️ Catatan:</div>
+                                {docxValidation.warnings.map((w, i) => (
+                                    <div key={i} style={{ marginBottom: '2px' }}>• {w}</div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Preview toggle button */}
+                        {parsedDocx?.html && (
+                            <button
+                                onClick={() => setShowDocxPreview(v => !v)}
+                                style={{
+                                    marginTop: '10px', padding: '8px 16px',
+                                    borderRadius: '8px', border: '1px solid #2563eb',
+                                    background: showDocxPreview ? '#2563eb' : '#fff',
+                                    color: showDocxPreview ? '#fff' : '#2563eb',
+                                    fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                }}
+                            >
+                                {showDocxPreview ? '🙈 Tutup Preview' : '👁️ Preview Dokumen (WYSIWYG)'}
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* ── DOCX Fidelity Engine: Inline Preview ───────────────── */}
+                {showDocxPreview && parsedDocx?.html && (
+                    <div style={{ marginBottom: '16px' }}>
+                        <DocxPreviewRenderer
+                            html={parsedDocx.html}
+                            styleMetadata={parsedDocx.styleMetadata || {}}
+                            preserveLayout={true}
+                            maxHeight="60vh"
+                            showToolbar={true}
+                        />
+                    </div>
+                )}
 
                 {/* Tombol aksi */}
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <button
                         onClick={handleUpload}
-                        disabled={uploading || isLocked || !selectedFile || !resolvedSeksiId}
+                        disabled={!canUpload}
                         style={{
                             padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 600,
                             fontSize: '14px',
-                            background: (uploading || isLocked || !selectedFile || !resolvedSeksiId) ? '#94a3b8' : '#2563eb',
+                            background: canUpload ? '#2563eb' : '#94a3b8',
                             color: '#fff',
-                            cursor: (uploading || isLocked || !selectedFile || !resolvedSeksiId) ? 'not-allowed' : 'pointer',
+                            cursor: canUpload ? 'pointer' : 'not-allowed',
                         }}
                     >
                         {uploading ? '⏳ Mengupload...' : '⬆️ Upload File'}
@@ -498,39 +963,23 @@ export default function UploadLaporan() {
                                 padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 600,
                                 fontSize: '14px',
                                 background: submitting ? '#94a3b8' : laporanBulanIni.status === 'Perlu Revisi' ? '#dc2626' : '#16a34a',
-                                color: '#fff',
-                                cursor: submitting ? 'not-allowed' : 'pointer',
-                                boxShadow: laporanBulanIni.status === 'Perlu Revisi' ? '0 2px 8px rgba(220,38,38,0.3)' : 'none',
+                                color: '#fff', cursor: submitting ? 'not-allowed' : 'pointer',
                             }}
                         >
                             {submitting ? '⏳ Mengirim...' : laporanBulanIni.status === 'Perlu Revisi' ? '📨 Kirim Ulang Revisi' : '📨 Kirim untuk Review'}
                         </button>
                     )}
-
-                    {laporanBulanIni?.file_url && (
-                        <a
-                            href={laporanBulanIni.file_url}
-                            target="_blank" rel="noreferrer"
-                            style={{
-                                padding: '10px 20px', borderRadius: '8px', border: '1px solid #cbd5e1',
-                                background: '#fff', color: '#1e293b', fontWeight: 600, fontSize: '14px',
-                                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
-                            }}
-                        >
-                            👁️ Lihat File
-                        </a>
-                    )}
                 </div>
             </div>
 
-            {/* ── Lampiran Foto / Gambar ─────────────────────────────────────── */}
+            {/* ── Lampiran Foto ───────────────────────────────────────────── */}
             <div style={{
                 background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
-                padding: '24px', marginBottom: '28px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                padding: '24px', marginBottom: '28px', boxShadow: '0 1px 4px rgba(0,0,0,.05)',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
-                        🖼️ Lampiran Foto & Gambar
+                        🖼️ Lampiran Foto &amp; Gambar
                         {contentJson.blocks.length > 0 && (
                             <span style={{
                                 marginLeft: '10px', padding: '2px 10px', borderRadius: '99px',
@@ -548,30 +997,20 @@ export default function UploadLaporan() {
                             background: addingImage || !resolvedSeksiId ? '#e2e8f0' : '#2563eb',
                             color: addingImage || !resolvedSeksiId ? '#94a3b8' : '#fff',
                             fontWeight: 600, fontSize: '13px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '6px',
-                        }}>
+                        }}
+                    >
                         {addingImage ? '⏳ Memproses...' : '➕ Tambah Gambar'}
                     </button>
                 </div>
 
-                {/* Hidden file input — image only */}
-                <input
-                    ref={imageRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                    style={{ display: 'none' }}
-                    onChange={handleImageUpload}
-                />
+                <input ref={imageRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
 
-                {/* Caption input — filled before clicking "Tambah Gambar" */}
                 <div style={{ marginBottom: '14px' }}>
                     <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-                        Keterangan gambar (opsional) — isi sebelum klik Tambah Gambar
+                        Keterangan gambar (opsional — isi sebelum klik Tambah Gambar)
                     </label>
                     <input
-                        type="text"
-                        value={imageCaption}
-                        onChange={e => setImageCaption(e.target.value)}
+                        type="text" value={imageCaption} onChange={e => setImageCaption(e.target.value)}
                         placeholder="Contoh: Kegiatan razia WNA di Simalungun"
                         style={{
                             width: '100%', padding: '8px 12px', borderRadius: '8px',
@@ -580,34 +1019,28 @@ export default function UploadLaporan() {
                     />
                 </div>
 
-                {/* Info */}
                 <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
-                    Format: PNG, JPG, WEBP, GIF · Maks. 5 MB per gambar ·
-                    Gambar disimpan permanen (base64) — tidak akan hilang saat export Word/PDF.
+                    Format: PNG, JPG, WEBP · Maks. 5 MB per gambar · Gambar disimpan permanen (base64).
                 </p>
 
-                {/* Thumbnail grid */}
                 {contentJson.blocks.length === 0 ? (
                     <div style={{
                         border: '2px dashed #e2e8f0', borderRadius: '10px', padding: '28px',
                         textAlign: 'center', color: '#94a3b8', fontSize: '13px',
                     }}>
-                        📷 Belum ada gambar. Klik <strong>Tambah Gambar</strong> untuk menambahkan foto ke laporan.
+                        📷 Belum ada gambar. Klik <strong>Tambah Gambar</strong> untuk menambahkan foto.
                     </div>
                 ) : (
-                    <div style={{
-                        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                        gap: '14px',
-                    }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '14px' }}>
                         {contentJson.blocks.map((block, idx) => (
                             <div key={block.id || idx} style={{
                                 border: '1px solid #e2e8f0', borderRadius: '10px',
                                 overflow: 'hidden', position: 'relative',
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                                boxShadow: '0 1px 4px rgba(0,0,0,.06)',
                             }}>
                                 <img
                                     src={block.base64}
-                                    alt={block.caption || block.metadata?.filename || 'Gambar'}
+                                    alt={block.caption || 'Gambar'}
                                     style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }}
                                 />
                                 <div style={{ padding: '8px' }}>
@@ -616,42 +1049,29 @@ export default function UploadLaporan() {
                                             {block.caption}
                                         </p>
                                     )}
-                                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: '0 0 6px', wordBreak: 'break-all' }}>
-                                        {block.metadata?.filename}
-                                        {' · '}
-                                        {block.metadata?.size_bytes
-                                            ? `${(block.metadata.size_bytes / 1024).toFixed(0)} KB`
-                                            : ''}
-                                    </p>
-                                    <button
-                                        onClick={() => handleRemoveImage(idx)}
-                                        style={{
-                                            width: '100%', padding: '4px', borderRadius: '6px',
-                                            border: '1px solid #fca5a5', background: '#fff1f2',
-                                            color: '#b91c1c', fontSize: '12px', fontWeight: 600,
-                                            cursor: 'pointer',
-                                        }}>
+                                    <button onClick={() => handleRemoveImage(idx)} style={{
+                                        width: '100%', padding: '4px', borderRadius: '6px',
+                                        border: '1px solid #fca5a5', background: '#fff1f2',
+                                        color: '#b91c1c', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                                    }}>
                                         🗑️ Hapus
                                     </button>
                                 </div>
-                                {/* Corner badge */}
                                 <div style={{
                                     position: 'absolute', top: '6px', right: '6px',
                                     background: '#16a34a', color: '#fff', borderRadius: '99px',
                                     fontSize: '10px', fontWeight: 700, padding: '2px 7px',
-                                }}>
-                                    ✅ Tersimpan
-                                </div>
+                                }}>✅ Tersimpan</div>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
 
-            {/* Riwayat Laporan */}
+            {/* ── Riwayat Laporan ─────────────────────────────────────────── */}
             <div style={{
                 background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
-                padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+                padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,.05)'
             }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>
                     📋 Riwayat Laporan — {seksiNama}
@@ -668,68 +1088,169 @@ export default function UploadLaporan() {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
-                                    {['Bulan', 'Tahun', 'File', 'Tipe', 'Status', 'Catatan Revisi', 'Aksi'].map(h => (
-                                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, borderBottom: '1px solid #e2e8f0' }}>
-                                            {h}
-                                        </th>
+                                    {['Bulan', 'Tahun', 'Judul / File', 'Tipe', 'Status', 'Aksi'].map(h => (
+                                        <th key={h} style={{
+                                            padding: '10px 12px', textAlign: 'left',
+                                            color: '#64748b', fontWeight: 600,
+                                            borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap'
+                                        }}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
                                 {laporan.map(l => (
                                     <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                        <td style={{ padding: '10px 12px' }}>{BULAN_NAMES[l.bulan]}</td>
+                                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                                            {BULAN_NAMES[l.bulan]}
+                                        </td>
                                         <td style={{ padding: '10px 12px' }}>{l.tahun}</td>
-                                        <td style={{ padding: '10px 12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px' }}>
-                                            {l.file_name || '-'}
+                                        <td style={{
+                                            padding: '10px 12px', maxWidth: '200px',
+                                            overflow: 'hidden', textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap', fontSize: '13px'
+                                        }}>
+                                            {editMode === l.id ? (
+                                                <input
+                                                    value={editJudul}
+                                                    onChange={e => setEditJudul(e.target.value)}
+                                                    style={{
+                                                        padding: '4px 8px', borderRadius: '6px',
+                                                        border: '1px solid #2563eb', fontSize: '13px',
+                                                        width: '100%', boxSizing: 'border-box',
+                                                    }}
+                                                />
+                                            ) : (
+                                                l.judul_laporan || l.file_name || '-'
+                                            )}
                                         </td>
                                         <td style={{ padding: '10px 12px' }}>
                                             {l.file_type ? (
                                                 <span style={{
                                                     background: l.file_type === 'pdf' ? '#fee2e2' : '#dbeafe',
                                                     color: l.file_type === 'pdf' ? '#b91c1c' : '#1d4ed8',
-                                                    padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700
-                                                }}>
-                                                    {l.file_type.toUpperCase()}
-                                                </span>
+                                                    padding: '2px 8px', borderRadius: '4px',
+                                                    fontSize: '11px', fontWeight: 700,
+                                                }}>{l.file_type.toUpperCase()}</span>
                                             ) : '-'}
                                         </td>
                                         <td style={{ padding: '10px 12px' }}>
                                             <span style={{
-                                                padding: '2px 10px', borderRadius: '99px', fontWeight: 600, fontSize: '12px',
-                                                background: STATUS_COLOR[l.status]?.bg, color: STATUS_COLOR[l.status]?.text,
-                                            }}>
-                                                {l.status}
-                                            </span>
+                                                padding: '2px 10px', borderRadius: '99px',
+                                                fontWeight: 600, fontSize: '12px',
+                                                background: STATUS_COLOR[l.status]?.bg,
+                                                color: STATUS_COLOR[l.status]?.text,
+                                            }}>{l.status}</span>
                                         </td>
-                                        <td style={{ padding: '10px 12px', maxWidth: '160px', fontSize: '12px', color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {l.catatan_revisi || '-'}
-                                        </td>
-                                        <td style={{ padding: '10px 12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                            {l.file_url && (
-                                                <a href={l.file_url} target="_blank" rel="noreferrer"
-                                                    style={{ color: '#2563eb', fontSize: '13px', textDecoration: 'none' }}>
-                                                    👁️ Lihat
-                                                </a>
-                                            )}
-                                            {/* Re-upload jika Draft/Perlu Revisi */}
-                                            {['Draft', 'Perlu Revisi'].includes(l.status) && !l.final_locked && (
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedBulan(l.bulan);
-                                                        setSelectedTahun(l.tahun);
-                                                        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                        setTimeout(() => fileRef.current?.click(), 400);
-                                                    }}
-                                                    style={{
-                                                        padding: '4px 12px', borderRadius: '6px', border: 'none',
-                                                        background: l.status === 'Perlu Revisi' ? '#fee2e2' : '#f1f5f9',
-                                                        color: l.status === 'Perlu Revisi' ? '#b91c1c' : '#64748b',
-                                                        fontSize: '12px', cursor: 'pointer', fontWeight: 700
-                                                    }}
-                                                >
-                                                    {l.status === 'Perlu Revisi' ? '🔄 Revisi' : '🔄 Ganti'}
-                                                </button>
+
+                                        {/* ── Action Buttons ──────────────────────────────── */}
+                                        <td style={{ padding: '10px 12px' }}>
+                                            {editMode === l.id ? (
+                                                /* Edit mode row */
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '200px' }}>
+                                                    {/* Ganti file (optional) */}
+                                                    <input
+                                                        ref={editFileRef}
+                                                        type="file"
+                                                        accept=".pdf,.docx,.doc"
+                                                        onChange={e => handleFileChange(e, setEditFile)}
+                                                        style={{ fontSize: '12px' }}
+                                                    />
+                                                    {editFile && (
+                                                        <span style={{ fontSize: '11px', color: '#0369a1' }}>
+                                                            📎 {editFile.name}
+                                                        </span>
+                                                    )}
+                                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                                        <button
+                                                            onClick={() => handleSimpanEdit(l)}
+                                                            disabled={savingEdit}
+                                                            style={{
+                                                                padding: '5px 14px', borderRadius: '6px', border: 'none',
+                                                                background: savingEdit ? '#94a3b8' : '#16a34a', color: '#fff',
+                                                                fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            {savingEdit ? '⏳' : '🟢 Simpan'}
+                                                        </button>
+                                                        <button
+                                                            onClick={cancelEdit}
+                                                            style={{
+                                                                padding: '5px 12px', borderRadius: '6px',
+                                                                border: '1px solid #e2e8f0', background: '#fff',
+                                                                fontSize: '12px', cursor: 'pointer', fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            Batal
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                /* Normal action buttons */
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    {/* 🔵 Edit */}
+                                                    {!l.final_locked && (
+                                                        <button
+                                                            onClick={() => openEdit(l)}
+                                                            title="Edit judul / ganti file"
+                                                            style={{
+                                                                padding: '5px 10px', borderRadius: '6px', border: 'none',
+                                                                background: '#dbeafe', color: '#1d4ed8',
+                                                                fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            🔵 Edit
+                                                        </button>
+                                                    )}
+
+                                                    {/* 🟡 Tinjau */}
+                                                    {l.file_url && (
+                                                        <button
+                                                            onClick={() => setPreviewTarget(l)}
+                                                            title="Preview file"
+                                                            style={{
+                                                                padding: '5px 10px', borderRadius: '6px', border: 'none',
+                                                                background: '#fef9c3', color: '#854d0e',
+                                                                fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            🟡 Tinjau
+                                                        </button>
+                                                    )}
+
+                                                    {/* 🔴 Hapus — selalu tersedia */}
+                                                    <button
+                                                        onClick={() => setHapusTarget(l)}
+                                                        title="Hapus laporan"
+                                                        style={{
+                                                            padding: '5px 10px', borderRadius: '6px', border: 'none',
+                                                            background: '#fee2e2', color: '#b91c1c',
+                                                            fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        🔴 Hapus
+                                                    </button>
+
+                                                    {/* Re-upload */}
+                                                    {['Draft', 'Perlu Revisi'].includes(l.status) && !l.final_locked && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedBulan(l.bulan);
+                                                                setSelectedTahun(l.tahun);
+                                                                uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                setTimeout(() => fileRef.current?.click(), 400);
+                                                            }}
+                                                            title="Upload ulang file"
+                                                            style={{
+                                                                padding: '5px 10px', borderRadius: '6px', border: 'none',
+                                                                background: l.status === 'Perlu Revisi' ? '#fee2e2' : '#f1f5f9',
+                                                                color: l.status === 'Perlu Revisi' ? '#b91c1c' : '#64748b',
+                                                                fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            🔄 {l.status === 'Perlu Revisi' ? 'Revisi' : 'Ganti'}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -739,6 +1260,19 @@ export default function UploadLaporan() {
                     </div>
                 )}
             </div>
+
+            {/* ── Modals ────────────────────────────────────────────────────── */}
+            {previewTarget && (
+                <PreviewModal laporan={previewTarget} onClose={() => setPreviewTarget(null)} />
+            )}
+            {hapusTarget && (
+                <HapusModal
+                    laporan={hapusTarget}
+                    loading={hapusLoading}
+                    onConfirm={handleHapus}
+                    onCancel={() => setHapusTarget(null)}
+                />
+            )}
         </div>
     );
 }

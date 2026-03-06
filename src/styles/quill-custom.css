@@ -332,6 +332,105 @@
     height: auto;
 }
 
+/* =========================================================
+   TABLE STYLES — Quill editor + preview + docx-imported
+   Matches government report format (borders, center alignment)
+   ========================================================= */
+
+/* Tables inside the Quill editor */
+.ql-editor table,
+.ql-editor .docx-imported table,
+.ql-editor .pdf-imported table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12pt 0;
+    font-size: 10pt;
+    font-family: 'Times New Roman', serif;
+    page-break-inside: avoid;
+}
+
+.ql-editor table td,
+.ql-editor table th {
+    border: 1px solid #000;
+    padding: 4px 8px;
+    text-align: center;
+    vertical-align: middle;
+    word-break: break-word;
+}
+
+.ql-editor table th {
+    background-color: #d9e2f3;
+    font-weight: bold;
+}
+
+.ql-editor table tr:nth-child(even) td {
+    background-color: #f8f9fa;
+}
+
+/* Tables inside preview area (dangerouslySetInnerHTML) */
+.preview-content table,
+.docx-imported table,
+.pdf-imported table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 12pt 0 !important;
+    font-size: 10pt !important;
+    font-family: Arial, 'Times New Roman', serif !important;
+    page-break-inside: avoid !important;
+    table-layout: auto !important;
+}
+
+.preview-content table td,
+.preview-content table th,
+.docx-imported table td,
+.docx-imported table th {
+    border: 1px solid #000 !important;
+    padding: 4px 6px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    word-break: break-word !important;
+    min-width: 30px !important;
+}
+
+.preview-content table th,
+.docx-imported table th {
+    background-color: #d9e2f3 !important;
+    font-weight: bold !important;
+}
+
+/* First row (header-like) styling for mammoth-generated tables (uses <td> not <th>) */
+.docx-imported table tr:first-child td {
+    background-color: #d9e2f3 !important;
+    font-weight: bold !important;
+}
+
+/* Don't double-color if real <th> is used */
+.docx-imported table thead td,
+.docx-imported table thead th {
+    background-color: #d9e2f3 !important;
+    font-weight: bold !important;
+}
+
+/* Images from PDF import */
+.pdf-imported img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 8px auto !important;
+}
+
+/* Ensure no paragraph text-indent inside table cells (would look terrible) */
+.preview-content table td p,
+.preview-content table th p,
+.docx-imported table td p,
+.docx-imported table th p {
+    text-indent: 0 !important;
+    margin: 0 !important;
+    text-align: center !important;
+}
+
+
+
 /* Image Resize and Editing Styles */
 .ql-editor img {
     max-width: 100%;
@@ -1025,4 +1124,61 @@
     .preview-paper .chapter-header:first-of-type {
         page-break-before: auto;
     }
+}
+
+/* ── Document View (Section Editor HTML viewer) ── */
+.docx-view-content {
+    font-family: Arial, 'Times New Roman', serif;
+    font-size: 10pt;
+    line-height: 1.5;
+    color: #1f2937;
+}
+
+.docx-view-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    page-break-inside: avoid;
+    font-size: 9pt;
+}
+
+.docx-view-content table th,
+.docx-view-content table td {
+    border: 1px solid #374151;
+    padding: 5px 8px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+}
+
+.docx-view-content table th {
+    background-color: #1e3a5f;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: center;
+}
+
+.docx-view-content table tr:nth-child(even) td {
+    background-color: #f8fafc;
+}
+
+.docx-view-content p {
+    margin-bottom: 0.5em;
+}
+
+.docx-view-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px auto;
+}
+
+.docx-view-content h1,
+.docx-view-content h2,
+.docx-view-content h3,
+.docx-view-content h4,
+.docx-view-content h5,
+.docx-view-content h6 {
+    font-weight: 700;
+    margin: 1em 0 0.5em;
 }

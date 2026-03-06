@@ -14,7 +14,6 @@ export const viewNameMap = {
     'work-program-list': 'Daftar Program Kerja',
     'monthly-report': 'Modul Laporan Bulanan (Baru)', // Added
     'report-editor': 'Editor Laporan (Legacy)', // Added
-    'write-report': 'Tulis Laporan Kegiatan', // Report editor
     'verification': 'Verifikasi & Review',
     'archive': 'Cetak & Arsip',
     'members': 'Anggota',

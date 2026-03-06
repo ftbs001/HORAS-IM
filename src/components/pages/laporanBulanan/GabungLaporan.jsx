@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { validateAllImages, logImageErrors } from '../../../utils/imageValidator';
 import { exportToPdf } from '../../../utils/pdfExporter';
+import { validateMergeDocuments } from '../../../utils/structuredDocValidator';
 
 // ─── Month names ──────────────────────────────────────────────────────────────
 const BULAN_NAMES = [
@@ -103,6 +104,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     const approved = laporan.filter(r => r.laporan && ['Disetujui', 'Final'].includes(r.laporan.status));
     const semuaDisetujui = approved.length === laporan.length && laporan.length > 0;
 
+    // ── File availability: approved but without file_url ──────────────────────
+    const approvedMissingFile = approved.filter(r => !r.laporan?.file_url);
+
     // ══════════════════════════════════════════════════════════════════════════
     // PRE-EXPORT VALIDATOR (v3: 11-point gate)
     // ══════════════════════════════════════════════════════════════════════════
@@ -113,6 +117,15 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     const handleOpenValidationGate = async () => {
         if (approved.length === 0) {
             showMsg('error', '⛔ Tidak ada laporan yang disetujui.');
+            return;
+        }
+        // Check: setiap laporan yang disetujui harus memiliki file_url
+        if (approvedMissingFile.length > 0) {
+            showMsg('error',
+                `⛔ ${approvedMissingFile.length} laporan disetujui tidak memiliki file:\n` +
+                approvedMissingFile.map(r => `• ${r.name}`).join('\n') +
+                '\n\nMinta seksi terkait untuk upload ulang sebelum menggabungkan.'
+            );
             return;
         }
         setShowValidationGate(true);
@@ -220,6 +233,27 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     : ''),
         });
 
+        // ── v5: Structured JSON health check (13th check) ─────────────────
+        // Validates pages[] format integrity — warns if missing, doesn't hard-block.
+        const structuredItems = approved.map(r => ({
+            seksiName: r.name,
+            structured_json: r.laporan?.structured_json || null,
+        }));
+        const structCheck = validateMergeDocuments(structuredItems);
+        const structuredCount = structuredItems.filter(s => s.structured_json?.pages?.length > 0).length;
+        const missingStructured = structuredItems.length - structuredCount;
+        results.push({
+            name: 'Structured JSON (Fidelity Engine)',
+            // Warn (but don't fail) if some laporan are missing structured_json.
+            // They will fall back to HTML/text export.
+            pass: true,
+            message: structuredCount === structuredItems.length
+                ? `✅ ${structuredCount} laporan pakai Structured JSON (tabel + gambar terjaga)`
+                : missingStructured === structuredItems.length
+                    ? `⚠️ Semua laporan belum memiliki Structured JSON — fallback ke HTML/teks`
+                    : `⚠️ ${structuredCount}/${structuredItems.length} pakai Structured JSON; ${missingStructured} fallback ke HTML`,
+        });
+
         setValidationResults(results);
         setValidating(false);
         setValidErrors(results.filter(r => !r.pass).map(r => r.message));
@@ -256,6 +290,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     // ══════════════════════════════════════════════════════════════════════════
     const doGenerate = async () => {
         try {
+
             const {
                 Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
                 HeadingLevel, AlignmentType, PageBreak, Footer, Header,
@@ -713,7 +748,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ══════════════════════════════════════════════════════════════
             // SECTION 5: BAB II PELAKSANAAN TUGAS
-            // ═══════════════════════════════════════════════════════════════
+            // ══════════════════════════════════════════════════════════════
+
             // Helper: strip HTML tags to plain text
             const stripHtml = (html) => {
                 if (!html) return '';
@@ -735,14 +771,10 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Helper: build content paragraphs from plain text
             const buildContentParagraphs = (plainText) => {
                 if (!plainText || plainText.trim().length < 5) return [];
-                // Split into meaningful paragraphs (double-newline or long single paragraphs)
                 const chunks = plainText
                     .split(/\n{2,}/)
                     .map(s => s.replace(/\n/g, ' ').trim())
                     .filter(s => s.length > 5);
-
-                if (chunks.length === 0) return [];
-
                 return chunks.map(chunk => PARA(chunk));
             };
 
@@ -756,7 +788,363 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const substantif = approved.filter(r => !isFasilitatif(r));
             const fasilitatif = approved.filter(r => isFasilitatif(r));
 
-            // Build blocks for a group of sections — supports content_json images
+            // ── Helper: decode HTML entities
+            const decodeHtmlEntities = (str) => {
+                if (!str) return '';
+                return str
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
+            };
+
+            // ── Helper: get text content from DOM node (recursive)
+            const getNodeText = (node) => {
+                if (!node) return '';
+                if (node.nodeType === Node.TEXT_NODE) return decodeHtmlEntities(node.textContent);
+                return Array.from(node.childNodes).map(getNodeText).join('');
+            };
+
+            // ── Helper: build TextRun from a DOM element (handle bold/italic/underline)
+            const nodeToRuns = (node) => {
+                if (!node) return [];
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const txt = decodeHtmlEntities(node.textContent);
+                    if (!txt) return [];
+                    return [TR(txt)];
+                }
+                const tag = node.tagName?.toLowerCase() || '';
+                const childRuns = Array.from(node.childNodes).flatMap(nodeToRuns);
+                if (['strong', 'b'].includes(tag)) {
+                    return childRuns.map(r => new TextRun({ ...r, bold: true }));
+                }
+                if (['em', 'i'].includes(tag)) {
+                    return childRuns.map(r => new TextRun({ ...r, italics: true }));
+                }
+                if (tag === 'u') {
+                    return childRuns.map(r => new TextRun({ ...r, underline: { type: UnderlineType.SINGLE } }));
+                }
+                if (tag === 'br') {
+                    return [new TextRun({ text: '', break: 1, font: FONT, size: F_BODY })];
+                }
+                return childRuns;
+            };
+
+            // ── Helper: convert a <table> DOM element → docx Table
+            const htmlTableToDocx = (tableEl) => {
+                const rows = Array.from(tableEl.querySelectorAll('tr'));
+                if (rows.length === 0) return null;
+
+                // Calculate max columns
+                const maxCols = rows.reduce((max, row) => {
+                    const cells = Array.from(row.querySelectorAll('th, td'));
+                    const colCount = cells.reduce((sum, cell) => {
+                        return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                    }, 0);
+                    return Math.max(max, colCount);
+                }, 1);
+
+                const colPct = Math.floor(100 / maxCols);
+
+                const docxRows = rows.map((row, rowIdx) => {
+                    const cells = Array.from(row.querySelectorAll('th, td'));
+                    const docxCells = cells.map((cell) => {
+                        const colSpan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                        const isHeader = cell.tagName.toLowerCase() === 'th';
+                        const cellText = decodeHtmlEntities(cell.textContent || '').trim();
+                        const cellRuns = nodeToRuns(cell);
+
+                        return new TableCell({
+                            columnSpan: colSpan > 1 ? colSpan : undefined,
+                            width: { size: colPct * colSpan, type: WidthType.PERCENTAGE },
+                            shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                            borders: {
+                                top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                            },
+                            children: [new Paragraph({
+                                children: cellRuns.length > 0
+                                    ? cellRuns
+                                    : [TR(cellText, { bold: isHeader })],
+                                alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+                                spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
+                            })],
+                        });
+                    });
+
+                    return new TableRow({
+                        children: docxCells,
+                        tableHeader: rowIdx === 0,
+                    });
+                });
+
+                return new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    rows: docxRows,
+                });
+            };
+
+            // ── Helper: convert HTML string (from docx_html / mammoth output) → docx elements[]
+            // This is the KEY function that enables full-fidelity export of DOCX content including tables.
+            const htmlToDocxElements = (htmlStr) => {
+                if (!htmlStr || htmlStr.trim().length < 5) return [];
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlStr, 'text/html');
+                    const root = doc.querySelector('.docx-page') || doc.body;
+                    const elements = [];
+
+                    const processNode = (node) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            const txt = decodeHtmlEntities(node.textContent || '').trim();
+                            if (txt) elements.push(PARA(txt));
+                            return;
+                        }
+                        const tag = node.tagName?.toLowerCase() || '';
+
+                        if (tag === 'table') {
+                            const tbl = htmlTableToDocx(node);
+                            if (tbl) {
+                                elements.push(tbl);
+                                elements.push(EMPTY(120)); // space after table
+                            }
+                            return; // table processed, don't recurse
+                        }
+
+                        if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+                            const txt = decodeHtmlEntities(node.textContent || '').trim();
+                            if (txt) elements.push(...subSubBab(txt, ''));
+                            return;
+                        }
+
+                        if (tag === 'p') {
+                            const runs = nodeToRuns(node);
+                            const txt = decodeHtmlEntities(node.textContent || '').trim();
+                            if (runs.length > 0 && txt) {
+                                elements.push(new Paragraph({
+                                    children: runs,
+                                    alignment: AlignmentType.JUSTIFIED,
+                                    spacing: { ...LS_15, before: 0, after: 120 },
+                                    indent: { firstLine: INDENT_1 },
+                                }));
+                            } else if (txt) {
+                                elements.push(PARA(txt));
+                            } else {
+                                // Empty paragraph → preserve spacing
+                                elements.push(EMPTY(160));
+                            }
+                            return;
+                        }
+
+                        if (['ul', 'ol'].includes(tag)) {
+                            const items = Array.from(node.querySelectorAll('li'));
+                            items.forEach((li, idx) => {
+                                const txt = decodeHtmlEntities(li.textContent || '').trim();
+                                const bullet = tag === 'ol' ? `${idx + 1}.  ` : '•  ';
+                                if (txt) elements.push(new Paragraph({
+                                    children: [TR(`${bullet}${txt}`)],
+                                    alignment: AlignmentType.JUSTIFIED,
+                                    spacing: { ...LS_15, after: 60 },
+                                    indent: { left: cm(1.25) },
+                                }));
+                            });
+                            return;
+                        }
+
+                        if (['div', 'section', 'article', 'main', 'body'].includes(tag)) {
+                            // Recurse into container elements
+                            Array.from(node.childNodes).forEach(processNode);
+                            return;
+                        }
+                        // For any other block: recurse
+                        if (node.children?.length > 0) {
+                            Array.from(node.childNodes).forEach(processNode);
+                        }
+                    };
+
+                    Array.from(root.childNodes).forEach(processNode);
+                    return elements;
+                } catch (err) {
+                    console.warn('[GabungLaporan] htmlToDocxElements error:', err);
+                    return [];
+                }
+            };
+
+
+            // ── NEW: Helper — convert structured_json page content → docx elements ──
+            // This is Priority 0: structured JSON from docxStructuredParser is the
+            // most accurate source (tables with colspan, images from ZIP).
+            const structuredBlockToDocx = async (block) => {
+                if (!block || !block.type) return [];
+                switch (block.type) {
+                    case 'paragraph': {
+                        if (!block.text?.trim() && (!block.runs || block.runs.length === 0)) return [EMPTY(80)];
+                        if (block.runs?.length > 0) {
+                            // Bug1 fix: docxStructuredParser stores run props directly
+                            // as r.bold, r.italic, r.fontSize — NOT r.style.bold etc.
+                            const runs = block.runs.map(r => new TextRun({
+                                text: r.text || '',
+                                font: r.font || FONT,
+                                size: r.fontSize ? pt(r.fontSize) : (r.style?.fontSize ? pt(r.style.fontSize) : F_BODY),
+                                bold: !!(r.bold || r.style?.bold),
+                                italics: !!(r.italic || r.style?.italic),
+                                underline: (r.underline || r.style?.underline) ? { type: UnderlineType.SINGLE } : undefined,
+                                strike: (r.strike || r.style?.strike) ? true : undefined,
+                                color: r.color || r.style?.color || undefined,
+                            }));
+                            return [new Paragraph({
+                                children: runs,
+                                alignment: block.style?.align === 'center' ? AlignmentType.CENTER
+                                    : block.style?.align === 'right' ? AlignmentType.RIGHT
+                                        : AlignmentType.JUSTIFIED,
+                                spacing: { ...LS_15, after: 120 },
+                                indent: { firstLine: INDENT_1 },
+                            })];
+                        }
+                        return [PARA(block.text?.trim() || '')];
+                    }
+                    case 'heading': {
+                        const headingTxt = block.text?.trim() || '';
+                        if (!headingTxt) return [];
+                        if (block.level <= 2) return [...subBab(headingTxt, '')];
+                        return [...subSubBab(headingTxt, '')];
+                    }
+                    case 'table': {
+                        const { rows = [] } = block;
+                        if (rows.length === 0) return [];
+                        const maxCols = rows.reduce((m, row) => {
+                            const cols = row.reduce((s, c) => s + (c.colspan || 1), 0);
+                            return Math.max(m, cols);
+                        }, 1);
+                        const colPct = Math.floor(100 / maxCols);
+
+                        // Helper: build cell child runs — uses per-run rich text if available
+                        const buildCellRuns = (cell, isHeader) => {
+                            if (cell.runs && cell.runs.length > 0) {
+                                return cell.runs.map(r => new TextRun({
+                                    text: r.text || '',
+                                    font: FONT, size: F_BODY,
+                                    bold: r.bold || isHeader,
+                                    italics: r.italic || false,
+                                    underline: r.underline ? { type: UnderlineType.SINGLE } : undefined,
+                                }));
+                            }
+                            return [TR(cell.text || '', { bold: isHeader || !!cell.bold })];
+                        };
+
+                        const docxRows = rows.map((row, ri) =>
+                            new TableRow({
+                                children: row.filter(c => !c.vContinue).map((cell) => {
+                                    const isHeader = ri === 0;
+                                    return new TableCell({
+                                        columnSpan: cell.colspan || undefined,
+                                        rowSpan: cell.rowspan || undefined,
+                                        width: { size: colPct * (cell.colspan || 1), type: WidthType.PERCENTAGE },
+                                        shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                                        borders: {
+                                            top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                            bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                            left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                            right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        },
+                                        children: [new Paragraph({
+                                            children: buildCellRuns(cell, isHeader),
+                                            alignment: cell.align === 'center' ? AlignmentType.CENTER
+                                                : cell.align === 'right' ? AlignmentType.RIGHT
+                                                    : isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+                                            spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
+                                        })],
+                                    });
+                                }),
+                                tableHeader: ri === 0,
+                            })
+                        );
+                        return [
+                            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: docxRows }),
+                            EMPTY(120),
+                        ];
+                    }
+                    case 'image': {
+                        if (!block.base64) return [];
+                        try {
+                            // Ensure the base64 string has the data: prefix
+                            const dataUrl = block.base64.startsWith('data:')
+                                ? block.base64
+                                : `data:image/png;base64,${block.base64}`;
+                            const b64 = dataUrl.split(',')[1];
+                            if (!b64) return [];
+                            const bin = atob(b64);
+                            const buf = new Uint8Array(bin.length);
+                            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+
+                            // Bug5 fix: ImageRun.transformation expects PIXELS (96 DPI),
+                            // not twips. 1 cm = 37.795 px at 96 DPI.
+                            const PX_PER_CM = 37.795;
+                            const MAX_W_PX = Math.round(14 * PX_PER_CM); // 14cm max
+                            const wPx = block.widthCm
+                                ? Math.min(Math.round(block.widthCm * PX_PER_CM), MAX_W_PX)
+                                : MAX_W_PX;
+                            const aspectRatio = (block.heightCm && block.widthCm && block.widthCm > 0)
+                                ? block.heightCm / block.widthCm
+                                : 0.75; // default 4:3
+                            const hPx = Math.round(wPx * aspectRatio);
+
+                            const mimeRaw = (dataUrl.match(/^data:image\/([a-z+]+);base64,/) || [])[1] || 'png';
+                            const mime = mimeRaw === 'jpg' ? 'jpeg' : mimeRaw;
+                            const elements = [new Paragraph({
+                                children: [new ImageRun({ data: buf.buffer, type: mime, transformation: { width: wPx, height: hPx } })],
+                                alignment: AlignmentType.CENTER,
+                                spacing: { before: 120, after: 120 },
+                            })];
+                            // Add caption if present
+                            if (block.caption) {
+                                elements.push(new Paragraph({
+                                    children: [TR(block.caption, { italics: true, size: F_SMALL })],
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 0, after: 120 },
+                                }));
+                            }
+                            return elements;
+                        } catch (imgErr) {
+                            console.warn('[GabungLaporan] structured image embed err:', imgErr);
+                            return [];
+                        }
+                    }
+                    case 'list': {
+                        const { ordered, items = [] } = block;
+                        return items.map((item, ii) => new Paragraph({
+                            children: [TR(`${ordered ? `${ii + 1}.  ` : '•  '}${item.text || ''}`)],
+                            alignment: AlignmentType.JUSTIFIED,
+                            spacing: { ...LS_15, after: 60 },
+                            indent: { left: cm(1.25 + (item.level || 0) * 0.6) },
+                        }));
+                    }
+                    case 'page_break':
+                        return [new Paragraph({ children: [new PageBreak()], spacing: { after: 0 } })];
+                    default:
+                        return [];
+                }
+            };
+
+            // ── Build docx elements from one structured_json page ────────────
+            const buildStructuredPageElements = async (page) => {
+                const elems = [];
+                for (const block of (page.content || [])) {
+                    const items = await structuredBlockToDocx(block);
+                    elems.push(...items);
+                }
+                return elems;
+            };
+
+            // Build blocks for a group of sections
+            // Priority 0: structured_json.pages[] (OpenXML-parsed: tables, images, orientation)
+            // Priority 1: docx_html (full fidelity — tables, images, formatting from mammoth)
+            // Priority 2: content_json.blocks (rich blocks with images)
+            // Priority 3: legacy plain text
             const buildSectionBlocks = async (sections) => {
                 const blocks = [];
                 for (const [idx, r] of sections.entries()) {
@@ -766,31 +1154,57 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     // Sub-sub-BAB heading: "1. Seksi Tikim"
                     blocks.push(...subSubBab(`${num}  ${secName}`, ''));
 
-                    // Priority 1: content_json blocks (rich content with images)
-                    const contentBlocks = r.laporan?.content_json?.blocks || [];
-                    const hasBlocks = contentBlocks.length > 0;
+                    // ── Priority 0: structured_json pages[] (most accurate) ──
+                    const structJson = r.laporan?.structured_json;
+                    if (structJson?.pages?.length > 0) {
+                        for (const page of structJson.pages) {
+                            const pageElems = await buildStructuredPageElements(page);
+                            blocks.push(...pageElems);
+                        }
+                        blocks.push(EMPTY(120));
+                        continue;
+                    }
 
-                    if (hasBlocks) {
+                    // ── Priority 1: docx_html (complete HTML from mammoth — includes tables) ──
+                    const docxHtml = r.laporan?.docx_html;
+                    if (docxHtml && docxHtml.trim().length > 10) {
+                        const htmlElements = htmlToDocxElements(docxHtml);
+                        if (htmlElements.length > 0) {
+                            blocks.push(...htmlElements);
+                            blocks.push(EMPTY(120));
+                            continue; // skip lower priority
+                        }
+                    }
+
+                    // ── Priority 2: content_json.blocks (paragraph/image/heading) ──
+                    const contentBlocks = r.laporan?.content_json?.blocks || [];
+                    if (contentBlocks.length > 0) {
                         for (const cb of contentBlocks) {
                             if (cb.type === 'paragraph' && cb.text?.trim()) {
                                 blocks.push(PARA(cb.text.trim()));
                             }
                             else if (cb.type === 'image' && cb.base64) {
                                 try {
-                                    // base64 → ArrayBuffer for ImageRun
-                                    const b64 = cb.base64.split(',')[1];
+                                    // Normalize base64 — handle missing data: prefix
+                                    const dataUrl = cb.base64.startsWith('data:')
+                                        ? cb.base64
+                                        : `data:image/png;base64,${cb.base64}`;
+                                    const b64 = dataUrl.split(',')[1];
+                                    if (!b64) throw new Error('base64 kosong');
                                     const bin = atob(b64);
                                     const buf = new Uint8Array(bin.length);
                                     for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
 
-                                    // Scale to max 14cm content width
-                                    const MAX_W_CM = 14;
+                                    // ImageRun.transformation expects PIXELS at 96 DPI
+                                    // 1 cm = 37.795 px; max 14cm = ~530px
+                                    const PX_PER_CM = 37.795;
+                                    const MAX_W_PX = Math.round(14 * PX_PER_CM);
                                     const origW = cb.metadata?.width_px || 800;
                                     const origH = cb.metadata?.height_px || 600;
-                                    const scaledW = origW <= cm(MAX_W_CM) ? origW : cm(MAX_W_CM);
+                                    const scaledW = Math.min(origW, MAX_W_PX);
                                     const scaledH = Math.round(origH * (scaledW / origW));
 
-                                    const mimeRaw = (cb.base64.match(/^data:image\/([a-z+]+);base64,/) || [])[1] || 'png';
+                                    const mimeRaw = (dataUrl.match(/^data:image\/([a-z+]+);base64,/) || [])[1] || 'png';
                                     const mime = mimeRaw === 'jpg' ? 'jpeg' : mimeRaw;
 
                                     blocks.push(new Paragraph({
@@ -802,9 +1216,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                         alignment: AlignmentType.CENTER,
                                         spacing: { before: 120, after: 120 },
                                     }));
-                                    // Caption
                                     if (cb.caption) {
-                                        blocks.push(PARA([TR(cb.caption, { italics: true, size: F_SMALL })], { noIndent: true, align: AlignmentType.CENTER }));
+                                        blocks.push(new Paragraph({
+                                            children: [TR(cb.caption, { italics: true, size: F_SMALL })],
+                                            alignment: AlignmentType.CENTER,
+                                            spacing: { before: 0, after: 120 },
+                                        }));
                                     }
                                 } catch (imgErr) {
                                     console.warn('[GabungLaporan] Image embed error:', imgErr);
@@ -814,19 +1231,35 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             else if (cb.type === 'heading') {
                                 blocks.push(...subSubBab(cb.text || '', ''));
                             }
+                            else if (cb.type === 'table') {
+                                // content_json table block (basic)
+                                const { headers = [], rows = [] } = cb;
+                                if (headers.length > 0 || rows.length > 0) {
+                                    try {
+                                        blocks.push(makeTable(
+                                            headers,
+                                            rows,
+                                            headers.map(() => Math.floor(100 / headers.length))
+                                        ));
+                                        blocks.push(EMPTY(120));
+                                    } catch (tblErr) {
+                                        console.warn('[GabungLaporan] Table block error:', tblErr);
+                                    }
+                                }
+                            }
                         }
+                        blocks.push(EMPTY(120));
+                        continue;
                     }
-                    // Priority 2: legacy rich-text HTML content
-                    else {
-                        const rawText = stripHtml(r.laporan?.content || '');
-                        const hasText = rawText.trim().length > 10;
-                        if (hasText) {
-                            blocks.push(...buildContentParagraphs(rawText));
-                        } else if (r.laporan?.file_url) {
-                            blocks.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah diupload. File laporan tersedia dan dapat dilihat pada lampiran.`));
-                        } else {
-                            blocks.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah disetujui. Uraian kegiatan terlampir.`));
-                        }
+
+                    // ── Priority 3: legacy HTML content field ──
+                    const rawText = stripHtml(r.laporan?.content || '');
+                    if (rawText.trim().length > 10) {
+                        blocks.push(...buildContentParagraphs(rawText));
+                    } else if (r.laporan?.file_url) {
+                        blocks.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah diupload. File laporan tersedia dan dapat dilihat pada lampiran.`));
+                    } else {
+                        blocks.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah disetujui. Uraian kegiatan terlampir.`));
                     }
 
                     blocks.push(EMPTY(120));
@@ -955,13 +1388,59 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             // ASSEMBLE DOCUMENT
             // ══════════════════════════════════════════════════════════════════
-            const secProps = (start = null) => ({
-                type: SectionType.NEXT_PAGE,
-                page: {
-                    margin: MARGIN,
-                    ...(start !== null ? { pageNumbers: { start, formatType: NumberFormat.DECIMAL } } : {}),
-                },
-            });
+            // secProps for standard portrait sections
+            const secProps = (start = null, landscape = false) => {
+                const pageMargin = landscape
+                    ? { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) }
+                    : MARGIN;
+                const pageSize = landscape
+                    ? { width: cm(29.7), height: cm(21), orientation: 'landscape' }
+                    : undefined; // default A4 portrait
+                return {
+                    type: SectionType.NEXT_PAGE,
+                    page: {
+                        margin: pageMargin,
+                        ...(pageSize ? { size: pageSize } : {}),
+                        ...(start !== null ? { pageNumbers: { start, formatType: NumberFormat.DECIMAL } } : {}),
+                    },
+                };
+            };
+
+            // ── Build landscape-aware sections for approved laporan ────────────
+            // If a laporan has structured_json with landscape pages, those are
+            // extracted into a dedicated NEXT_PAGE section with landscape orientation.
+            const buildLandscapeAwareSections = async (allSectionBlocks, approvedSections) => {
+                const docSections = [];
+
+                for (const [idx, r] of approvedSections.entries()) {
+                    const structJson = r.laporan?.structured_json;
+                    if (!structJson?.pages?.length) continue;
+
+                    // Check if this laporan has any landscape page
+                    const landscapePages = structJson.pages.filter(p => p.orientation === 'landscape');
+                    const portraitPages = structJson.pages.filter(p => p.orientation !== 'landscape');
+
+                    if (landscapePages.length === 0) continue; // normal flow — already in main section
+
+                    // Add portrait pages as continuation of main section (already handled in buildSectionBlocks)
+                    // Add landscape pages as a separate section
+                    for (const lPage of landscapePages) {
+                        const lElems = await buildStructuredPageElements(lPage);
+                        if (lElems.length > 0) {
+                            docSections.push({
+                                properties: secProps(null, true), // landscape!
+                                headers: { default: makeHeader() },
+                                footers: { default: makeFooter() },
+                                children: lElems,
+                            });
+                        }
+                    }
+                }
+                return docSections;
+            };
+
+            // Build landscape-aware additional sections (from structured_json laporan)
+            const landscapeExtraSections = await buildLandscapeAwareSections([], approved);
 
             const doc = new Document({
                 creator: user?.nama || 'HORAS-IM',
@@ -1009,7 +1488,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         footers: { default: makeFooter() },
                         children: daftarChildren,
                     },
-                    // 4-8. BAB I–V (single section with page breaks between BABs)
+                    // 4-8. BAB I–V (portrait — single section with page breaks between BABs)
                     {
                         properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
                         headers: { default: makeHeader() },
@@ -1022,6 +1501,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             ...bab5,
                         ],
                     },
+                    // 9+. Landscape sections from individual laporan (orientation-aware)
+                    //     Each landscape page from structured_json becomes a separate DOCX section.
+                    ...landscapeExtraSections,
                 ],
             });
 

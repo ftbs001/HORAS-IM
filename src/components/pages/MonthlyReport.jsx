@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useRef } from 'react';
 import { useReport, SECTION_TOC_MAPPING } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import ReactQuill from 'react-quill-new';
@@ -374,6 +374,31 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     const [viewMode, setViewMode] = useState(sectionFilter ? 'edit' : 'dashboard'); // Default to dashboard if no section filter
     const [isSaving, setIsSaving] = useState(false);
     const [history, setHistory] = useState({});
+    // 'document' = HTML viewer (tables work), 'text' = Quill editor
+    const [editorTab, setEditorTab] = useState('document');
+    const [paperSettings, setPaperSettings] = useState({});
+    const [showPaperSettings, setShowPaperSettings] = useState(false);
+
+    const PAPER_SIZES = {
+        A4:     { w: 210, h: 297 },
+        A3:     { w: 297, h: 420 },
+        Letter: { w: 216, h: 279 },
+        Legal:  { w: 216, h: 356 },
+    };
+
+    const getPaperSettings = (sectionId) => ({
+        orientation: 'portrait',
+        size: 'A4',
+        marginTop: 4,
+        marginRight: 3,
+        marginBottom: 3,
+        marginLeft: 4,
+        ...(paperSettings[sectionId] || {}),
+    });
+
+    const updatePaperSettings = (sectionId, updates) => {
+        setPaperSettings(prev => ({ ...prev, [sectionId]: { ...getPaperSettings(sectionId), ...updates } }));
+    };
 
 
 
@@ -1150,7 +1175,180 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 ))}
             </div>
         );
+
     };
+
+    // ── Inner SectionEditor component ─────────────────────────────────────────
+    const SectionEditor = () => {
+        const ps = getPaperSettings(activeSection);
+        const isLandscape = ps.orientation === 'landscape';
+        const pzBase = PAPER_SIZES[ps.size] || PAPER_SIZES.A4;
+        const pz = isLandscape ? { w: pzBase.h, h: pzBase.w } : pzBase;
+        const content = reportData[activeSection] || '';
+        const hasImportedContent = content.includes('docx-imported') || content.includes('pdf-imported') || /<table/i.test(content);
+
+        return (
+            <div className="flex flex-col h-full bg-gray-100">
+                {/* ── Top Toolbar ── */}
+                <div className="bg-white border-b border-gray-200 px-4 py-2 flex flex-wrap items-center gap-2 shadow-sm">
+                    <div className="text-xs font-bold text-gray-500 uppercase truncate max-w-xs">
+                        {activeSection.replace(/_/g, ' ')}
+                    </div>
+                    <div className="flex-1" />
+                    {/* Mode tabs */}
+                    <div className="flex bg-gray-100 rounded-lg p-0.5">
+                        {[{ id: 'document', label: '📄 Lihat Dokumen' }, { id: 'text', label: '✏️ Edit Teks' }].map(tab => (
+                            <button key={tab.id} onClick={() => setEditorTab(tab.id)}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                    editorTab === tab.id ? 'bg-imigrasi-navy text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                }`}>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Paper settings toggle */}
+                    <button onClick={() => setShowPaperSettings(v => !v)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
+                            showPaperSettings ? 'bg-amber-50 border-amber-400 text-amber-700' : 'border-gray-300 text-gray-600 hover:border-amber-400'
+                        }`} title="Pengaturan Kertas">📐 Kertas</button>
+                    <button onClick={handleUndo} className="p-1.5 hover:bg-gray-200 rounded text-gray-500" title="Undo">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                    </button>
+                    <button onClick={handleManualSave} className="px-4 py-1.5 bg-imigrasi-navy text-white rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-blue-900">
+                        {isSaving && <div className="w-3 h-3 border-2 border-white border-t-transparent animate-spin rounded-full" />}
+                        Simpan
+                    </button>
+                </div>
+
+                {/* ── Paper Settings Panel ── */}
+                {showPaperSettings && (
+                    <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+                        <div className="flex flex-wrap gap-4 items-end">
+                            <div>
+                                <label className="block text-[10px] font-bold text-amber-800 mb-1 uppercase">Orientasi</label>
+                                <div className="flex gap-1">
+                                    {['portrait', 'landscape'].map(o => (
+                                        <button key={o}
+                                            onClick={() => updatePaperSettings(activeSection, { orientation: o })}
+                                            className={`px-2 py-1 rounded text-xs font-bold border transition-all ${
+                                                ps.orientation === o ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-600 border-gray-300 hover:border-amber-400'
+                                            }`}>
+                                            {o === 'portrait' ? '↕ Portrait' : '↔ Landscape'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-amber-800 mb-1 uppercase">Ukuran Kertas</label>
+                                <select value={ps.size} onChange={e => updatePaperSettings(activeSection, { size: e.target.value })}
+                                    className="border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:border-amber-400 focus:outline-none">
+                                    {Object.entries(PAPER_SIZES).map(([s, d]) => (
+                                        <option key={s} value={s}>{s} ({isLandscape ? d.h : d.w}×{isLandscape ? d.w : d.h}mm)</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {[{ key: 'marginTop', label: 'Atas' }, { key: 'marginRight', label: 'Kanan' }, { key: 'marginBottom', label: 'Bawah' }, { key: 'marginLeft', label: 'Kiri' }].map(m => (
+                                <div key={m.key}>
+                                    <label className="block text-[10px] font-bold text-amber-800 mb-1 uppercase">{m.label} (cm)</label>
+                                    <input type="number" min="0.5" max="10" step="0.5" value={ps[m.key]}
+                                        onChange={e => updatePaperSettings(activeSection, { [m.key]: parseFloat(e.target.value) || 3 })}
+                                        className="w-16 border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:border-amber-400 focus:outline-none" />
+                                </div>
+                            ))}
+                            <div className="text-[10px] text-amber-700 bg-amber-100 rounded px-2 py-1">{pz.w}×{pz.h}mm</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Content Area ── */}
+                <div className="flex-1 overflow-y-auto bg-gray-200 p-6 flex flex-col items-center">
+                    {editorTab === 'document' ? (
+                        /* DOCUMENT VIEW — renders HTML tables/images faithfully */
+                        <div className="bg-white shadow-2xl"
+                            style={{ width: `${pz.w}mm`, minHeight: `${pz.h}mm`, paddingTop: `${ps.marginTop}cm`, paddingRight: `${ps.marginRight}cm`, paddingBottom: `${ps.marginBottom}cm`, paddingLeft: `${ps.marginLeft}cm`, fontFamily: 'Arial, "Times New Roman", serif', fontSize: '10pt', lineHeight: 1.5, boxSizing: 'border-box' }}>
+                            {content ? (
+                                <div className="docx-view-content" dangerouslySetInnerHTML={{ __html: content }} />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-64 text-gray-300">
+                                    <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    <p className="text-sm font-medium">Belum ada konten</p>
+                                    <p className="text-xs mt-1 text-center">Upload file DOCX/PDF atau tulis di tab ✏️ Edit Teks</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        /* TEXT EDITOR — ReactQuill for manual writing */
+                        <div className="bg-white shadow-2xl" style={{ width: `${pz.w}mm`, minHeight: `${pz.h}mm` }}>
+                            {hasImportedContent && (
+                                <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
+                                    <span>⚠️</span>
+                                    <span>Konten dari DOCX/PDF tidak dapat diedit di sini — tabel akan hilang. Gunakan tab <strong>📄 Lihat Dokumen</strong> untuk melihatnya.</span>
+                                </div>
+                            )}
+                            <div className="quill-editor-container" style={{ minHeight: `calc(${pz.h}mm - 2cm)` }}>
+                                <ReactQuill ref={quillRef} theme="snow"
+                                    value={hasImportedContent ? '' : content}
+                                    onChange={(newContent) => { if (!hasImportedContent && newContent !== content) updateSection(activeSection, newContent); }}
+                                    modules={modules} formats={formats}
+                                    placeholder={hasImportedContent ? 'Konten dari file sudah ada — gunakan tab Lihat Dokumen.' : 'Ketik konten laporan di sini...'}
+                                    readOnly={hasImportedContent}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Upload / Attachments strip ── */}
+                    <div className="w-full mt-4 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden" style={{ maxWidth: `${pz.w}mm` }}>
+                        <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <h3 className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                Lampiran ({(reportAttachments[activeSection] || []).length})
+                            </h3>
+                            <label className="px-3 py-1.5 bg-imigrasi-navy text-white rounded-lg hover:bg-blue-900 cursor-pointer text-xs font-bold flex items-center gap-1 transition-colors">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                                Upload DOCX / PDF
+                                <input type="file" className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 15 * 1024 * 1024) { showNotification('Ukuran file maksimal 15MB', 'error'); return; }
+                                            handleFileUploadWithExtract(file);
+                                            setEditorTab('document');
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                    accept=".txt,.docx,.doc,.pdf" />
+                            </label>
+                        </div>
+                        {(reportAttachments[activeSection] || []).length > 0 ? (
+                            <div className="divide-y divide-gray-100 max-h-36 overflow-y-auto">
+                                {(reportAttachments[activeSection] || []).map((file) => (
+                                    <div key={file.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 group">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <div className="w-6 h-6 bg-blue-50 rounded flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-blue-600 uppercase">
+                                                {file.name?.split('.').pop() || 'f'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-medium text-gray-800 truncate">{file.name}</p>
+                                                <p className="text-[10px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1 text-blue-500 hover:bg-blue-50 rounded text-xs" title="Buka">👁</a>
+                                            <button onClick={() => { if (window.confirm('Hapus lampiran?')) removeAttachment(activeSection, file.id); }} className="p-1 text-red-500 hover:bg-red-50 rounded text-xs" title="Hapus">🗑</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-4 text-center text-xs text-gray-400">Upload DOCX atau PDF untuk menampilkan tabel dan gambar secara otomatis</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+    // ── End SectionEditor ──────────────────────────────────────────────────────
 
     return (
         <div className="flex flex-col h-full bg-gray-100 animate-fade-in">
@@ -1217,121 +1415,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                         ) : activeSection === 'toc' ? (
                             <TableOfContents />
                         ) : (
-                            <div className="p-8 max-w-5xl mx-auto">
-                                <div className="bg-white rounded-2xl shadow-xl overflow-hidden min-h-[700px] flex flex-col">
-                                    <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                                        <h2 className="font-bold text-imigrasi-navy">{activeSection.toUpperCase().replace(/_/g, ' ')}</h2>
-                                        <div className="flex gap-2">
-                                            <button onClick={handleUndo} className="p-2 hover:bg-gray-200 rounded" title="Undo"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg></button>
-                                            <button onClick={handleManualSave} className="px-4 py-1 bg-imigrasi-navy text-white rounded text-sm font-bold flex items-center gap-2">
-                                                {isSaving && <div className="w-3 h-3 border-2 border-white border-t-transparent animate-spin rounded-full"></div>}
-                                                Simpan
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="quill-editor-container flex-1">
-                                        <ReactQuill
-                                            ref={quillRef}
-                                            theme="snow"
-                                            value={reportData[activeSection] || ''}
-                                            onChange={(content) => {
-                                                const currentContent = reportData[activeSection] || '';
-                                                // Only update if content actually changed
-                                                if (content !== currentContent) {
-                                                    updateSection(activeSection, content);
-                                                }
-                                            }}
-                                            modules={modules}
-                                            formats={formats}
-                                            placeholder="Ketik konten laporan di sini..."
-                                        />
-                                    </div>
-
-                                    {/* File Attachments Section */}
-                                    <div className="p-4 border-t border-gray-200 bg-gray-50">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                                                Lampiran File ({(reportAttachments[activeSection] || []).length})
-                                            </h3>
-                                            <label className="px-4 py-2 bg-imigrasi-navy text-white rounded-lg hover:bg-blue-900 cursor-pointer text-xs font-bold flex items-center gap-2 transition-colors">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                                                Upload File
-                                                <input
-                                                    type="file"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) {
-                                                            // Max 10MB
-                                                            if (file.size > 10 * 1024 * 1024) {
-                                                                showNotification('Ukuran file maksimal 10MB', 'error');
-                                                                return;
-                                                            }
-                                                            // Use new extraction handler
-                                                            handleFileUploadWithExtract(file);
-                                                            e.target.value = ''; // Reset input
-                                                        }
-                                                    }}
-                                                    accept=".txt,.docx,.doc,.pdf"
-                                                />
-                                            </label>
-                                        </div>
-
-                                        {/* File List */}
-                                        {reportAttachments[activeSection] && reportAttachments[activeSection].length > 0 ? (
-                                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                                                {reportAttachments[activeSection].map((file) => (
-                                                    <div key={file.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 hover:border-imigrasi-blue transition-colors group">
-                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                            <div className="w-8 h-8 bg-blue-50 rounded flex items-center justify-center flex-shrink-0">
-                                                                <svg className="w-4 h-4 text-imigrasi-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
-                                                                <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(2)} KB</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <a
-                                                                href={file.url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="p-1.5 text-imigrasi-blue hover:bg-blue-50 rounded transition-colors"
-                                                                title="Pratinjau"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                                            </a>
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (window.confirm('Hapus file ini?')) {
-                                                                        removeAttachment(activeSection, file.id);
-                                                                        showNotification('File dihapus', 'success');
-                                                                    }
-                                                                }}
-                                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
-                                                                title="Hapus"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-6 bg-white rounded-lg border border-dashed border-gray-300">
-                                                <svg className="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                                                <p className="text-sm text-gray-400">Belum ada file dilampirkan</p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between text-[10px] text-gray-400">
-                                        <span>HTML Content Length: {(reportData[activeSection] || '').length}</span>
-                                        <span>Draft Tersimpan di Supabase</span>
-                                    </div>
-                                </div>
-                            </div>
+                            <SectionEditor />
                         )
                     ) : (
                         // PREVIEW MODE
@@ -1349,12 +1433,9 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                 {/* Table of Contents Preview */}
                                 <TableOfContentsPreview />
 
-                                {/* Removed duplicate header - already shown in cover page */}
-
                                 {filteredToc && filteredToc.filter(chapter => chapter.id !== 'cover_letter' && chapter.id !== 'cover_page' && chapter.id !== 'foreword' && chapter.id !== 'toc').map(chapter => (
                                     <div key={chapter.id} className="mb-12">
                                         <h3 className="text-2xl font-bold uppercase text-center mb-8 bg-gray-100 py-2 border-y border-black">{chapter.label}</h3>
-                                        {/* Recursive Preview Logic */}
                                         <div className="space-y-6">
                                             {renderPreviewNodes(chapter.children)}
                                         </div>

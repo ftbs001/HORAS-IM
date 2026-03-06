@@ -51,8 +51,8 @@ export const LETTERHEAD_TEXT = {
     LINE_3: 'KANTOR WILAYAH SUMATERA UTARA',
     LINE_4: 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR',
     LINE_5: 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun',
-    LINE_6_LAMAN: 'pematangsiantar.imigrasi.go.id',
-    LINE_6_EMAIL: 'kanim_pematangsiantar@imigrasi.go.id',
+    LINE_6_LAMAN: 'imigrasipematangsiantar.kemenkumham.go.id',
+    LINE_6_EMAIL: 'knm.pematangsiantar@kemenkumham.go.id',
     get LINE_6() {
         return `Laman: ${this.LINE_6_LAMAN}, Pos-el: ${this.LINE_6_EMAIL}`;
     },

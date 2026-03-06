@@ -24,6 +24,10 @@ import {
     Packer,
     Paragraph,
     TextRun,
+    Table,
+    TableRow,
+    TableCell,
+    WidthType,
     TableOfContents,
     BorderStyle,
     AlignmentType,
@@ -39,6 +43,7 @@ import {
     NumberFormat,
     LevelFormat,
     convertInchesToTwip,
+    VerticalAlign,
 } from 'docx';
 
 import { saveAs } from 'file-saver';
@@ -135,6 +140,216 @@ const stripHtml = (html) => {
         .trim();
 };
 
+// ==================== HTML → DOCX CONVERTER ====================
+// Converts mammoth-generated HTML (tables, bold, italic, headings)
+// into proper docx library elements.
+
+const CELL_BORDER = {
+    top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+    bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+    left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+    right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+};
+
+/**
+ * Build DOCX TextRun(s) from an HTML inline element / text node.
+ * Handles <strong>, <b>, <em>, <i>, <u>, <s>, nested spans.
+ */
+const inlineNodeToRuns = (node, inherited = {}) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+        const txt = node.textContent || '';
+        if (!txt) return [];
+        return [new TextRun({
+            text: txt,
+            font: FONT.NAME,
+            size: inherited.size ?? FONT.SIZE.BODY,
+            bold: inherited.bold ?? false,
+            italics: inherited.italic ?? false,
+            underline: inherited.underline ? { type: UnderlineType.SINGLE } : undefined,
+            strike: inherited.strike ?? false,
+            color: '000000',
+        })];
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return [];
+    const tag = node.tagName?.toLowerCase();
+    const newCtx = { ...inherited };
+    if (tag === 'strong' || tag === 'b') newCtx.bold = true;
+    if (tag === 'em' || tag === 'i') newCtx.italic = true;
+    if (tag === 'u') newCtx.underline = true;
+    if (tag === 's' || tag === 'del') newCtx.strike = true;
+    // Recurse into children
+    const runs = [];
+    node.childNodes.forEach(child => runs.push(...inlineNodeToRuns(child, newCtx)));
+    return runs;
+};
+
+/**
+ * Convert a <tr> element to a DOCX TableRow.
+ * Handles colspan and rowspan attributes.
+ */
+const htmlRowToDocxRow = (trEl, isHeader = false) => {
+    const cells = [];
+    Array.from(trEl.querySelectorAll('td, th')).forEach(cell => {
+        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+        const rawText = cell.textContent?.trim() || '';
+        // Build runs from inline content
+        const runs = [];
+        cell.childNodes.forEach(child => runs.push(...inlineNodeToRuns(child, { bold: isHeader })));
+        const effectiveRuns = runs.length > 0 ? runs : [new TextRun({ text: rawText, font: FONT.NAME, size: FONT.SIZE.BODY, bold: isHeader, color: '000000' })];
+
+        cells.push(new TableCell({
+            columnSpan: colspan > 1 ? colspan : 1,
+            borders: CELL_BORDER,
+            shading: isHeader ? { fill: 'D9E2F3' } : undefined,
+            verticalAlign: VerticalAlign.CENTER,
+            children: [new Paragraph({
+                children: effectiveRuns,
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 60, after: 60, line: SPACING.LINE_1 },
+            })],
+        }));
+    });
+    return cells.length > 0 ? new TableRow({ children: cells, tableHeader: isHeader }) : null;
+};
+
+/**
+ * Convert a <table> HTML element into a DOCX Table.
+ */
+const htmlTableToDocxTable = (tableEl) => {
+    const rows = [];
+    const allTrs = Array.from(tableEl.querySelectorAll('tr'));
+    // Detect header rows (inside <thead> or first row with <th>)
+    const theadTrs = new Set(Array.from(tableEl.querySelectorAll('thead tr')));
+
+    allTrs.forEach(tr => {
+        const isHeader = theadTrs.has(tr) || tr.querySelector('th') !== null;
+        const row = htmlRowToDocxRow(tr, isHeader);
+        if (row) rows.push(row);
+    });
+
+    if (rows.length === 0) return null;
+
+    return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+            top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            insideH: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            insideV: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+        },
+        rows,
+    });
+};
+
+/**
+ * Convert mammoth-generated HTML string into an array of DOCX elements.
+ * Handles: paragraphs, headings, tables, bold/italic inline text, lists.
+ *
+ * @param {string} htmlStr — HTML from mammoth.convertToHtml or Quill editor
+ * @returns {Array} Array of docx Paragraph / Table objects
+ */
+export const htmlToDocxElements = (htmlStr) => {
+    if (!htmlStr || typeof htmlStr !== 'string') return [];
+    const elements = [];
+
+    // Use DOMParser to parse the HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<body>${htmlStr}</body>`, 'text/html');
+    const body = doc.body;
+
+    const processNode = (node) => {
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        const tag = node.tagName?.toLowerCase();
+
+        // ── Table ────────────────────────────────────────────────
+        if (tag === 'table') {
+            const tbl = htmlTableToDocxTable(node);
+            if (tbl) {
+                elements.push(tbl);
+                elements.push(new Paragraph({ children: [], spacing: { before: 0, after: 120 } }));
+            }
+            return; // don't recurse into children — table already processed
+        }
+
+        // ── Headings ──────────────────────────────────────────────
+        if (tag === 'h1') {
+            const txt = node.textContent?.trim() || '';
+            if (txt) elements.push(buildBabHeader(txt));
+            return;
+        }
+        if (tag === 'h2') {
+            const txt = node.textContent?.trim() || '';
+            if (txt) elements.push(buildSubBabHeader(txt));
+            return;
+        }
+        if (tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
+            const txt = node.textContent?.trim() || '';
+            if (txt) elements.push(buildSubSubBabHeader(txt));
+            return;
+        }
+
+        // ── Paragraphs ────────────────────────────────────────────
+        if (tag === 'p') {
+            const runs = [];
+            node.childNodes.forEach(child => runs.push(...inlineNodeToRuns(child, {})));
+            if (runs.length > 0 && runs.some(r => r.root?.children?.[0]?.options?.text?.trim())) {
+                elements.push(new Paragraph({
+                    style: STYLE_ID.NORMAL,
+                    children: runs,
+                    alignment: AlignmentType.JUSTIFIED,
+                    spacing: { before: 0, after: SPACING.PARA_SPACING_PT, line: SPACING.LINE_1_5 },
+                    indent: { firstLine: INDENT.FIRST_LINE },
+                }));
+            } else {
+                // Fallback: just get the text
+                const txt = node.textContent?.trim();
+                if (txt) elements.push(para(txt, { indent: true }));
+            }
+            return;
+        }
+
+        // ── Lists ─────────────────────────────────────────────────
+        if (tag === 'ul' || tag === 'ol') {
+            const items = Array.from(node.querySelectorAll('li'));
+            items.forEach((li, i) => {
+                const bullet = tag === 'ol' ? `${i + 1}.` : '•';
+                const txt = li.textContent?.trim() || '';
+                if (txt) {
+                    elements.push(new Paragraph({
+                        style: STYLE_ID.NORMAL,
+                        children: [new TextRun({ text: `${bullet}  ${txt}`, font: FONT.NAME, size: FONT.SIZE.BODY, color: '000000' })],
+                        indent: { left: INDENT.SUB_BAB },
+                        spacing: { before: 0, after: 60, line: SPACING.LINE_1_5 },
+                    }));
+                }
+            });
+            return;
+        }
+
+        // ── Wrapper divs — just recurse into children ─────────────
+        if (tag === 'div' || tag === 'section' || tag === 'article') {
+            node.childNodes.forEach(processNode);
+            return;
+        }
+
+        // ── br → empty line ───────────────────────────────────────
+        if (tag === 'br') {
+            elements.push(emptyLine());
+            return;
+        }
+
+        // ── Fallback: recurse ─────────────────────────────────────
+        node.childNodes.forEach(processNode);
+    };
+
+    body.childNodes.forEach(processNode);
+    return elements;
+};
+
+
+
 // ==================== PAGE NUMBER FOOTER ====================
 
 const buildPageFooter = () =>
@@ -162,7 +377,7 @@ const buildCoverLetter = async (data, logoPath) => {
     if (!data || !data.nomor) return [];
     const elems = [];
 
-    const letterheadElems = await generateLetterhead(logoPath);
+    const letterheadElems = await generateLetterhead(logoPath, data);
     elems.push(...letterheadElems);
 
     elems.push(new Paragraph({
@@ -214,35 +429,101 @@ const buildCoverLetter = async (data, logoPath) => {
 };
 
 // ==================== COVER PAGE ====================
+// Layout persis seperti gambar referensi:
+//   [spasi atas]
+//   KANTOR IMIGRASI KELAS II TPI   ← 14pt Bold Underline Center
+//   PEMATANG SIANTAR               ← 14pt Bold Underline Center
+//   [spasi]
+//   LAPORAN BULANAN                ← 14pt Bold Center
+//   DESEMBER 2025                  ← 14pt Bold Center
+//   [spasi besar]
+//   [LOGO HD 240×120px]            ← logos-combined.png embedded
+//   [spasi besar]
+//   KEMENTERIAN IMIGRASI...        ← 12pt Bold Center (per baris)
+//   REPUBLIK INDONESIA             ← 12pt Bold Center
+//   DIREKTORAT JENDERAL IMIGRASI   ← 12pt Bold Center
+//   2025                           ← 12pt Bold Center
 
 const buildCoverPage = async (data, logoPath) => {
     if (!data) return [];
     const elems = [];
+
+    // ── Spasi atas ─────────────────────────────────────────────
+    for (let i = 0; i < 5; i++) elems.push(emptyLine());
+
+    // ── Judul Kantor: Bold + Underline + Center ─────────────────
+    const titleStyle = (text) => new Paragraph({
+        style: STYLE_ID.NORMAL,
+        children: [new TextRun({
+            text,
+            font: FONT.NAME,
+            size: FONT.SIZE.BAB,        // 14pt
+            bold: true,
+            underline: { type: UnderlineType.SINGLE },
+            color: '000000',
+        })],
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0, line: SPACING.LINE_1 },
+    });
+
+    elems.push(titleStyle('KANTOR IMIGRASI KELAS II TPI'));
+    elems.push(titleStyle('PEMATANG SIANTAR'));
+
+    // ── Spasi setelah judul ─────────────────────────────────────
     for (let i = 0; i < 4; i++) elems.push(emptyLine());
 
-    elems.push(centerPara('KANTOR IMIGRASI KELAS II TPI', { size: FONT.SIZE.BAB, bold: true, spaceAfter: 0 }));
-    elems.push(centerPara('PEMATANG SIANTAR', { size: FONT.SIZE.BAB, bold: true, spaceAfter: SPACING.PARA_SPACING_PT * 2 }));
-    elems.push(centerPara(data.reportTitle || 'LAPORAN BULANAN', { size: FONT.SIZE.BAB, bold: true, spaceAfter: SPACING.PARA_SPACING_PT }));
-    elems.push(centerPara(`${data.month || ''} ${data.year || ''}`, { size: FONT.SIZE.LARGE, bold: true, spaceAfter: SPACING.PARA_SPACING_PT * 2 }));
+    // ── Judul Laporan ───────────────────────────────────────────
+    elems.push(centerPara(data.reportTitle || 'LAPORAN BULANAN', {
+        size: FONT.SIZE.BAB,           // 14pt
+        bold: true,
+        spaceAfter: SPACING.PARA_SPACING_PT,
+    }));
+    elems.push(centerPara(`${(data.month || '').toUpperCase()} ${data.year || ''}`, {
+        size: FONT.SIZE.BAB,           // 14pt
+        bold: true,
+        spaceAfter: 0,
+    }));
 
+    // ── Spasi sebelum logo ──────────────────────────────────────
+    for (let i = 0; i < 5; i++) elems.push(emptyLine());
+
+    // ── Logo HD — embedded ImageRun 240×120px ──────────────────
     if (logoPath) {
-        const logoData = await fetchImageAsArrayBuffer(logoPath);
-        if (logoData) {
-            elems.push(new Paragraph({
-                children: [new ImageRun({ data: logoData, transformation: { width: 100, height: 100 } })],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: SPACING.PARA_SPACING_PT * 2, line: SPACING.LINE_1 },
-            }));
+        try {
+            const logoData = await fetchImageAsArrayBuffer(logoPath);
+            if (logoData) {
+                // logos-combined.png: 2 logo berdampingan, rasio ±2:1
+                elems.push(new Paragraph({
+                    children: [new ImageRun({
+                        data: logoData,
+                        transformation: {
+                            width: 240,   // px → ~6.4cm di 96 DPI
+                            height: 120,  // px → ~3.2cm (rasio 2:1)
+                        },
+                    })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 0, after: 0, line: SPACING.LINE_1 },
+                }));
+            }
+        } catch (e) {
+            console.warn('Cover logo load failed:', e);
         }
-    } else {
-        elems.push(centerPara('[LOGO KEMENTERIAN]', { size: FONT.SIZE.XSMALL, spaceAfter: SPACING.PARA_SPACING_PT * 2 }));
     }
 
-    for (let i = 0; i < 4; i++) elems.push(emptyLine());
+    // ── Spasi setelah logo ──────────────────────────────────────
+    for (let i = 0; i < 5; i++) elems.push(emptyLine());
 
-    ['KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN', 'REPUBLIK INDONESIA',
-        'DIREKTORAT JENDERAL IMIGRASI', data.year || String(new Date().getFullYear())]
-        .forEach(line => elems.push(centerPara(line, { bold: true, spaceAfter: 40 })));
+    // ── Footer Institusi: Bold Center ──────────────────────────
+    [
+        'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN',
+        'REPUBLIK INDONESIA',
+        'DIREKTORAT JENDERAL IMIGRASI',
+        data.year || String(new Date().getFullYear()),
+    ].forEach(line => elems.push(centerPara(line, {
+        size: FONT.SIZE.SUB_BAB,       // 12pt
+        bold: true,
+        spaceAfter: 40,
+    })));
 
     return elems;
 };
@@ -430,9 +711,6 @@ const buildChapter = async (title, sections, isFirst = false) => {
     const elems = [];
     elems.push(buildBabHeader(title, isFirst));
 
-    // Import docx symbols once for reuse inside this async function
-    const { Paragraph, ImageRun, AlignmentType } = await import('docx').catch(() => ({}));
-
     for (const section of (sections || [])) {
         if (section.level === 3) {
             elems.push(buildSubSubBabHeader(section.title));
@@ -443,22 +721,38 @@ const buildChapter = async (title, sections, isFirst = false) => {
         // Priority 1: content_json blocks (rich content with images)
         if (section.blocks && section.blocks.length > 0) {
             for (const block of section.blocks) {
-                const blockElems = await buildContentBlock(block, { Paragraph, ImageRun, AlignmentType });
+                const blockElems = await buildContentBlock(block, { Paragraph, ImageRun: (await import('docx')).ImageRun, AlignmentType });
                 elems.push(...blockElems);
             }
         }
-        // Priority 2: legacy HTML content (plain text fallback)
-        else if (section.content) {
-            stripHtml(section.content).split('\n\n').forEach(p => {
-                if (p.trim() && !p.includes('[Belum ada konten]')) {
-                    elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
+        // Priority 2: HTML content → convert tables and formatting to DOCX elements
+        else if (section.content && section.content.trim() && !section.content.includes('[Belum ada konten]')) {
+            const hasTable = /<table/i.test(section.content);
+            if (hasTable) {
+                // Use full HTML-to-DOCX converter that preserves tables
+                const htmlElems = htmlToDocxElements(section.content);
+                if (htmlElems.length > 0) {
+                    elems.push(...htmlElems);
+                } else {
+                    // Fallback to plain text if conversion failed
+                    stripHtml(section.content).split('\n\n').forEach(p => {
+                        if (p.trim()) elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
+                    });
                 }
-            });
+            } else {
+                // No tables — use plain text (simpler, more reliable)
+                stripHtml(section.content).split('\n\n').forEach(p => {
+                    if (p.trim() && !p.includes('[Belum ada konten]')) {
+                        elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
+                    }
+                });
+            }
         }
     }
 
     return elems;
 };
+
 
 // ==================== MAIN EXPORT FUNCTION ====================
 

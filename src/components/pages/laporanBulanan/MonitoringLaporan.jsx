@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useLaporan } from '../../../contexts/LaporanContext';
+import DocxPreviewRenderer from '../../common/DocxPreviewRenderer';
 
 const BULAN_NAMES = [
     '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
 
-// ── Deduplicate sections by normalized name ──────────────────────────────────
-// Strips "Seksi" / "Subbag" prefix then groups by lowercased name.
-// Keeps the row with the highest data score (staff + programs + performance).
 const normalizeName = (name = '') =>
     name.toLowerCase().trim()
         .replace(/^seksi\s+/i, '')
@@ -38,55 +37,74 @@ const STATUS_COLOR = {
 
 export default function MonitoringLaporan({ onNavigate }) {
     const { user } = useAuth();
+    const { loadLaporan, getLaporan, subscribe, submitLaporan: ctxSubmit } = useLaporan();
+
     const [bulan, setBulan] = useState(new Date().getMonth() + 1);
     const [tahun, setTahun] = useState(new Date().getFullYear());
-    const [laporan, setLaporan] = useState([]);          // semua laporan bulan ini
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState(null);
 
     // Modal review
-    const [reviewModal, setReviewModal] = useState(null);  // {laporan, action: 'approve'|'revisi'}
+    const [reviewModal, setReviewModal] = useState(null);
     const [catatan, setCatatan] = useState('');
     const [processing, setProcessing] = useState(false);
 
+    // DOCX inline preview
+    const [docxPreviewTarget, setDocxPreviewTarget] = useState(null);
+
     const showMsg = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
 
-    // ---- Load data ----
+    // ── Load sections & laporan
     const loadData = useCallback(async () => {
         setLoading(true);
-        const [{ data: sec }, { data: lap }] = await Promise.all([
-            supabase.from('sections').select('id, name, urutan_penggabungan').order('urutan_penggabungan'),
-            supabase.from('laporan_bulanan')
-                .select('*')
-                .eq('bulan', bulan)
-                .eq('tahun', tahun)
-        ]);
-        setSections(dedupSections(sec || []));
-        setLaporan(lap || []);
-        setLoading(false);
-    }, [bulan, tahun]);
+        try {
+            const { data: sec, error: secErr } = await supabase
+                .from('sections')
+                .select('id, name, urutan_penggabungan')
+                .order('urutan_penggabungan');
+            if (secErr) console.error('MonitoringLaporan: gagal load sections:', secErr);
+            setSections(dedupSections(sec || []));
+            await loadLaporan(bulan, tahun);
+        } catch (err) {
+            console.error('MonitoringLaporan loadData error:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [bulan, tahun, loadLaporan]);
+
+    // ── Force refresh
+    const handleRefresh = useCallback(() => loadData(), [loadData]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // Gabungkan sections dengan status laporan
+    // Subscribe to LaporanContext changes (upload by admin_seksi triggers refresh here)
+    useEffect(() => {
+        const unsub = subscribe((b, t) => {
+            if (b === bulan && t === tahun) loadLaporan(bulan, tahun);
+        });
+        return unsub;
+    }, [subscribe, bulan, tahun, loadLaporan]);
+
+    // Get laporan list from context cache
+    const laporan = getLaporan(bulan, tahun);
+
+    // Derive rows (section + their laporan)
     const rows = sections.map(s => ({
         ...s,
         laporan: laporan.find(l => l.seksi_id === s.id) || null,
     }));
 
-    // Cek apakah semua laporan sudah Disetujui
+    // Laporan yang seksi_id-nya tidak cocok dengan sections yang ada (orphan)
+    const matchedIds = new Set(rows.filter(r => r.laporan).map(r => r.laporan.id));
+    const orphanLaporan = laporan.filter(l => !matchedIds.has(l.id));
+
     const semuaDisetujui = sections.length > 0 &&
         sections.every(s => laporan.find(l => l.seksi_id === s.id && l.status === 'Disetujui'));
-
-    // Cek apakah sudah difinalisasi
     const sudahFinal = laporan.length > 0 && laporan.every(l => l.status === 'Final');
 
-    // ---- Review action ----
-    const openReview = (l, action) => {
-        setReviewModal({ laporan: l, action });
-        setCatatan('');
-    };
+    // ── Review action
+    const openReview = (l, action) => { setReviewModal({ laporan: l, action }); setCatatan(''); };
 
     const handleReview = async () => {
         if (!reviewModal) return;
@@ -114,7 +132,7 @@ export default function MonitoringLaporan({ onNavigate }) {
 
             setReviewModal(null);
             showMsg('success', action === 'approve' ? 'Laporan disetujui!' : 'Catatan revisi dikirim!');
-            await loadData();
+            await loadLaporan(bulan, tahun);
         } catch (err) {
             showMsg('error', err.message);
         } finally {
@@ -122,9 +140,9 @@ export default function MonitoringLaporan({ onNavigate }) {
         }
     };
 
-    // ---- Paksa Submit (Draft → Dikirim) ----
+    // ── Paksa Submit
     const handlePaksaSubmit = async (l) => {
-        if (!window.confirm('Paksa status laporan ini menjadi "Dikirim" agar bisa di-review?')) return;
+        if (!window.confirm('Paksa status laporan ini menjadi "Dikirim"?')) return;
         setProcessing(true);
         try {
             const { error } = await supabase.from('laporan_bulanan')
@@ -132,7 +150,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                 .eq('id', l.id);
             if (error) throw error;
             showMsg('success', 'Laporan berhasil dipindah ke status Dikirim.');
-            await loadData();
+            await loadLaporan(bulan, tahun);
         } catch (err) {
             showMsg('error', err.message);
         } finally {
@@ -140,62 +158,76 @@ export default function MonitoringLaporan({ onNavigate }) {
         }
     };
 
-    // ---- Render action buttons per status ----
+    // ── Render action buttons per status
     const renderActions = (l) => {
-        if (!l || l.final_locked) {
-            return <span style={{ fontSize: '12px', color: '#7e22ce', fontWeight: 600 }}>🔒 Final</span>;
-        }
-        if (l.status === 'Draft') {
+        const previewBtn = (l?.docx_html || l?.file_url) ? (
+            <button
+                onClick={() => l.docx_html
+                    ? setDocxPreviewTarget(l)
+                    : window.open(l.file_url, '_blank')
+                }
+                title={l.docx_html ? 'Preview DOCX inline' : 'Buka file'}
+                style={{
+                    padding: '5px 10px', borderRadius: '6px',
+                    border: '1px solid #bfdbfe', background: '#eff6ff',
+                    color: '#1d4ed8', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                }}
+            >
+                {l.docx_html ? '👁 Preview' : '📂 Buka'}
+            </button>
+        ) : null;
+
+        if (!l || l.final_locked)
             return (
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={() => openReview(l, 'approve')}
-                        title="Setujui langsung meski masih Draft"
-                        style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        ✅ Setujui
-                    </button>
-                    <button
-                        onClick={() => handlePaksaSubmit(l)}
-                        title="Ubah status menjadi Dikirim"
-                        style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        📤 Submit
-                    </button>
+                    <span style={{ fontSize: '12px', color: '#7e22ce', fontWeight: 600 }}>🔒 Final</span>
+                    {previewBtn}
                 </div>
             );
-        }
-        if (l.status === 'Dikirim' || l.status === 'Perlu Revisi') {
-            return (
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={() => openReview(l, 'approve')}
-                        style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        ✅ Setujui
-                    </button>
-                    <button
-                        onClick={() => openReview(l, 'revisi')}
-                        style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        🔄 Revisi
-                    </button>
-                </div>
-            );
-        }
-        if (l.status === 'Disetujui') {
-            return (
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 600 }}>✅ Disetujui</span>
-                    <button
-                        onClick={() => openReview(l, 'revisi')}
-                        title="Batalkan persetujuan dan minta revisi"
-                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: '11px', cursor: 'pointer' }}>
-                        ↩ Revisi
-                    </button>
-                </div>
-            );
-        }
+
+        if (l.status === 'Draft') return (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {previewBtn}
+                <button onClick={() => openReview(l, 'approve')}
+                    style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    ✅ Setujui
+                </button>
+                <button onClick={() => handlePaksaSubmit(l)}
+                    style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    📤 Submit
+                </button>
+            </div>
+        );
+
+        if (l.status === 'Dikirim' || l.status === 'Perlu Revisi') return (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {previewBtn}
+                <button onClick={() => openReview(l, 'approve')}
+                    style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    ✅ Setujui
+                </button>
+                <button onClick={() => openReview(l, 'revisi')}
+                    style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    🔄 Revisi
+                </button>
+            </div>
+        );
+
+        if (l.status === 'Disetujui') return (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {previewBtn}
+                <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 600 }}>✅ Disetujui</span>
+                <button onClick={() => openReview(l, 'revisi')}
+                    style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: '11px', cursor: 'pointer' }}>
+                    ↩ Revisi
+                </button>
+            </div>
+        );
+
         return <span style={{ fontSize: '12px', color: '#94a3b8' }}>—</span>;
     };
 
-    // ---- Finalisasi ----
+    // ── Finalisasi
     const handleFinalisasi = async () => {
         if (!semuaDisetujui) return;
         if (!window.confirm('Finalisasi akan mengunci semua laporan. Tidak bisa diedit kembali tanpa membuka manual. Lanjutkan?')) return;
@@ -215,7 +247,7 @@ export default function MonitoringLaporan({ onNavigate }) {
             });
 
             showMsg('success', 'Laporan berhasil difinalisasi dan dikunci!');
-            await loadData();
+            await loadLaporan(bulan, tahun);
         } catch (err) {
             showMsg('error', err.message);
         } finally {
@@ -232,16 +264,83 @@ export default function MonitoringLaporan({ onNavigate }) {
         final: laporan.filter(l => l.status === 'Final').length,
     };
 
+    // Seksi yang belum upload (untuk info di tombol)
+    const belumUpload = rows.filter(r => !r.laporan).map(r => r.name);
+
     return (
         <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
+
+            {/* DOCX Inline Preview Modal */}
+            {docxPreviewTarget && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 2000, padding: '16px',
+                }}>
+                    <div style={{
+                        background: '#fff', borderRadius: '16px', width: '100%',
+                        maxWidth: '900px', maxHeight: '92vh', display: 'flex',
+                        flexDirection: 'column', overflow: 'hidden',
+                        boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+                    }}>
+                        <div style={{
+                            padding: '14px 20px', borderBottom: '1px solid #e2e8f0',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                                    👁️ Preview — {docxPreviewTarget.judul_laporan || docxPreviewTarget.file_name}
+                                </h3>
+                                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
+                                    {BULAN_NAMES[docxPreviewTarget.bulan]} {docxPreviewTarget.tahun} ·{' '}
+                                    {sections.find(s => s.id === docxPreviewTarget.seksi_id)?.name || '—'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setDocxPreviewTarget(null)}
+                                style={{
+                                    width: '36px', height: '36px', borderRadius: '8px',
+                                    border: '1px solid #e2e8f0', background: '#f8fafc',
+                                    cursor: 'pointer', fontSize: '18px',
+                                }}
+                            >×</button>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+                            <DocxPreviewRenderer
+                                html={docxPreviewTarget.docx_html}
+                                styleMetadata={docxPreviewTarget.docx_meta || {}}
+                                preserveLayout={docxPreviewTarget.preserve_layout !== false}
+                                maxHeight="72vh"
+                                showToolbar={true}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
-            <div style={{ marginBottom: '24px' }}>
-                <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
-                    📊 Monitoring Laporan Bulanan
-                </h1>
-                <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>
-                    Super Admin — Pantau dan review laporan dari semua seksi.
-                </p>
+            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                    <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                        📊 Monitoring Laporan Bulanan
+                    </h1>
+                    <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>
+                        Super Admin — Pantau dan review laporan dari semua seksi.
+                    </p>
+                </div>
+                <button
+                    onClick={handleRefresh}
+                    disabled={loading}
+                    title="Muat ulang data laporan"
+                    style={{
+                        padding: '9px 18px', borderRadius: '8px', border: '1px solid #cbd5e1',
+                        background: '#f8fafc', color: '#475569', fontSize: '13px',
+                        fontWeight: 600, cursor: loading ? 'wait' : 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                    }}
+                >
+                    {loading ? '⏳' : '🔄'} Refresh
+                </button>
             </div>
 
             {msg && (
@@ -255,11 +354,8 @@ export default function MonitoringLaporan({ onNavigate }) {
                 </div>
             )}
 
-            {/* Filter Bulan Tahun */}
-            <div style={{
-                display: 'flex', gap: '12px', marginBottom: '20px',
-                alignItems: 'flex-end', flexWrap: 'wrap'
-            }}>
+            {/* Filter */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div>
                     <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '6px' }}>Bulan</label>
                     <select value={bulan} onChange={e => setBulan(+e.target.value)}
@@ -277,7 +373,7 @@ export default function MonitoringLaporan({ onNavigate }) {
             </div>
 
             {/* Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: '12px', marginBottom: '24px' }}>
                 {[
                     { label: 'Draft', val: summaryStats.draft, ...STATUS_COLOR['Draft'] },
                     { label: 'Dikirim', val: summaryStats.dikirim, ...STATUS_COLOR['Dikirim'] },
@@ -287,7 +383,6 @@ export default function MonitoringLaporan({ onNavigate }) {
                 ].map(s => (
                     <div key={s.label} style={{
                         padding: '16px', borderRadius: '10px', background: s.bg, textAlign: 'center',
-                        border: `1px solid ${s.bg}`
                     }}>
                         <div style={{ fontSize: '28px', fontWeight: 700, color: s.text }}>{s.val}</div>
                         <div style={{ fontSize: '12px', color: s.text, marginTop: '2px' }}>{s.label}</div>
@@ -295,14 +390,24 @@ export default function MonitoringLaporan({ onNavigate }) {
                 ))}
             </div>
 
-            {/* Tabel Laporan */}
+            {/* Tabel */}
             <div style={{
                 background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
-                padding: '24px', marginBottom: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+                padding: '24px', marginBottom: '20px', boxShadow: '0 1px 4px rgba(0,0,0,.05)',
             }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>
                     Status per Seksi — {BULAN_NAMES[bulan]} {tahun}
                 </h2>
+
+                {/* Warning jika ada seksi belum upload */}
+                {belumUpload.length > 0 && !loading && (
+                    <div style={{
+                        padding: '12px 16px', borderRadius: '8px', marginBottom: '16px',
+                        background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '13px', color: '#9a3412',
+                    }}>
+                        ⚠️ <strong>{belumUpload.length} seksi belum upload:</strong> {belumUpload.join(', ')}
+                    </div>
+                )}
 
                 {loading ? (
                     <p style={{ color: '#94a3b8', textAlign: 'center', padding: '20px' }}>Memuat...</p>
@@ -311,7 +416,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
-                                    {['Seksi', 'File', 'Status', 'Dikirim', 'Catatan Revisi', 'Aksi'].map(h => (
+                                    {['Seksi', 'Judul / File', 'Status', 'Dikirim', 'Catatan Revisi', 'Aksi'].map(h => (
                                         <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, borderBottom: '1px solid #e2e8f0' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -322,9 +427,11 @@ export default function MonitoringLaporan({ onNavigate }) {
                                     return (
                                         <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                             <td style={{ padding: '12px', fontWeight: 600 }}>{row.name}</td>
-                                            <td style={{ padding: '12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                                            <td style={{ padding: '12px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px' }}>
                                                 {l?.file_url
-                                                    ? <a href={l.file_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>{l.file_name || 'Lihat'}</a>
+                                                    ? <a href={l.file_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>
+                                                        {l.judul_laporan || l.file_name || 'Lihat'}
+                                                    </a>
                                                     : <span style={{ color: '#94a3b8' }}>Belum ada</span>
                                                 }
                                             </td>
@@ -332,17 +439,17 @@ export default function MonitoringLaporan({ onNavigate }) {
                                                 {l ? (
                                                     <span style={{
                                                         padding: '3px 10px', borderRadius: '99px', fontWeight: 600, fontSize: '12px',
-                                                        background: STATUS_COLOR[l.status]?.bg, color: STATUS_COLOR[l.status]?.text
+                                                        background: STATUS_COLOR[l.status]?.bg, color: STATUS_COLOR[l.status]?.text,
                                                     }}>{l.status}</span>
                                                 ) : (
-                                                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>Belum upload</span>
+                                                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>Belum Upload</span>
                                                 )}
                                             </td>
-                                            <td style={{ padding: '12px', fontSize: '12px', color: '#64748b' }}>
-                                                {l?.submitted_at ? new Date(l.submitted_at).toLocaleDateString('id-ID') : '-'}
+                                            <td style={{ padding: '12px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                                {l?.submitted_at ? new Date(l.submitted_at).toLocaleDateString('id-ID') : '—'}
                                             </td>
                                             <td style={{ padding: '12px', maxWidth: '180px', fontSize: '12px', color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {l?.catatan_revisi || '-'}
+                                                {l?.catatan_revisi || '—'}
                                             </td>
                                             <td style={{ padding: '12px' }}>
                                                 {l ? renderActions(l) : <span style={{ fontSize: '12px', color: '#94a3b8' }}>Belum Upload</span>}
@@ -356,19 +463,81 @@ export default function MonitoringLaporan({ onNavigate }) {
                 )}
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <button
-                    onClick={() => onNavigate('gabung-laporan', { bulan, tahun })}
-                    disabled={!semuaDisetujui || sudahFinal || sections.length === 0}
-                    style={{
-                        padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, fontSize: '15px',
-                        cursor: semuaDisetujui && !sudahFinal ? 'pointer' : 'not-allowed',
-                        background: semuaDisetujui && !sudahFinal ? '#7c3aed' : '#e2e8f0',
-                        color: semuaDisetujui && !sudahFinal ? '#fff' : '#94a3b8',
-                    }}>
-                    📎 Gabungkan Laporan {!semuaDisetujui && sections.length > 0 && '(Belum semua disetujui)'}
-                </button>
+            {/* Laporan Orphan — seksi_id tidak cocok dengan sections */}
+            {orphanLaporan.length > 0 && (
+                <div style={{
+                    background: '#fffbeb', border: '1px solid #fde68a',
+                    borderRadius: '12px', padding: '20px', marginBottom: '20px',
+                }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#92400e', margin: '0 0 12px' }}>
+                        ⚠️ Laporan Tidak Terasosiasi ({orphanLaporan.length})
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#78350f', margin: '0 0 12px' }}>
+                        Laporan berikut ada di database tetapi <strong>seksi_id</strong>-nya tidak cocok dengan daftar seksi yang ada.
+                        Ini bisa disebabkan oleh seksiId yang tidak sinkron antara data user dan tabel sections.
+                    </p>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                                <tr style={{ background: '#fef3c7' }}>
+                                    {['seksi_id', 'Judul / File', 'Status', 'Bulan/Tahun', 'Aksi'].map(h => (
+                                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: '#92400e', fontWeight: 600, borderBottom: '1px solid #fde68a' }}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {orphanLaporan.map(l => (
+                                    <tr key={l.id} style={{ borderBottom: '1px solid #fef3c7' }}>
+                                        <td style={{ padding: '10px' }}>
+                                            <code style={{ background: '#fef9c3', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>seksi_id={l.seksi_id}</code>
+                                        </td>
+                                        <td style={{ padding: '10px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {l.file_url
+                                                ? <a href={l.file_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>{l.judul_laporan || l.file_name || 'Lihat'}</a>
+                                                : <span style={{ color: '#94a3b8' }}>—</span>
+                                            }
+                                        </td>
+                                        <td style={{ padding: '10px' }}>
+                                            <span style={{
+                                                padding: '3px 10px', borderRadius: '99px', fontWeight: 600, fontSize: '12px',
+                                                background: STATUS_COLOR[l.status]?.bg, color: STATUS_COLOR[l.status]?.text,
+                                            }}>{l.status}</span>
+                                        </td>
+                                        <td style={{ padding: '10px', whiteSpace: 'nowrap', color: '#64748b' }}>
+                                            {BULAN_NAMES[l.bulan]} {l.tahun}
+                                        </td>
+                                        <td style={{ padding: '10px' }}>
+                                            {renderActions(l)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Tombol Aksi */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button
+                        onClick={() => onNavigate('gabung-laporan', { bulan, tahun })}
+                        disabled={!semuaDisetujui || sudahFinal || sections.length === 0}
+                        style={{
+                            padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, fontSize: '15px',
+                            cursor: semuaDisetujui && !sudahFinal ? 'pointer' : 'not-allowed',
+                            background: semuaDisetujui && !sudahFinal ? '#7c3aed' : '#e2e8f0',
+                            color: semuaDisetujui && !sudahFinal ? '#fff' : '#94a3b8',
+                        }}
+                    >
+                        📎 Gabungkan Laporan
+                    </button>
+                    {!semuaDisetujui && belumUpload.length > 0 && sections.length > 0 && (
+                        <p style={{ fontSize: '12px', color: '#9a3412', margin: 0 }}>
+                            Menunggu: {belumUpload.join(', ')}
+                        </p>
+                    )}
+                </div>
 
                 {semuaDisetujui && !sudahFinal && (
                     <button
@@ -377,9 +546,9 @@ export default function MonitoringLaporan({ onNavigate }) {
                         style={{
                             padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, fontSize: '15px',
                             cursor: processing ? 'not-allowed' : 'pointer',
-                            background: processing ? '#94a3b8' : '#dc2626',
-                            color: '#fff',
-                        }}>
+                            background: processing ? '#94a3b8' : '#dc2626', color: '#fff',
+                        }}
+                    >
                         {processing ? '⏳ Proses...' : '🔒 Finalisasi & Kunci Laporan'}
                     </button>
                 )}
@@ -389,11 +558,11 @@ export default function MonitoringLaporan({ onNavigate }) {
             {reviewModal && (
                 <div style={{
                     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
                 }}>
                     <div style={{
-                        background: '#fff', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '480px',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
+                        background: '#fff', borderRadius: '16px', padding: '28px',
+                        width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,.2)',
                     }}>
                         <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700 }}>
                             {reviewModal.action === 'approve' ? '✅ Setujui Laporan' : '🔄 Minta Revisi'}
@@ -404,7 +573,8 @@ export default function MonitoringLaporan({ onNavigate }) {
                             </strong>
                             {' · '}Status saat ini:
                             <span style={{
-                                marginLeft: '4px', padding: '1px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600,
+                                marginLeft: '4px', padding: '1px 8px', borderRadius: '99px',
+                                fontSize: '11px', fontWeight: 600,
                                 background: STATUS_COLOR[reviewModal.laporan.status]?.bg,
                                 color: STATUS_COLOR[reviewModal.laporan.status]?.text,
                             }}>
@@ -423,31 +593,31 @@ export default function MonitoringLaporan({ onNavigate }) {
                                     rows={4}
                                     placeholder="Tuliskan bagian yang perlu diperbaiki..."
                                     style={{
-                                        width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1',
-                                        fontSize: '14px', resize: 'vertical', boxSizing: 'border-box'
+                                        width: '100%', padding: '10px', borderRadius: '8px',
+                                        border: '1px solid #cbd5e1', fontSize: '14px',
+                                        resize: 'vertical', boxSizing: 'border-box',
                                     }}
                                 />
                             </div>
                         )}
 
                         {reviewModal.action === 'approve' && (
-                            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px', lineHeight: '1.6' }}>
-                                Laporan akan ditandai sebagai <strong>Disetujui</strong>. Tindakan ini dapat dibatalkan
-                                dengan memilih <em>↩ Revisi</em> pada baris laporan jika diperlukan koreksi.
+                            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px', lineHeight: 1.6 }}>
+                                Laporan akan ditandai sebagai <strong>Disetujui</strong>. Tindakan ini dapat dibatalkan dengan memilih <em>↩ Revisi</em>.
                             </p>
                         )}
 
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                            <button onClick={() => setReviewModal(null)}
-                                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>
-                                Batal
-                            </button>
-                            <button onClick={handleReview} disabled={processing}
-                                style={{
-                                    padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 700, cursor: 'pointer',
-                                    background: reviewModal.action === 'approve' ? '#16a34a' : '#dc2626',
-                                    color: '#fff'
-                                }}>
+                            <button onClick={() => setReviewModal(null)} style={{
+                                padding: '10px 20px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                                background: '#fff', cursor: 'pointer', fontWeight: 600,
+                            }}>Batal</button>
+                            <button onClick={handleReview} disabled={processing} style={{
+                                padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 700,
+                                cursor: 'pointer',
+                                background: reviewModal.action === 'approve' ? '#16a34a' : '#dc2626',
+                                color: '#fff',
+                            }}>
                                 {processing ? 'Proses...' : reviewModal.action === 'approve' ? 'Ya, Setujui' : 'Kirim Revisi'}
                             </button>
                         </div>

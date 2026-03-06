@@ -203,39 +203,10 @@ export const generateLetterhead = async (logoPath) => {
  * @returns {string} HTML string for letterhead
  */
 export const generateLetterheadHTML = (logoBase64) => {
-    return `
-    <table style="width:100%; margin-bottom:10pt; font-family: ${LETTERHEAD_FONT.FAMILY}, sans-serif;">
-        <tr>
-            <td style="width:${LETTERHEAD_LOGO.WIDTH_CM}cm; text-align:center; vertical-align:middle;">
-                ${logoBase64 ?
-            `<img src="${logoBase64}" style="width:${LETTERHEAD_LOGO.WIDTH_CM}cm; height:${LETTERHEAD_LOGO.HEIGHT_CM}cm;" />` :
-            '[LOGO]'
-        }
-            </td>
-            <td style="text-align:center; vertical-align:middle;">
-                <div style="font-size:${LETTERHEAD_FONT.SIZE.LINE_1_3}pt; font-weight:normal; line-height:1.3;">
-                    ${LETTERHEAD_STYLES.LINE_1.text}
-                </div>
-                <div style="font-size:${LETTERHEAD_FONT.SIZE.LINE_1_3}pt; font-weight:normal; line-height:1.3;">
-                    ${LETTERHEAD_STYLES.LINE_2.text}
-                </div>
-                <div style="font-size:${LETTERHEAD_FONT.SIZE.LINE_1_3}pt; font-weight:normal; line-height:1.3;">
-                    ${LETTERHEAD_STYLES.LINE_3.text}
-                </div>
-                <div style="font-size:${LETTERHEAD_FONT.SIZE.LINE_4}pt; font-weight:bold; line-height:1.3;">
-                    ${LETTERHEAD_STYLES.LINE_4.text}
-                </div>
-                <div style="font-size:${LETTERHEAD_FONT.SIZE.LINE_5}pt; font-weight:normal; line-height:1.3;">
-                    ${LETTERHEAD_STYLES.LINE_5.text}
-                </div>
-                <div style="font-size:${LETTERHEAD_FONT.SIZE.LINE_6}pt; font-weight:normal; line-height:1.3;">
-                    ${LETTERHEAD_STYLES.LINE_6.text}
-                </div>
-            </td>
-        </tr>
-    </table>
-    <div style="border-bottom:${LETTERHEAD_BORDER.THICKNESS_PT}pt solid #${LETTERHEAD_BORDER.COLOR}; margin-bottom:15pt;"></div>
-    `;
+    const f = LETTERHEAD_FONT.FAMILY;
+    const logoW = LETTERHEAD_LOGO.WIDTH_CM;
+    const logoH = LETTERHEAD_LOGO.HEIGHT_CM;
+    return `<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border:none;margin:0;padding:0;font-family:${f},sans-serif;"><tr><td style="width:${logoW}cm;text-align:center;vertical-align:middle;padding:4pt 6pt 0 0;border:none;">${logoBase64 ? `<img src="${logoBase64}" style="width:${logoW}cm;height:${logoH}cm;display:block;margin:0 auto;" />` : '[LOGO]'}</td><td style="text-align:center;vertical-align:middle;padding:4pt 0 0 0;border:none;"><div style="font-family:${f},sans-serif;font-size:${LETTERHEAD_FONT.SIZE.LINE_1_3}pt;font-weight:normal;line-height:1.3;margin:0;padding:0;">${LETTERHEAD_STYLES.LINE_1.text}</div><div style="font-family:${f},sans-serif;font-size:${LETTERHEAD_FONT.SIZE.LINE_1_3}pt;font-weight:normal;line-height:1.3;margin:0;padding:0;">${LETTERHEAD_STYLES.LINE_2.text}</div><div style="font-family:${f},sans-serif;font-size:${LETTERHEAD_FONT.SIZE.LINE_1_3}pt;font-weight:normal;line-height:1.3;margin:0;padding:0;">${LETTERHEAD_STYLES.LINE_3.text}</div><div style="font-family:${f},sans-serif;font-size:${LETTERHEAD_FONT.SIZE.LINE_4}pt;font-weight:bold;line-height:1.4;margin:1pt 0;padding:0;">${LETTERHEAD_STYLES.LINE_4.text}</div><div style="font-family:${f},sans-serif;font-size:${LETTERHEAD_FONT.SIZE.LINE_5}pt;font-weight:normal;line-height:1.3;margin:0;padding:0;">${LETTERHEAD_STYLES.LINE_5.text}</div><div style="font-family:${f},sans-serif;font-size:${LETTERHEAD_FONT.SIZE.LINE_6}pt;font-weight:normal;line-height:1.3;margin:0;padding:0;">${LETTERHEAD_STYLES.LINE_6.text}</div></td></tr><tr><td colspan="2" style="border-top:3pt solid #000000;height:0;padding:0;line-height:0;font-size:0;border-left:none;border-right:none;border-bottom:none;"></td></tr><tr><td colspan="2" style="border-top:1pt solid #000000;height:0;padding:0;line-height:0;font-size:0;border-left:none;border-right:none;border-bottom:none;"></td></tr></table><p style="margin:0 0 12pt 0;padding:0;line-height:0;font-size:0;"></p>`.trim();
 };
 
 export default {

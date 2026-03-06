@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useReport } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import KopSurat from '../common/KopSurat';
 
 const CoverLetter = () => {
     const { coverLetterData, updateCoverLetter } = useReport();
@@ -8,13 +9,13 @@ const CoverLetter = () => {
 
     // Local state for editing
     const [formData, setFormData] = useState({
-        // Letterhead fields (editable)
+        // Letterhead fields — harus selalu cocok dengan letterheadConfig.js dan KopSurat.jsx DEFAULT_TEXT
         letterhead1: 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA',
         letterhead2: 'DIREKTORAT JENDERAL IMIGRASI',
         letterhead3: 'KANTOR WILAYAH SUMATERA UTARA',
         letterhead4: 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR',
-        letterhead5: 'Jalan Raya Medan Km. 11,5, Purbasetan, Tanjung Dolok, Simalungun',
-        letterhead6: 'Laman: imigrasiSiantar.id, Surel: kanim.siantar@gmail.id Faks: kanim@kemenkumham.go.id',
+        letterhead5: 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun',
+        letterhead6: 'Laman: imigrasipematangsiantar.kemenkumham.go.id, Pos-el: knm.pematangsiantar@kemenkumham.go.id',
         // Cover letter fields
         nomor: 'WIM.2.IMI.4-PR.04.01-3291',
         tanggal: '19 Agustus 2025',
@@ -72,73 +73,15 @@ const CoverLetter = () => {
 
                 {/* Konten Surat */}
                 <div className="p-12 bg-white" style={{ fontFamily: 'Times New Roman, serif' }}>
-                    {/* Kop Surat - Semua teks dapat diedit */}
-                    <div className="flex items-start gap-4 pb-2 mb-0">
-                        {/* Logo */}
-                        <div className="flex-shrink-0">
-                            <img
-                                src="/src/assets/logo-kementerian-imigrasi.png"
-                                alt="Logo"
-                                width="80"
-                                height="80"
-                                className="object-contain"
-                            />
-                        </div>
+                    {/* KOP SURAT — komponen global */}
+                    <KopSurat
+                        data={formData}
+                        editable={true}
+                        onChange={handleChange}
+                    />
 
-                        {/* Letterhead Text - All Editable */}
-                        <div className="flex-1 text-center space-y-0.5">
-                            {/* Line 1 */}
-                            <input
-                                type="text"
-                                value={formData.letterhead1}
-                                onChange={(e) => handleChange('letterhead1', e.target.value)}
-                                className="w-full text-center px-2 py-0.5 border border-gray-200 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none font-bold"
-                                style={{ fontSize: '9pt', letterSpacing: '0.3px' }}
-                            />
-                            {/* Line 2 */}
-                            <input
-                                type="text"
-                                value={formData.letterhead2}
-                                onChange={(e) => handleChange('letterhead2', e.target.value)}
-                                className="w-full text-center px-2 py-0.5 border border-gray-200 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none font-bold"
-                                style={{ fontSize: '8.5pt' }}
-                            />
-                            {/* Line 3 */}
-                            <input
-                                type="text"
-                                value={formData.letterhead3}
-                                onChange={(e) => handleChange('letterhead3', e.target.value)}
-                                className="w-full text-center px-2 py-0.5 border border-gray-200 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none font-bold"
-                                style={{ fontSize: '8.5pt' }}
-                            />
-                            {/* Line 4 */}
-                            <input
-                                type="text"
-                                value={formData.letterhead4}
-                                onChange={(e) => handleChange('letterhead4', e.target.value)}
-                                className="w-full text-center px-2 py-0.5 border border-gray-200 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none font-bold"
-                                style={{ fontSize: '11pt' }}
-                            />
-                            {/* Line 5 - Address */}
-                            <input
-                                type="text"
-                                value={formData.letterhead5}
-                                onChange={(e) => handleChange('letterhead5', e.target.value)}
-                                className="w-full text-center px-2 py-0.5 border border-gray-200 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
-                                style={{ fontSize: '7.5pt', fontWeight: 'normal', marginTop: '4px' }}
-                            />
-                            {/* Line 6 - Contact */}
-                            <input
-                                type="text"
-                                value={formData.letterhead6}
-                                onChange={(e) => handleChange('letterhead6', e.target.value)}
-                                className="w-full text-center px-2 py-0.5 border border-gray-200 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
-                                style={{ fontSize: '7.5pt', fontWeight: 'normal' }}
-                            />
-                        </div>
-                    </div>
-                    {/* Border line - tight under letterhead */}
-                    <div className="border-b-2 border-black mb-4"></div>
+                    {/* Spacer setelah kop surat */}
+                    <div style={{ marginBottom: '16px' }}></div>
 
                     {/* Tanggal (di kanan atas, setelah kop surat) */}
                     <div className="text-right mb-6 text-sm">
