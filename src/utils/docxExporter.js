@@ -63,6 +63,14 @@ import {
 import { fetchImageAsArrayBuffer, base64ToArrayBuffer, getMimeFromBase64, scaleToMaxWidth } from './imageHandler';
 import { generateLetterhead } from './letterheadGenerator';
 
+// ==================== XML SANITIZER ====================
+const cleanXml = (str) => {
+    if (typeof str !== 'string') return str;
+    // Remove illegal XML control characters
+    // eslint-disable-next-line no-control-regex
+    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
+};
+
 // ==================== PARAGRAPH HELPERS ====================
 
 /**
@@ -70,7 +78,7 @@ import { generateLetterhead } from './letterheadGenerator';
  */
 const tr = (text, opts = {}) =>
     new TextRun({
-        text: text || '',
+        text: cleanXml(text || ''),
         font: FONT.NAME,
         size: opts.size ?? FONT.SIZE.BODY,
         bold: opts.bold ?? false,
@@ -126,18 +134,20 @@ const removePageBreakStyles = (html) => {
 
 const stripHtml = (html) => {
     if (!html) return '';
-    return removePageBreakStyles(html)
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n\n')
-        .replace(/<p[^>]*>/gi, '')
-        .replace(/<[^>]+>/g, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
+    return cleanXml(
+        removePageBreakStyles(html)
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/p>/gi, '\n\n')
+            .replace(/<p[^>]*>/gi, '')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim()
+    );
 };
 
 // ==================== HTML → DOCX CONVERTER ====================
@@ -184,50 +194,90 @@ const inlineNodeToRuns = (node, inherited = {}) => {
 };
 
 /**
- * Convert a <tr> element to a DOCX TableRow.
- * Handles colspan and rowspan attributes.
+ * Convert a <table> HTML element into a DOCX Table (Grid-Aware).
  */
-const htmlRowToDocxRow = (trEl, isHeader = false) => {
-    const cells = [];
-    Array.from(trEl.querySelectorAll('td, th')).forEach(cell => {
-        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-        const rawText = cell.textContent?.trim() || '';
-        // Build runs from inline content
-        const runs = [];
-        cell.childNodes.forEach(child => runs.push(...inlineNodeToRuns(child, { bold: isHeader })));
-        const effectiveRuns = runs.length > 0 ? runs : [new TextRun({ text: rawText, font: FONT.NAME, size: FONT.SIZE.BODY, bold: isHeader, color: '000000' })];
-
-        cells.push(new TableCell({
-            columnSpan: colspan > 1 ? colspan : 1,
-            borders: CELL_BORDER,
-            shading: isHeader ? { fill: 'D9E2F3' } : undefined,
-            verticalAlign: VerticalAlign.CENTER,
-            children: [new Paragraph({
-                children: effectiveRuns,
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 60, after: 60, line: SPACING.LINE_1 },
-            })],
-        }));
-    });
-    return cells.length > 0 ? new TableRow({ children: cells, tableHeader: isHeader }) : null;
-};
-
-/**
- * Convert a <table> HTML element into a DOCX Table.
- */
-const htmlTableToDocxTable = (tableEl) => {
-    const rows = [];
+export const htmlTableToDocxTable = (tableEl) => {
     const allTrs = Array.from(tableEl.querySelectorAll('tr'));
-    // Detect header rows (inside <thead> or first row with <th>)
+    if (allTrs.length === 0) return null;
+
     const theadTrs = new Set(Array.from(tableEl.querySelectorAll('thead tr')));
 
-    allTrs.forEach(tr => {
-        const isHeader = theadTrs.has(tr) || tr.querySelector('th') !== null;
-        const row = htmlRowToDocxRow(tr, isHeader);
-        if (row) rows.push(row);
-    });
+    // 1. Calculate max columns across all rows
+    const maxCols = allTrs.reduce((max, row) => {
+        const cells = Array.from(row.querySelectorAll('th, td'));
+        const colCount = cells.reduce((sum, cell) => sum + (parseInt(cell.getAttribute('colspan') || '1', 10)), 0);
+        return Math.max(max, colCount);
+    }, 1);
 
-    if (rows.length === 0) return null;
+    const defaultColPct = Math.floor(100 / maxCols);
+
+    // 2. Track occupied cells for rowSpan
+    const occupied = Array.from({ length: allTrs.length }, () => Array(maxCols).fill(false));
+    const rows = [];
+
+    allTrs.forEach((tr, rowIdx) => {
+        const cells = Array.from(tr.querySelectorAll('th, td'));
+        const isHeader = theadTrs.has(tr) || tr.querySelector('th') !== null;
+        const docxCells = [];
+        let currentCol = 0;
+
+        cells.forEach((cell) => {
+            // Skip occupied
+            while (currentCol < maxCols && occupied[rowIdx][currentCol]) {
+                currentCol++;
+            }
+            if (currentCol >= maxCols) return;
+
+            const colspan = Math.min(parseInt(cell.getAttribute('colspan') || '1', 10), maxCols - currentCol);
+            const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+            const alignment = cell.style.textAlign || (isHeader ? 'center' : 'left');
+
+            // Mark occupied
+            for (let r = 0; r < rowspan; r++) {
+                for (let c = 0; c < colspan; c++) {
+                    if (rowIdx + r < allTrs.length) {
+                        occupied[rowIdx + r][currentCol + c] = true;
+                    }
+                }
+            }
+
+            const cellWidthPct = defaultColPct * colspan;
+
+            const paragraphs = Array.from(cell.childNodes).flatMap(node => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const txt = stripHtml(node.textContent || '').trim();
+                    return txt ? [para(txt, { alignment, bold: isHeader })] : [];
+                }
+                if (node.tagName?.toLowerCase() === 'p') {
+                    const txt = stripHtml(node.textContent || '').trim();
+                    return txt ? [para(txt, { alignment, bold: isHeader })] : [];
+                }
+                return [];
+            });
+
+            if (paragraphs.length === 0) {
+                paragraphs.push(para('', { alignment, bold: isHeader }));
+            }
+
+            docxCells.push(new TableCell({
+                children: paragraphs,
+                columnSpan: colspan > 1 ? colspan : undefined,
+                rowSpan: rowspan > 1 ? rowspan : undefined,
+                shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                width: { size: Math.round(cellWidthPct), type: WidthType.PERCENTAGE },
+                borders: CELL_BORDER,
+            }));
+
+            currentCol += colspan;
+        });
+
+        if (docxCells.length > 0) {
+            rows.push(new TableRow({
+                children: docxCells,
+                tableHeader: isHeader,
+            }));
+        }
+    });
 
     return new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },

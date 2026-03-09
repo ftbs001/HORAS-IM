@@ -56,6 +56,14 @@ const fmtDate = (d) => (d || new Date()).toLocaleDateString('id-ID', {
     day: 'numeric', month: 'long', year: 'numeric'
 });
 
+// ─── XML Sanitizer ──────────────────────────────────────────────────────────
+const cleanXml = (str) => {
+    if (typeof str !== 'string') return str;
+    // Remove illegal XML control characters except tab, newline, carriage return
+    // eslint-disable-next-line no-control-regex
+    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -166,10 +174,23 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             },
             {
                 name: 'Konten Tidak Kosong',
-                pass: approved.every(r => r.laporan?.content && r.laporan.content.length > 10),
-                message: approved.every(r => r.laporan?.content && r.laporan.content.length > 10)
-                    ? 'Semua laporan memiliki konten'
-                    : 'Beberapa laporan tidak memiliki konten',
+                pass: approved.every(r => {
+                    const l = r.laporan;
+                    if (!l) return false;
+                    // Bypass internal content check, trust the uploaded file presence
+                    return !!l.file_url;
+                }),
+                message: approved.every(r => {
+                    const l = r.laporan;
+                    if (!l) return false;
+                    return !!l.file_url;
+                })
+                    ? 'Semua laporan memiliki file'
+                    : 'Kosong: ' + approved.filter(r => {
+                        const l = r.laporan;
+                        if (!l) return true;
+                        return !l.file_url;
+                    }).map(r => r.name).join(', ') + ' (Harap upload ulang file Word di seksi ini)',
             },
             {
                 name: 'Struktur BAB Lengkap',
@@ -320,19 +341,25 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ── HELPER: TextRun ──────────────────────────────────────────────
             const TR = (text, o = {}) => new TextRun({
-                text, font: FONT, size: o.size || F_BODY,
+                text: cleanXml(text), font: FONT, size: o.size || F_BODY,
                 bold: o.bold || false, italics: o.italics || false,
                 underline: o.underline,
             });
 
             // ── HELPER: body paragraph (justify, 1.5, first-line indent) ────
-            const PARA = (runs, o = {}) => new Paragraph({
-                children: Array.isArray(runs) ? runs : [TR(runs, o)],
-                alignment: o.align || AlignmentType.JUSTIFIED,
-                spacing: { ...LS_15, before: o.before || 0, after: o.after !== undefined ? o.after : 120 },
-                indent: o.noIndent ? undefined : { firstLine: INDENT_1 },
-                keepNext: o.keepNext || false,
-            });
+            const PARA = (runs, o = {}) => {
+                const children = Array.isArray(runs)
+                    ? runs
+                    : [TR(typeof runs === 'string' ? cleanXml(runs) : runs, o)];
+
+                return new Paragraph({
+                    children: children.length > 0 ? children : [TR('')],
+                    alignment: o.align || AlignmentType.JUSTIFIED,
+                    spacing: { ...LS_15, before: o.before || 0, after: o.after !== undefined ? o.after : 120 },
+                    indent: o.noIndent ? undefined : { firstLine: INDENT_1 },
+                    keepNext: o.keepNext || false,
+                });
+            };
 
             // ── HELPER: heading paragraph (center/left, bold, no indent) ────
             const HEAD = (text, level, o = {}) => new Paragraph({
@@ -832,33 +859,54 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 return childRuns;
             };
 
-            // ── Helper: convert a <table> DOM element → docx Table
+            // ── Helper: convert a <table> DOM element → docx Table (Grid-Aware)
             const htmlTableToDocx = (tableEl) => {
                 const rows = Array.from(tableEl.querySelectorAll('tr'));
                 if (rows.length === 0) return null;
 
-                // Calculate max columns
+                // 1. Calculate max columns across all rows (including colspans)
                 const maxCols = rows.reduce((max, row) => {
                     const cells = Array.from(row.querySelectorAll('th, td'));
-                    const colCount = cells.reduce((sum, cell) => {
-                        return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                    }, 0);
+                    const colCount = cells.reduce((sum, cell) => sum + (parseInt(cell.getAttribute('colspan') || '1', 10)), 0);
                     return Math.max(max, colCount);
                 }, 1);
 
                 const colPct = Math.floor(100 / maxCols);
 
-                const docxRows = rows.map((row, rowIdx) => {
+                // 2. Track occupied cells for rowSpan
+                const occupied = Array.from({ length: rows.length }, () => Array(maxCols).fill(false));
+                const docxRows = [];
+
+                rows.forEach((row, rowIdx) => {
                     const cells = Array.from(row.querySelectorAll('th, td'));
-                    const docxCells = cells.map((cell) => {
-                        const colSpan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                    const docxCells = [];
+                    let currentCol = 0;
+
+                    cells.forEach((cell) => {
+                        // Skip cells already occupied by a rowSpan from above
+                        while (currentCol < maxCols && occupied[rowIdx][currentCol]) {
+                            currentCol++;
+                        }
+                        if (currentCol >= maxCols) return;
+
+                        const colSpan = Math.min(parseInt(cell.getAttribute('colspan') || '1', 10), maxCols - currentCol);
+                        const rowSpan = parseInt(cell.getAttribute('rowspan') || '1', 10);
                         const isHeader = cell.tagName.toLowerCase() === 'th';
-                        const cellText = decodeHtmlEntities(cell.textContent || '').trim();
                         const cellRuns = nodeToRuns(cell);
 
-                        return new TableCell({
+                        // Mark occupied cells for current and future rows
+                        for (let r = 0; r < rowSpan; r++) {
+                            for (let c = 0; c < colSpan; c++) {
+                                if (rowIdx + r < rows.length) {
+                                    occupied[rowIdx + r][currentCol + c] = true;
+                                }
+                            }
+                        }
+
+                        docxCells.push(new TableCell({
                             columnSpan: colSpan > 1 ? colSpan : undefined,
-                            width: { size: colPct * colSpan, type: WidthType.PERCENTAGE },
+                            rowSpan: rowSpan > 1 ? rowSpan : undefined,
+                            width: { size: Math.round(colPct * colSpan), type: WidthType.PERCENTAGE },
                             shading: isHeader ? { fill: 'F5F5F5' } : undefined,
                             borders: {
                                 top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
@@ -867,25 +915,27 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                             },
                             children: [new Paragraph({
-                                children: cellRuns.length > 0
-                                    ? cellRuns
-                                    : [TR(cellText, { bold: isHeader })],
+                                children: cellRuns.length > 0 ? cellRuns : [TR('')],
                                 alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
                                 spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
                             })],
-                        });
+                        }));
+
+                        currentCol += colSpan;
                     });
 
-                    return new TableRow({
-                        children: docxCells,
-                        tableHeader: rowIdx === 0,
-                    });
+                    if (docxCells.length > 0) {
+                        docxRows.push(new TableRow({
+                            children: docxCells,
+                            tableHeader: rowIdx === 0,
+                        }));
+                    }
                 });
 
-                return new Table({
+                return docxRows.length > 0 ? new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
                     rows: docxRows,
-                });
+                }) : null;
             };
 
             // ── Helper: convert HTML string (from docx_html / mammoth output) → docx elements[]
@@ -1014,59 +1064,103 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         return [...subSubBab(headingTxt, '')];
                     }
                     case 'table': {
-                        const { rows = [] } = block;
+                        const { rows = [], colWidths = [] } = block;
                         if (rows.length === 0) return [];
                         const maxCols = rows.reduce((m, row) => {
                             const cols = row.reduce((s, c) => s + (c.colspan || 1), 0);
                             return Math.max(m, cols);
                         }, 1);
-                        const colPct = Math.floor(100 / maxCols);
+
+                        // Default fallback: evenly distributed
+                        const defaultColPct = Math.floor(100 / maxCols);
 
                         // Helper: build cell child runs — uses per-run rich text if available
                         const buildCellRuns = (cell, isHeader) => {
                             if (cell.runs && cell.runs.length > 0) {
                                 return cell.runs.map(r => new TextRun({
-                                    text: r.text || '',
+                                    text: cleanXml(r.text || ''),
                                     font: FONT, size: F_BODY,
                                     bold: r.bold || isHeader,
                                     italics: r.italic || false,
                                     underline: r.underline ? { type: UnderlineType.SINGLE } : undefined,
                                 }));
                             }
-                            return [TR(cell.text || '', { bold: isHeader || !!cell.bold })];
+                            return [TR(cleanXml(cell.text || ''), { bold: isHeader || !!cell.bold })];
                         };
 
-                        const docxRows = rows.map((row, ri) =>
-                            new TableRow({
-                                children: row.filter(c => !c.vContinue).map((cell) => {
-                                    const isHeader = ri === 0;
-                                    return new TableCell({
-                                        columnSpan: cell.colspan || undefined,
-                                        rowSpan: cell.rowspan || undefined,
-                                        width: { size: colPct * (cell.colspan || 1), type: WidthType.PERCENTAGE },
-                                        shading: isHeader ? { fill: 'F5F5F5' } : undefined,
-                                        borders: {
-                                            top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                            bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                            left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                            right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                        },
-                                        children: [new Paragraph({
-                                            children: buildCellRuns(cell, isHeader),
-                                            alignment: cell.align === 'center' ? AlignmentType.CENTER
-                                                : cell.align === 'right' ? AlignmentType.RIGHT
-                                                    : isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
-                                            spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
-                                        })],
-                                    });
-                                }),
-                                tableHeader: ri === 0,
-                            })
-                        );
-                        return [
+                        // Track occupied for rowSpan in structured JSON
+                        const occupied = Array.from({ length: rows.length }, () => Array(maxCols).fill(false));
+                        const docxRows = [];
+
+                        rows.forEach((row, ri) => {
+                            const docxCells = [];
+                            let currentCol = 0;
+
+                            row.forEach((cell) => {
+                                // Important: skip cells that are flagged as vContinue/merged
+                                if (cell.vContinue) return;
+
+                                // Respect the logical grid
+                                while (currentCol < maxCols && occupied[ri][currentCol]) {
+                                    currentCol++;
+                                }
+                                if (currentCol >= maxCols) return;
+
+                                const isHeader = ri === 0;
+                                const colSpan = Math.min(cell.colspan || 1, maxCols - currentCol);
+                                const rowSpan = cell.rowspan || 1;
+
+                                // Mark occupied
+                                for (let r = 0; r < rowSpan; r++) {
+                                    for (let c = 0; c < colSpan; c++) {
+                                        if (ri + r < rows.length) occupied[ri + r][currentCol + c] = true;
+                                    }
+                                }
+
+                                // Calculate actual percentage from extracted w:tblGrid colWidths
+                                let cellWidthPct = defaultColPct * colSpan;
+                                if (colWidths && colWidths.length > 0) {
+                                    cellWidthPct = 0;
+                                    for (let spanIdx = 0; spanIdx < colSpan; spanIdx++) {
+                                        const wPct = colWidths[currentCol + spanIdx];
+                                        cellWidthPct += (typeof wPct === 'number' && !isNaN(wPct) ? wPct : defaultColPct);
+                                    }
+                                }
+
+                                docxCells.push(new TableCell({
+                                    columnSpan: colSpan > 1 ? colSpan : undefined,
+                                    rowSpan: rowSpan > 1 ? rowSpan : undefined,
+                                    width: { size: Math.round(cellWidthPct), type: WidthType.PERCENTAGE },
+                                    shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                                    borders: {
+                                        top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                    },
+                                    children: [new Paragraph({
+                                        children: buildCellRuns(cell, isHeader),
+                                        alignment: cell.align === 'center' ? AlignmentType.CENTER
+                                            : cell.align === 'right' ? AlignmentType.RIGHT
+                                                : isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+                                        spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
+                                    })],
+                                }));
+                                currentCol += colSpan;
+                            });
+
+                            if (docxCells.length > 0) {
+                                docxRows.push(new TableRow({
+                                    children: docxCells,
+                                    tableHeader: ri === 0,
+                                }));
+                            }
+                        });
+
+                        return docxRows.length > 0 ? [
                             new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: docxRows }),
                             EMPTY(120),
-                        ];
+                        ] : [];
                     }
                     case 'image': {
                         if (!block.base64) return [];
@@ -1234,12 +1328,13 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             else if (cb.type === 'table') {
                                 // content_json table block (basic)
                                 const { headers = [], rows = [] } = cb;
-                                if (headers.length > 0 || rows.length > 0) {
+                                if ((headers && headers.length > 0) || (rows && rows.length > 0)) {
                                     try {
+                                        const tableHeaders = headers.length > 0 ? headers : rows[0].map(() => '');
                                         blocks.push(makeTable(
-                                            headers,
+                                            tableHeaders,
                                             rows,
-                                            headers.map(() => Math.floor(100 / headers.length))
+                                            tableHeaders.map(() => Math.floor(100 / tableHeaders.length))
                                         ));
                                         blocks.push(EMPTY(120));
                                     } catch (tblErr) {
@@ -1292,7 +1387,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             const bab3 = [
                 ...babTitle('III', 'PERMASALAHAN'),
-                PARA(`Dalam pelaksanaan tugas dan fungsi pada ${getPeriode()}, terdapat beberapa permasalahan yang dihadapi oleh Kantor Imigrasi Kelas II TPI Pematang Siantar, sebagai berikut:`),
+                PARA(`Dalam pelaksanaan tugas dan fungsi pada ${BULAN_NAMES[bulan]} ${tahun}, terdapat beberapa permasalahan yang dihadapi oleh Kantor Imigrasi Kelas II TPI Pematang Siantar, sebagai berikut:`),
 
                 ...subBab('1.  Urusan Kepegawaian', ''),
                 PARA([TR('a.  Permasalahan : ', { bold: true }), TR('Kekurangan personel di beberapa seksi sehingga beban kerja tidak merata.')]),

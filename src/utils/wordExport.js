@@ -166,6 +166,13 @@ td, th { padding: 4pt 6pt; vertical-align: top; font-size: 12pt; }
 
     const logoBase64 = await getBase64(logoUrl);
 
+    // Helper: Remove illegal XML control characters
+    const cleanXml = (str) => {
+        if (typeof str !== 'string') return str;
+        // eslint-disable-next-line no-control-regex
+        return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
+    };
+
     // ===================== SURAT PENGANTAR =====================
     if (coverLetterData && Object.keys(coverLetterData).length > 0) {
         content += `<div class="surat-pengantar">`;
@@ -297,7 +304,7 @@ td, th { padding: 4pt 6pt; vertical-align: top; font-size: 12pt; }
     traverseNodes(tocStructure);
 
     // Generate blob and return download info
-    const fullHtml = header + content + footer;
+    const fullHtml = cleanXml(header + content + footer);
     const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword' });
 
     return {

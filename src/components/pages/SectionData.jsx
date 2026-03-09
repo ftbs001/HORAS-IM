@@ -46,10 +46,23 @@ const SectionData = ({ initialSectionFilter = null }) => {
     /* ── access check ─────────────────────────────────────── */
     const isMySeksi = (section) => {
         if (isSuperAdmin) return true;
-        const myAlias = (user?.seksi?.alias || user?.seksi?.name || '').toLowerCase();
+
         const secName = (section.name || '').toLowerCase();
         const secAlias = (section.alias || '').toLowerCase();
-        return myAlias && (secName.includes(myAlias) || secAlias.includes(myAlias) || myAlias.includes(secAlias));
+
+        // 1. Check via user's linked section
+        const myAlias = (user?.seksi?.alias || user?.seksi?.name || '').toLowerCase();
+        if (myAlias && (secName.includes(myAlias) || secAlias.includes(myAlias) || myAlias.includes(secAlias))) {
+            return true;
+        }
+
+        // 2. Fallback check via user's email prefix (e.g. 'inteldakim@horas-im.local')
+        const myEmailAlias = (user?.email || '').split('@')[0].toLowerCase();
+        if (myEmailAlias && (secName.includes(myEmailAlias) || secAlias.includes(myEmailAlias))) {
+            return true;
+        }
+
+        return false;
     };
 
     /* ── double-guard deduplication ───────────────────────── */
@@ -140,7 +153,8 @@ const SectionData = ({ initialSectionFilter = null }) => {
             showNotification('Data Seksi berhasil diperbarui! ✅', 'success');
             setModalOpen(false);
         } else {
-            showNotification('Gagal menyimpan data. Silakan coba lagi.', 'error');
+            const errDetail = result.error?.message || result.error?.details || 'Error tak dikenal';
+            showNotification(`Gagal menyimpan data: ${errDetail}`, 'error');
         }
     };
 

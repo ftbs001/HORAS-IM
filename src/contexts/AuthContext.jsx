@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
                 .select(`
                     id, nama, email, role, is_active,
                     seksi_id, nip, phone,
-                    sections:seksi_id ( id, name, alias, urutan_penggabungan )
+                    sections ( id, name, alias, urutan_penggabungan )
                 `)
                 .eq('email', emailNorm)
                 .eq('password_hash', hash)
@@ -89,7 +89,8 @@ export const AuthProvider = ({ children }) => {
             if (data && !error) {
                 const userData = {
                     id: data.id, nama: data.nama, email: data.email,
-                    role: data.role, seksiId: data.seksi_id, seksi: data.sections,
+                    role: data.role, seksiId: data.seksi_id,
+                    seksi: Array.isArray(data.sections) ? (data.sections[0] || null) : (data.sections || null),
                     nip: data.nip || '', phone: data.phone || '',
                     source: 'supabase',
                 };

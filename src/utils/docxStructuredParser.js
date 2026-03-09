@@ -446,6 +446,7 @@ function parseParagraph(pEl, imageRelMap, buffer) {
 /**
  * Parse a <w:tbl> element into a structured table block.
  * Preserves:
+ *   - Column widths (w:tblGrid -> w:gridCol)
  *   - colspan (gridSpan)
  *   - vMerge / vContinue (rowspan tracking)
  *   - Per-cell rich-text runs (bold, italic, underline)
@@ -455,6 +456,26 @@ function parseTable(tblEl) {
     const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
     const rows = tblEl.getElementsByTagNameNS(ns, 'tr');
     const tableRows = [];
+
+    // ── Extract column widths (w:tblGrid) ──────────────────────────────────
+    let colWidths = [];
+    const tblGrid = tblEl.getElementsByTagNameNS(ns, 'tblGrid')[0];
+    if (tblGrid) {
+        const gridCols = tblGrid.getElementsByTagNameNS(ns, 'gridCol');
+        for (const gc of gridCols) {
+            const wVal = gc.getAttribute('w:w') || gc.getAttribute('w');
+            const parsedW = parseInt(wVal || '0', 10);
+            colWidths.push(isNaN(parsedW) ? 0 : parsedW);
+        }
+    }
+    // Convert absolute twips to percentages if valid
+    const totalWidth = colWidths.reduce((sum, w) => sum + w, 0);
+    if (totalWidth > 0) {
+        // e.g., if one col is 1500 and total is 3000, it's 50%
+        colWidths = colWidths.map(w => Math.round((w / totalWidth) * 100));
+    } else {
+        colWidths = []; // Fallback to auto if no valid data
+    }
 
     // Track rowspan counts per column index for vMerge
     // columnRowspanRemaining[colIndex] = remaining rows this col spans
@@ -549,7 +570,10 @@ function parseTable(tblEl) {
         }
     }
 
-    return { type: 'table', rows: tableRows };
+    const tableResult = { type: 'table', rows: tableRows };
+    if (colWidths.length > 0) tableResult.colWidths = colWidths;
+
+    return tableResult;
 }
 
 /* ── Image extractor from drawing element ─────────────────────────────────── */

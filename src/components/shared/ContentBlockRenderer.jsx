@@ -281,9 +281,19 @@ const renderBlock = (block, idx) => {
         case 'table': {
             // Support structured rows[] format (from docxStructuredParser)
             if (block.rows && block.rows.length > 0) {
+                // Support structured rows[] format (from docxStructuredParser)
+                const hasColWidths = block.colWidths && block.colWidths.length > 0;
+
                 return (
                     <div key={idx} style={TABLE_WRAPPER_STYLE}>
-                        <table style={TABLE_STYLE}>
+                        <table style={{ ...TABLE_STYLE, tableLayout: hasColWidths ? 'fixed' : 'auto' }}>
+                            {hasColWidths && (
+                                <colgroup>
+                                    {block.colWidths.map((w, ci) => (
+                                        <col key={ci} style={{ width: `${Math.max(w || 1, 1)}%` }} />
+                                    ))}
+                                </colgroup>
+                            )}
                             <tbody>
                                 {block.rows.map((row, ri) => (
                                     <tr key={ri}>
