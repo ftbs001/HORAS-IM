@@ -36,9 +36,65 @@ const STATUS_COLOR = {
     'Final': { bg: '#f3e8ff', text: '#7e22ce' },
 };
 
+/* ── Konfirmasi Hapus (Super Admin view) ─────────────────────────────────── */
+function HapusModalMonitoring({ laporan, onConfirm, onCancel, loading }) {
+    const BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000,
+        }}>
+            <div style={{
+                background: '#fff', borderRadius: '16px', padding: '32px 28px',
+                maxWidth: '440px', width: '100%', boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+                textAlign: 'center',
+            }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🗑️</div>
+                <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
+                    Hapus Laporan?
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.65, marginBottom: '8px' }}>
+                    Laporan <strong>{laporan?.judul_laporan || laporan?.file_name}</strong><br />
+                    ({BULAN[laporan?.bulan]} {laporan?.tahun}) akan dihapus permanen.
+                    File di storage juga dihapus.
+                </p>
+                {laporan?.final_locked && (
+                    <div style={{
+                        background: '#fef3c7', border: '1px solid #fde68a',
+                        borderRadius: '8px', padding: '10px 14px', marginBottom: '16px',
+                        fontSize: '13px', color: '#92400e', textAlign: 'left',
+                    }}>
+                        ⚠️ Laporan ini berstatus <strong>Final</strong>. Menghapus tidak dapat dibatalkan.
+                    </div>
+                )}
+                <div style={{
+                    background: '#fff1f2', border: '1px solid #fca5a5',
+                    borderRadius: '8px', padding: '10px 14px', marginBottom: '20px',
+                    fontSize: '13px', color: '#9a3412', textAlign: 'left',
+                }}>
+                    ⚠️ Tindakan ini <strong>tidak dapat dibatalkan</strong>.
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={onCancel} style={{
+                        padding: '10px 22px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                        background: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '14px',
+                    }}>Batal</button>
+                    <button onClick={onConfirm} disabled={loading} style={{
+                        padding: '10px 22px', borderRadius: '8px', border: 'none',
+                        background: loading ? '#94a3b8' : '#dc2626', color: '#fff',
+                        fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontSize: '14px',
+                    }}>
+                        {loading ? '⏳ Menghapus...' : '🗑️ Ya, Hapus'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function MonitoringLaporan({ onNavigate }) {
     const { user } = useAuth();
-    const { loadLaporan, getLaporan, subscribe, submitLaporan: ctxSubmit } = useLaporan();
+    const { loadLaporan, getLaporan, subscribe, submitLaporan: ctxSubmit, hapusLaporan: ctxHapus } = useLaporan();
 
     const [bulan, setBulan] = useState(new Date().getMonth() + 1);
     const [tahun, setTahun] = useState(new Date().getFullYear());
@@ -54,6 +110,11 @@ export default function MonitoringLaporan({ onNavigate }) {
     // DOCX inline preview
     const [docxPreviewTarget, setDocxPreviewTarget] = useState(null);
     const [docxPreviewTab, setDocxPreviewTab] = useState('structured'); // 'structured' | 'html'
+
+    // Hapus & Unlock
+    const [hapusTarget, setHapusTarget] = useState(null);
+    const [hapusLoading, setHapusLoading] = useState(false);
+    const [unlockLoading, setUnlockLoading] = useState(false);
 
     const showMsg = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
 
@@ -160,8 +221,55 @@ export default function MonitoringLaporan({ onNavigate }) {
         }
     };
 
+    // ── Hapus laporan (super_admin)
+    const handleHapus = async () => {
+        if (!hapusTarget) return;
+        setHapusLoading(true);
+        try {
+            const result = await ctxHapus({
+                id: hapusTarget.id,
+                filePath: hapusTarget.file_path,
+                bulan: hapusTarget.bulan,
+                tahun: hapusTarget.tahun,
+                userId: user?.id,
+                userName: user?.nama,
+            });
+            if (result?.error) throw new Error(result.error);
+            showMsg('success', '🗑️ Laporan berhasil dihapus.');
+            setHapusTarget(null);
+            await loadLaporan(bulan, tahun);
+        } catch (err) {
+            showMsg('error', `Hapus gagal: ${err.message}`);
+        } finally {
+            setHapusLoading(false);
+        }
+    };
+
+    // ── Buka kunci laporan Final — reset ke Draft agar admin_seksi bisa upload ulang
+    const handleUnlockFinal = async (l) => {
+        if (!window.confirm(`Buka kunci laporan "${l.judul_laporan || l.file_name}" dan kembalikan ke Draft? Seksi terkait dapat mengupload ulang.`)) return;
+        setUnlockLoading(l.id);
+        try {
+            const { error } = await supabase.from('laporan_bulanan')
+                .update({ status: 'Draft', final_locked: false, catatan_revisi: null })
+                .eq('id', l.id);
+            if (error) throw error;
+            await supabase.from('activity_logs').insert({
+                user_id: user.id, user_name: user.nama, action: 'unlock_final',
+                entity_type: 'laporan_bulanan', entity_id: l.id,
+                detail: `Buka kunci laporan seksi_id=${l.seksi_id} ${BULAN_NAMES[bulan]} ${tahun}`,
+            });
+            showMsg('success', '🔓 Laporan dibuka kunci. Status kembali ke Draft.');
+            await loadLaporan(bulan, tahun);
+        } catch (err) {
+            showMsg('error', `Gagal buka kunci: ${err.message}`);
+        } finally {
+            setUnlockLoading(false);
+        }
+    };
+
     // ── Render action buttons per status
-    const renderActions = (l) => {
+    const renderActions = (l, seksiRow) => {
         const previewBtn = (l?.structured_json?.pages?.length || l?.docx_html || l?.file_url) ? (
             <button
                 onClick={() => {
@@ -183,11 +291,52 @@ export default function MonitoringLaporan({ onNavigate }) {
             </button>
         ) : null;
 
-        if (!l || l.final_locked)
+        // Hapus button — available on all statuses unless Final
+        const hapusBtn = !l?.final_locked ? (
+            <button
+                onClick={() => setHapusTarget(l)}
+                title="Hapus laporan ini"
+                style={{
+                    padding: '5px 10px', borderRadius: '6px', border: 'none',
+                    background: '#fee2e2', color: '#b91c1c',
+                    fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                }}
+            >
+                🗑️ Hapus
+            </button>
+        ) : null;
+
+        if (!l)
+            return <span style={{ fontSize: '12px', color: '#94a3b8' }}>— Belum upload</span>;
+
+        if (l.final_locked)
             return (
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', color: '#7e22ce', fontWeight: 600 }}>🔒 Final</span>
                     {previewBtn}
+                    <button
+                        onClick={() => handleUnlockFinal(l)}
+                        disabled={unlockLoading === l.id}
+                        title="Buka kunci agar seksi bisa upload ulang"
+                        style={{
+                            padding: '5px 10px', borderRadius: '6px', border: '1px solid #d8b4fe',
+                            background: '#faf5ff', color: '#7e22ce',
+                            fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        }}
+                    >
+                        {unlockLoading === l.id ? '⏳' : '🔓 Buka Kunci'}
+                    </button>
+                    <button
+                        onClick={() => setHapusTarget(l)}
+                        title="Hapus laporan Final"
+                        style={{
+                            padding: '5px 10px', borderRadius: '6px', border: 'none',
+                            background: '#fee2e2', color: '#b91c1c',
+                            fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        }}
+                    >
+                        🗑️ Hapus
+                    </button>
                 </div>
             );
 
@@ -202,6 +351,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                     style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                     📤 Submit
                 </button>
+                {hapusBtn}
             </div>
         );
 
@@ -216,6 +366,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                     style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                     🔄 Revisi
                 </button>
+                {hapusBtn}
             </div>
         );
 
@@ -227,11 +378,13 @@ export default function MonitoringLaporan({ onNavigate }) {
                     style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: '11px', cursor: 'pointer' }}>
                     ↩ Revisi
                 </button>
+                {hapusBtn}
             </div>
         );
 
         return <span style={{ fontSize: '12px', color: '#94a3b8' }}>—</span>;
     };
+
 
     // ── Finalisasi
     const handleFinalisasi = async () => {
@@ -675,6 +828,16 @@ export default function MonitoringLaporan({ onNavigate }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Hapus Modal (Super Admin) */}
+            {hapusTarget && (
+                <HapusModalMonitoring
+                    laporan={hapusTarget}
+                    loading={hapusLoading}
+                    onConfirm={handleHapus}
+                    onCancel={() => setHapusTarget(null)}
+                />
             )}
         </div>
     );

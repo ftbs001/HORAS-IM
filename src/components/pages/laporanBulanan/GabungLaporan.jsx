@@ -317,7 +317,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 HeadingLevel, AlignmentType, PageBreak, Footer, Header,
                 PageNumber, NumberFormat, SectionType, BorderStyle,
                 WidthType, VerticalAlign, TabStopType, LeaderType,
-                UnderlineType, ImageRun, TableLayoutType,
+                UnderlineType, ImageRun, TableLayoutType, PageOrientation,
             } = await import('docx');
 
             // ── FETCH LOGOS as ArrayBuffer (HD embed) ────────────────────────
@@ -1385,28 +1385,34 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // A new DOCX section is created whenever orientation changes.
             // Portrait sections use the standard MARGIN (2cm all sides).
             // Landscape sections use A4-landscape page size with same margins.
-            const MARGIN_LANDSCAPE = { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) };
-            const mkSecProps = (landscape) => ({
+            // ── Section property builder ───────────────────────────────────────
+            // IMPORTANT: Use PageOrientation enum (not string) to avoid DOCX corruption
+            const mkSecProps = (landscape = false) => ({
                 type: SectionType.NEXT_PAGE,
                 page: {
-                    margin: landscape ? MARGIN_LANDSCAPE : MARGIN,
+                    margin: MARGIN,
                     ...(landscape ? {
                         size: {
-                            width: cm(29.7),   // 29.7cm  = A4 landscape width
-                            height: cm(21.0),  // 21.0cm  = A4 landscape height
-                            orientation: 'landscape',
+                            width: cm(29.7),
+                            height: cm(21.0),
+                            orientation: PageOrientation?.LANDSCAPE || 'landscape',
                         },
                     } : {}),
                 },
             });
 
-            // Merge consecutive same-orientation chunks, then convert to sections
-            const chunksToSections = (chunks, babHeaderElems) => {
-                if (chunks.length === 0) return [];
+            // ── Merge consecutive same-orientation chunks → DOCX sections ─────
+            // Guards: (1) empty chunks are filtered, (2) each section gets ≥1 child
+            const chunksToSections = (chunks) => {
+                if (!chunks || chunks.length === 0) return [];
 
-                // Step 1: merge consecutive same-orientation chunks
+                // Step 1: filter out empty element arrays
+                const valid = chunks.filter(c => c.elements && c.elements.length > 0);
+                if (valid.length === 0) return [];
+
+                // Step 2: merge consecutive same-orientation chunks
                 const merged = [];
-                for (const chunk of chunks) {
+                for (const chunk of valid) {
                     const last = merged[merged.length - 1];
                     if (last && last.orientation === chunk.orientation) {
                         last.elements.push(...chunk.elements);
@@ -1415,53 +1421,57 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     }
                 }
 
-                // Step 2: first chunk gets the BAB header elements prepended
-                if (babHeaderElems && babHeaderElems.length > 0) {
-                    merged[0].elements = [...babHeaderElems, ...merged[0].elements];
-                }
-
                 // Step 3: convert each merged chunk to a DOCX section object
+                // Ensure children is never empty (add empty para as safety net)
                 return merged.map((chunk) => ({
                     properties: mkSecProps(chunk.orientation === 'landscape'),
                     headers: { default: makeHeader() },
                     footers: { default: makeFooter() },
-                    children: chunk.elements,
+                    children: chunk.elements.length > 0 ? chunk.elements : [EMPTY(120)],
                 }));
             };
 
-            // ── BAB II: Assemble orientation-aware sections ──────────────────────
+            // ── BAB II: Assemble orientation-aware sections ───────────────────
             const bab2HeaderElems = babTitle('II', 'PELAKSANAAN TUGAS');
             const subBabAElems = subBab('A.  BIDANG SUBSTANTIF', '');
             const subBabBElems = subBab('B.  BIDANG FASILITATIF', '');
 
-            // Prepend the BAB II + sub-BAB A header to the first substantif section
-            const substantifWithHeader = [
-                {
-                    orientation: 'portrait',
-                    elements: [...bab2HeaderElems, ...subBabAElems],
-                },
+            // Substantif: header + content chunks
+            const substantifAllChunks = [
+                { orientation: 'portrait', elements: [...bab2HeaderElems, ...subBabAElems] },
                 ...(substantifChunks.length > 0
                     ? substantifChunks
                     : [{ orientation: 'portrait', elements: [PARA(`Tidak ada laporan seksi substantif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)] }]
                 ),
             ];
 
-            const fasilitatifWithHeader = [
-                {
-                    orientation: 'portrait',
-                    elements: [...subBabBElems],
-                },
+            // Fasilitatif: sub-bab header + content chunks
+            const fasilitatifAllChunks = [
+                { orientation: 'portrait', elements: [...subBabBElems] },
                 ...(fasilitatifChunks.length > 0
                     ? fasilitatifChunks
                     : [{ orientation: 'portrait', elements: [PARA(`Tidak ada laporan seksi fasilitatif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)] }]
                 ),
             ];
 
-            // Full BAB II sections (inline mixed orientation)
+            // Full BAB II sections — filtered for empty, guaranteed ≥1 section
             const bab2Sections = [
-                ...chunksToSections(substantifWithHeader, null),
-                ...chunksToSections(fasilitatifWithHeader, null),
+                ...chunksToSections(substantifAllChunks),
+                ...chunksToSections(fasilitatifAllChunks),
             ];
+
+            // Safety net: if somehow bab2Sections is empty, use a single portrait section
+            if (bab2Sections.length === 0) {
+                bab2Sections.push({
+                    properties: mkSecProps(false),
+                    headers: { default: makeHeader() },
+                    footers: { default: makeFooter() },
+                    children: [
+                        ...bab2HeaderElems,
+                        PARA(`Belum ada laporan yang tersedia untuk periode ${bNama} ${tahun}.`),
+                    ],
+                });
+            }
 
 
             // ══════════════════════════════════════════════════════════════════
