@@ -174,19 +174,26 @@ function renderTable(block, idx) {
 function renderImage(block, idx) {
     const { base64, widthCm, heightCm, caption } = block;
     if (!base64) return null;
-    const maxW = widthCm ? `${(widthCm * 37.8).toFixed(0)}px` : '100%';
+
+    // Convert cm → px at 96dpi and always cap at 100% of container width
+    const toCssPx = (cm) => `${(cm * 37.8).toFixed(0)}px`;
+    const imgStyle = {
+        display: 'block',
+        margin: '0 auto',
+        maxWidth: '100%',    // never exceed container
+        height: 'auto',
+        imageRendering: 'crisp-edges',
+    };
+    if (widthCm) imgStyle.width = toCssPx(widthCm);
+    if (heightCm) imgStyle.height = toCssPx(heightCm);
+
     return (
-        <figure key={idx} style={{ margin: '0.6em 0', textAlign: 'center' }}>
+        <figure key={idx} style={{ margin: '0.6em 0', textAlign: 'center', overflow: 'hidden' }}>
             <img
                 src={base64}
                 alt={caption || `Gambar ${idx + 1}`}
-                style={{
-                    maxWidth: maxW,
-                    height: heightCm ? `${(heightCm * 37.8).toFixed(0)}px` : 'auto',
-                    display: 'block',
-                    margin: '0 auto',
-                    imageRendering: 'high-quality',
-                }}
+                style={imgStyle}
+                loading="lazy"
             />
             {caption && (
                 <figcaption style={{

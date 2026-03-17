@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLaporan } from '../../../contexts/LaporanContext';
 import DocxPreviewRenderer from '../../common/DocxPreviewRenderer';
+import PagedDocumentViewer from '../../common/PagedDocumentViewer';
 
 const BULAN_NAMES = [
     '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -52,6 +53,7 @@ export default function MonitoringLaporan({ onNavigate }) {
 
     // DOCX inline preview
     const [docxPreviewTarget, setDocxPreviewTarget] = useState(null);
+    const [docxPreviewTab, setDocxPreviewTab] = useState('structured'); // 'structured' | 'html'
 
     const showMsg = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
 
@@ -160,20 +162,24 @@ export default function MonitoringLaporan({ onNavigate }) {
 
     // ── Render action buttons per status
     const renderActions = (l) => {
-        const previewBtn = (l?.docx_html || l?.file_url) ? (
+        const previewBtn = (l?.structured_json?.pages?.length || l?.docx_html || l?.file_url) ? (
             <button
-                onClick={() => l.docx_html
-                    ? setDocxPreviewTarget(l)
-                    : window.open(l.file_url, '_blank')
-                }
-                title={l.docx_html ? 'Preview DOCX inline' : 'Buka file'}
+                onClick={() => {
+                    if (l.structured_json?.pages?.length || l.docx_html) {
+                        setDocxPreviewTab(l.structured_json?.pages?.length ? 'structured' : 'html');
+                        setDocxPreviewTarget(l);
+                    } else {
+                        window.open(l.file_url, '_blank');
+                    }
+                }}
+                title={l.structured_json?.pages?.length ? 'Preview halaman lengkap (gambar/tabel)' : l.docx_html ? 'Preview DOCX inline' : 'Buka file'}
                 style={{
                     padding: '5px 10px', borderRadius: '6px',
                     border: '1px solid #bfdbfe', background: '#eff6ff',
                     color: '#1d4ed8', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
                 }}
             >
-                {l.docx_html ? '👁 Preview' : '📂 Buka'}
+                {(l.structured_json?.pages?.length || l.docx_html) ? '👁 Preview' : '📂 Buka'}
             </button>
         ) : null;
 
@@ -270,53 +276,99 @@ export default function MonitoringLaporan({ onNavigate }) {
     return (
         <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
 
-            {/* DOCX Inline Preview Modal */}
-            {docxPreviewTarget && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 2000, padding: '16px',
-                }}>
+            {/* DOCX Inline Preview Modal — with PagedDocumentViewer for images */}
+            {docxPreviewTarget && (() => {
+                const hasStructured = !!docxPreviewTarget.structured_json?.pages?.length;
+                const hasHtml = !!docxPreviewTarget.docx_html;
+                const tabs = [];
+                if (hasStructured) tabs.push({ id: 'structured', label: '🖥 Halaman' });
+                if (hasHtml) tabs.push({ id: 'html', label: '📄 HTML' });
+                const activeTab = tabs.find(t => t.id === docxPreviewTab)?.id || tabs[0]?.id;
+                return (
                     <div style={{
-                        background: '#fff', borderRadius: '16px', width: '100%',
-                        maxWidth: '900px', maxHeight: '92vh', display: 'flex',
-                        flexDirection: 'column', overflow: 'hidden',
-                        boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+                        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 2000, padding: '16px',
                     }}>
                         <div style={{
-                            padding: '14px 20px', borderBottom: '1px solid #e2e8f0',
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            background: '#fff', borderRadius: '16px', width: '100%',
+                            maxWidth: '1100px', maxHeight: '92vh', display: 'flex',
+                            flexDirection: 'column', overflow: 'hidden',
+                            boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
                         }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
-                                    👁️ Preview — {docxPreviewTarget.judul_laporan || docxPreviewTarget.file_name}
-                                </h3>
-                                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
-                                    {BULAN_NAMES[docxPreviewTarget.bulan]} {docxPreviewTarget.tahun} ·{' '}
-                                    {sections.find(s => s.id === docxPreviewTarget.seksi_id)?.name || '—'}
-                                </p>
+                            {/* Header */}
+                            <div style={{
+                                padding: '14px 20px', borderBottom: '1px solid #e2e8f0',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                flexWrap: 'wrap', gap: '8px',
+                            }}>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                                        👁️ Preview — {docxPreviewTarget.judul_laporan || docxPreviewTarget.file_name}
+                                    </h3>
+                                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
+                                        {BULAN_NAMES[docxPreviewTarget.bulan]} {docxPreviewTarget.tahun} ·{' '}
+                                        {sections.find(s => s.id === docxPreviewTarget.seksi_id)?.name || '—'}
+                                        {hasStructured && ` · ${docxPreviewTarget.structured_json.pages.length} halaman`}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setDocxPreviewTarget(null)}
+                                    style={{
+                                        width: '36px', height: '36px', borderRadius: '8px',
+                                        border: '1px solid #e2e8f0', background: '#f8fafc',
+                                        cursor: 'pointer', fontSize: '18px',
+                                    }}
+                                >×</button>
                             </div>
-                            <button
-                                onClick={() => setDocxPreviewTarget(null)}
-                                style={{
-                                    width: '36px', height: '36px', borderRadius: '8px',
-                                    border: '1px solid #e2e8f0', background: '#f8fafc',
-                                    cursor: 'pointer', fontSize: '18px',
-                                }}
-                            >×</button>
-                        </div>
-                        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
-                            <DocxPreviewRenderer
-                                html={docxPreviewTarget.docx_html}
-                                styleMetadata={docxPreviewTarget.docx_meta || {}}
-                                preserveLayout={docxPreviewTarget.preserve_layout !== false}
-                                maxHeight="72vh"
-                                showToolbar={true}
-                            />
+
+                            {/* Tabs (only if multiple tab options exist) */}
+                            {tabs.length > 1 && (
+                                <div style={{
+                                    display: 'flex', gap: '4px', padding: '0 16px',
+                                    borderBottom: '1px solid #e2e8f0', background: '#f8fafc',
+                                }}>
+                                    {tabs.map(t => (
+                                        <button
+                                            key={t.id}
+                                            onClick={() => setDocxPreviewTab(t.id)}
+                                            style={{
+                                                padding: '6px 14px', borderRadius: '6px 6px 0 0',
+                                                border: 'none',
+                                                borderBottom: activeTab === t.id ? '2px solid #2563eb' : '2px solid transparent',
+                                                background: activeTab === t.id ? '#eff6ff' : 'transparent',
+                                                color: activeTab === t.id ? '#1d4ed8' : '#64748b',
+                                                fontWeight: activeTab === t.id ? 700 : 500,
+                                                cursor: 'pointer', fontSize: '13px',
+                                            }}
+                                        >{t.label}</button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Body */}
+                            <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+                                {activeTab === 'structured' && hasStructured && (
+                                    <PagedDocumentViewer
+                                        structuredJson={docxPreviewTarget.structured_json}
+                                        maxHeight="74vh"
+                                        showPageNumbers={true}
+                                    />
+                                )}
+                                {activeTab === 'html' && hasHtml && (
+                                    <DocxPreviewRenderer
+                                        html={docxPreviewTarget.docx_html}
+                                        styleMetadata={docxPreviewTarget.docx_meta || {}}
+                                        preserveLayout={docxPreviewTarget.preserve_layout !== false}
+                                        maxHeight="74vh"
+                                        showToolbar={true}
+                                    />
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Header */}
             <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>

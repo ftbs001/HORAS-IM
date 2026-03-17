@@ -1234,52 +1234,75 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 return elems;
             };
 
-            // Build blocks for a group of sections
-            // Priority 0: structured_json.pages[] (OpenXML-parsed: tables, images, orientation)
-            // Priority 1: docx_html (full fidelity — tables, images, formatting from mammoth)
-            // Priority 2: content_json.blocks (rich blocks with images)
-            // Priority 3: legacy plain text
-            const buildSectionBlocks = async (sections) => {
-                const blocks = [];
+            // Build orientation-tagged chunks for a group of sections.
+            // Returns: Array<{ orientation: 'portrait'|'landscape', elements: docx.Paragraph[] }>
+            // Each page from structured_json becomes its own chunk with the page's orientation.
+            // Non-structured content is treated as portrait.
+            const buildSectionChunks = async (sections) => {
+                // All chunks across all sections, preserving per-page orientation
+                const allChunks = [];
+
+                // Helper: flush accumulated portrait elements into a chunk
+                const flushPortrait = (buf) => {
+                    if (buf.length > 0) {
+                        allChunks.push({ orientation: 'portrait', elements: [...buf] });
+                        buf.length = 0;
+                    }
+                };
+
                 for (const [idx, r] of sections.entries()) {
                     const num = `${idx + 1}.`;
                     const secName = r.name || `Seksi ${idx + 1}`;
 
-                    // Sub-sub-BAB heading: "1. Seksi Tikim"
-                    blocks.push(...subSubBab(`${num}  ${secName}`, ''));
+                    // Collect portrait-orientation elements that precede any landscape pages
+                    const portraitBuf = [];
 
-                    // ── Priority 0: structured_json pages[] (most accurate) ──
+                    // Sub-sub-BAB heading always portrait
+                    portraitBuf.push(...subSubBab(`${num}  ${secName}`, ''));
+
+                    // ── Priority 0: structured_json pages[] — respect per-page orientation ──
                     const structJson = r.laporan?.structured_json;
                     if (structJson?.pages?.length > 0) {
                         for (const page of structJson.pages) {
                             const pageElems = await buildStructuredPageElements(page);
-                            blocks.push(...pageElems);
+                            if (pageElems.length === 0) continue;
+
+                            const orient = page.orientation === 'landscape' ? 'landscape' : 'portrait';
+
+                            if (orient === 'landscape') {
+                                // Flush any accumulated portrait content first
+                                flushPortrait(portraitBuf);
+                                // Landscape page → dedicated landscape chunk
+                                allChunks.push({ orientation: 'landscape', elements: [...pageElems, EMPTY(120)] });
+                            } else {
+                                portraitBuf.push(...pageElems);
+                            }
                         }
-                        blocks.push(EMPTY(120));
+                        portraitBuf.push(EMPTY(120));
+                        flushPortrait(portraitBuf);
                         continue;
                     }
 
-                    // ── Priority 1: docx_html (complete HTML from mammoth — includes tables) ──
+                    // ── Priority 1: docx_html ──
                     const docxHtml = r.laporan?.docx_html;
                     if (docxHtml && docxHtml.trim().length > 10) {
                         const htmlElements = htmlToDocxElements(docxHtml);
                         if (htmlElements.length > 0) {
-                            blocks.push(...htmlElements);
-                            blocks.push(EMPTY(120));
-                            continue; // skip lower priority
+                            portraitBuf.push(...htmlElements, EMPTY(120));
+                            flushPortrait(portraitBuf);
+                            continue;
                         }
                     }
 
-                    // ── Priority 2: content_json.blocks (paragraph/image/heading) ──
+                    // ── Priority 2: content_json.blocks ──
                     const contentBlocks = r.laporan?.content_json?.blocks || [];
                     if (contentBlocks.length > 0) {
                         for (const cb of contentBlocks) {
                             if (cb.type === 'paragraph' && cb.text?.trim()) {
-                                blocks.push(PARA(cb.text.trim()));
+                                portraitBuf.push(PARA(cb.text.trim()));
                             }
                             else if (cb.type === 'image' && cb.base64) {
                                 try {
-                                    // Normalize base64 — handle missing data: prefix
                                     const dataUrl = cb.base64.startsWith('data:')
                                         ? cb.base64
                                         : `data:image/png;base64,${cb.base64}`;
@@ -1288,30 +1311,21 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                     const bin = atob(b64);
                                     const buf = new Uint8Array(bin.length);
                                     for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-
-                                    // ImageRun.transformation expects PIXELS at 96 DPI
-                                    // 1 cm = 37.795 px; max 14cm = ~530px
                                     const PX_PER_CM = 37.795;
                                     const MAX_W_PX = Math.round(14 * PX_PER_CM);
                                     const origW = cb.metadata?.width_px || 800;
                                     const origH = cb.metadata?.height_px || 600;
                                     const scaledW = Math.min(origW, MAX_W_PX);
                                     const scaledH = Math.round(origH * (scaledW / origW));
-
                                     const mimeRaw = (dataUrl.match(/^data:image\/([a-z+]+);base64,/) || [])[1] || 'png';
                                     const mime = mimeRaw === 'jpg' ? 'jpeg' : mimeRaw;
-
-                                    blocks.push(new Paragraph({
-                                        children: [new ImageRun({
-                                            data: buf.buffer,
-                                            type: mime,
-                                            transformation: { width: scaledW, height: scaledH },
-                                        })],
+                                    portraitBuf.push(new Paragraph({
+                                        children: [new ImageRun({ data: buf.buffer, type: mime, transformation: { width: scaledW, height: scaledH } })],
                                         alignment: AlignmentType.CENTER,
                                         spacing: { before: 120, after: 120 },
                                     }));
                                     if (cb.caption) {
-                                        blocks.push(new Paragraph({
+                                        portraitBuf.push(new Paragraph({
                                             children: [TR(cb.caption, { italics: true, size: F_SMALL })],
                                             alignment: AlignmentType.CENTER,
                                             spacing: { before: 0, after: 120 },
@@ -1319,68 +1333,136 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                     }
                                 } catch (imgErr) {
                                     console.warn('[GabungLaporan] Image embed error:', imgErr);
-                                    blocks.push(PARA(`[⚠️ Gambar tidak dapat di-embed: ${cb.id || 'unknown'}]`));
+                                    portraitBuf.push(PARA(`[⚠️ Gambar tidak dapat di-embed: ${cb.id || 'unknown'}]`));
                                 }
                             }
                             else if (cb.type === 'heading') {
-                                blocks.push(...subSubBab(cb.text || '', ''));
+                                portraitBuf.push(...subSubBab(cb.text || '', ''));
                             }
                             else if (cb.type === 'table') {
-                                // content_json table block (basic)
                                 const { headers = [], rows = [] } = cb;
                                 if ((headers && headers.length > 0) || (rows && rows.length > 0)) {
                                     try {
                                         const tableHeaders = headers.length > 0 ? headers : rows[0].map(() => '');
-                                        blocks.push(makeTable(
-                                            tableHeaders,
-                                            rows,
+                                        portraitBuf.push(makeTable(
+                                            tableHeaders, rows,
                                             tableHeaders.map(() => Math.floor(100 / tableHeaders.length))
                                         ));
-                                        blocks.push(EMPTY(120));
+                                        portraitBuf.push(EMPTY(120));
                                     } catch (tblErr) {
                                         console.warn('[GabungLaporan] Table block error:', tblErr);
                                     }
                                 }
                             }
                         }
-                        blocks.push(EMPTY(120));
+                        portraitBuf.push(EMPTY(120));
+                        flushPortrait(portraitBuf);
                         continue;
                     }
 
-                    // ── Priority 3: legacy HTML content field ──
+                    // ── Priority 3: legacy plain text ──
                     const rawText = stripHtml(r.laporan?.content || '');
                     if (rawText.trim().length > 10) {
-                        blocks.push(...buildContentParagraphs(rawText));
+                        portraitBuf.push(...buildContentParagraphs(rawText));
                     } else if (r.laporan?.file_url) {
-                        blocks.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah diupload. File laporan tersedia dan dapat dilihat pada lampiran.`));
+                        portraitBuf.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah diupload. File laporan tersedia dan dapat dilihat pada lampiran.`));
                     } else {
-                        blocks.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah disetujui. Uraian kegiatan terlampir.`));
+                        portraitBuf.push(PARA(`Laporan ${secName} periode ${bNama} ${tahun} telah disetujui. Uraian kegiatan terlampir.`));
                     }
-
-                    blocks.push(EMPTY(120));
+                    portraitBuf.push(EMPTY(120));
+                    flushPortrait(portraitBuf);
                 }
-                return blocks;
+
+                return allChunks;
             };
 
-            // buildSectionBlocks is async (image embedding) — await both groups
-            const substantifBlocks = substantif.length > 0 ? await buildSectionBlocks(substantif) : [];
-            const fasilitatifBlocks = fasilitatif.length > 0 ? await buildSectionBlocks(fasilitatif) : [];
 
-            const bab2 = [
-                ...babTitle('II', 'PELAKSANAAN TUGAS'),
+            // Build orientation-tagged section chunks for both groups
+            const substantifChunks = substantif.length > 0 ? await buildSectionChunks(substantif) : [];
+            const fasilitatifChunks = fasilitatif.length > 0 ? await buildSectionChunks(fasilitatif) : [];
 
-                ...subBab('A.  BIDANG SUBSTANTIF', ''),
-                ...(substantifBlocks.length > 0
-                    ? substantifBlocks
-                    : [PARA(`Tidak ada laporan seksi substantif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)]
-                ),
+            // ── Helper: convert orientation-tagged chunks → DOCX sections ───────
+            // A new DOCX section is created whenever orientation changes.
+            // Portrait sections use the standard MARGIN (2cm all sides).
+            // Landscape sections use A4-landscape page size with same margins.
+            const MARGIN_LANDSCAPE = { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) };
+            const mkSecProps = (landscape) => ({
+                type: SectionType.NEXT_PAGE,
+                page: {
+                    margin: landscape ? MARGIN_LANDSCAPE : MARGIN,
+                    ...(landscape ? {
+                        size: {
+                            width: cm(29.7),   // 29.7cm  = A4 landscape width
+                            height: cm(21.0),  // 21.0cm  = A4 landscape height
+                            orientation: 'landscape',
+                        },
+                    } : {}),
+                },
+            });
 
-                ...subBab('B.  BIDANG FASILITATIF', ''),
-                ...(fasilitatifBlocks.length > 0
-                    ? fasilitatifBlocks
-                    : [PARA(`Tidak ada laporan seksi fasilitatif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)]
+            // Merge consecutive same-orientation chunks, then convert to sections
+            const chunksToSections = (chunks, babHeaderElems) => {
+                if (chunks.length === 0) return [];
+
+                // Step 1: merge consecutive same-orientation chunks
+                const merged = [];
+                for (const chunk of chunks) {
+                    const last = merged[merged.length - 1];
+                    if (last && last.orientation === chunk.orientation) {
+                        last.elements.push(...chunk.elements);
+                    } else {
+                        merged.push({ orientation: chunk.orientation, elements: [...chunk.elements] });
+                    }
+                }
+
+                // Step 2: first chunk gets the BAB header elements prepended
+                if (babHeaderElems && babHeaderElems.length > 0) {
+                    merged[0].elements = [...babHeaderElems, ...merged[0].elements];
+                }
+
+                // Step 3: convert each merged chunk to a DOCX section object
+                return merged.map((chunk) => ({
+                    properties: mkSecProps(chunk.orientation === 'landscape'),
+                    headers: { default: makeHeader() },
+                    footers: { default: makeFooter() },
+                    children: chunk.elements,
+                }));
+            };
+
+            // ── BAB II: Assemble orientation-aware sections ──────────────────────
+            const bab2HeaderElems = babTitle('II', 'PELAKSANAAN TUGAS');
+            const subBabAElems = subBab('A.  BIDANG SUBSTANTIF', '');
+            const subBabBElems = subBab('B.  BIDANG FASILITATIF', '');
+
+            // Prepend the BAB II + sub-BAB A header to the first substantif section
+            const substantifWithHeader = [
+                {
+                    orientation: 'portrait',
+                    elements: [...bab2HeaderElems, ...subBabAElems],
+                },
+                ...(substantifChunks.length > 0
+                    ? substantifChunks
+                    : [{ orientation: 'portrait', elements: [PARA(`Tidak ada laporan seksi substantif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)] }]
                 ),
             ];
+
+            const fasilitatifWithHeader = [
+                {
+                    orientation: 'portrait',
+                    elements: [...subBabBElems],
+                },
+                ...(fasilitatifChunks.length > 0
+                    ? fasilitatifChunks
+                    : [{ orientation: 'portrait', elements: [PARA(`Tidak ada laporan seksi fasilitatif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)] }]
+                ),
+            ];
+
+            // Full BAB II sections (inline mixed orientation)
+            const bab2Sections = [
+                ...chunksToSections(substantifWithHeader, null),
+                ...chunksToSections(fasilitatifWithHeader, null),
+            ];
+
 
             // ══════════════════════════════════════════════════════════════════
             // SECTION 6: BAB III PERMASALAHAN
@@ -1480,62 +1562,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 PARA('(Lampiran terlampir pada dokumen terpisah atau disertakan bersama laporan ini.)', { noIndent: true }),
             ];
 
-            // ══════════════════════════════════════════════════════════════════
-            // ASSEMBLE DOCUMENT
-            // ══════════════════════════════════════════════════════════════════
-            // secProps for standard portrait sections
-            const secProps = (start = null, landscape = false) => {
-                const pageMargin = landscape
-                    ? { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) }
-                    : MARGIN;
-                const pageSize = landscape
-                    ? { width: cm(29.7), height: cm(21), orientation: 'landscape' }
-                    : undefined; // default A4 portrait
-                return {
-                    type: SectionType.NEXT_PAGE,
-                    page: {
-                        margin: pageMargin,
-                        ...(pageSize ? { size: pageSize } : {}),
-                        ...(start !== null ? { pageNumbers: { start, formatType: NumberFormat.DECIMAL } } : {}),
-                    },
-                };
-            };
-
-            // ── Build landscape-aware sections for approved laporan ────────────
-            // If a laporan has structured_json with landscape pages, those are
-            // extracted into a dedicated NEXT_PAGE section with landscape orientation.
-            const buildLandscapeAwareSections = async (allSectionBlocks, approvedSections) => {
-                const docSections = [];
-
-                for (const [idx, r] of approvedSections.entries()) {
-                    const structJson = r.laporan?.structured_json;
-                    if (!structJson?.pages?.length) continue;
-
-                    // Check if this laporan has any landscape page
-                    const landscapePages = structJson.pages.filter(p => p.orientation === 'landscape');
-                    const portraitPages = structJson.pages.filter(p => p.orientation !== 'landscape');
-
-                    if (landscapePages.length === 0) continue; // normal flow — already in main section
-
-                    // Add portrait pages as continuation of main section (already handled in buildSectionBlocks)
-                    // Add landscape pages as a separate section
-                    for (const lPage of landscapePages) {
-                        const lElems = await buildStructuredPageElements(lPage);
-                        if (lElems.length > 0) {
-                            docSections.push({
-                                properties: secProps(null, true), // landscape!
-                                headers: { default: makeHeader() },
-                                footers: { default: makeFooter() },
-                                children: lElems,
-                            });
-                        }
-                    }
-                }
-                return docSections;
-            };
-
-            // Build landscape-aware additional sections (from structured_json laporan)
-            const landscapeExtraSections = await buildLandscapeAwareSections([], approved);
 
             const doc = new Document({
                 creator: user?.nama || 'HORAS-IM',
@@ -1566,12 +1592,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 },
 
                 sections: [
-                    // 1. Surat Pengantar (no header/footer, page 1)
+                    // 1. Surat Pengantar
                     {
-                        properties: { ...secProps(1) },
+                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
                         children: suratChildren,
                     },
-                    // 2. Cover (no header/footer)
+                    // 2. Cover
                     {
                         properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
                         children: coverChildren,
@@ -1583,32 +1609,52 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         footers: { default: makeFooter() },
                         children: daftarChildren,
                     },
-                    // 4-8. BAB I–V (portrait — single section with page breaks between BABs)
+                    // 4. BAB I PENDAHULUAN (portrait)
                     {
                         properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
-                        children: [
-                            ...bab1,
-                            ...bab2,
-                            ...bab3,
-                            ...bab4,
-                            ...bab5,
-                        ],
+                        children: bab1,
                     },
-                    // 9+. Landscape sections from individual laporan (orientation-aware)
-                    //     Each landscape page from structured_json becomes a separate DOCX section.
-                    ...landscapeExtraSections,
+                    // 5+. BAB II — inline mixed portrait/landscape sections
+                    //      Each orientation change creates a new DOCX section
+                    ...bab2Sections,
+                    // BAB III PERMASALAHAN (portrait)
+                    {
+                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        headers: { default: makeHeader() },
+                        footers: { default: makeFooter() },
+                        children: bab3,
+                    },
+                    // BAB IV PENUTUP (portrait)
+                    {
+                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        headers: { default: makeHeader() },
+                        footers: { default: makeFooter() },
+                        children: bab4,
+                    },
+                    // BAB V LAMPIRAN (portrait)
+                    {
+                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        headers: { default: makeHeader() },
+                        footers: { default: makeFooter() },
+                        children: bab5,
+                    },
                 ],
             });
+
 
             const buffer = await Packer.toBlob(doc);
             const url = URL.createObjectURL(buffer);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Laporan_Bulanan_${bNama}_${tahun}.docx`;
+            // Timestamp suffix prevents "file in use" error when Word still has a previous download open
+            const ts = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').slice(8); // HHMMSS
+            a.download = `Laporan_Bulanan_${bNama}_${tahun}_${ts}.docx`;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
 
             // Log activity
             try {
