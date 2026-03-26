@@ -304,12 +304,15 @@ td, th { padding: 4pt 6pt; vertical-align: top; font-size: 12pt; }
     traverseNodes(tocStructure);
 
     // Generate blob and return download info
+    // NOTE: This utility generates HTML-formatted content.
+    // For real DOCX output, use generateDocx() from docxExporter.js instead.
     const fullHtml = cleanXml(header + content + footer);
-    const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword' });
+    // Use text/html MIME so the browser/OS treats it correctly (not corrupt Word)
+    const blob = new Blob(['\ufeff', fullHtml], { type: 'text/html;charset=utf-8' });
 
     return {
         blob,
-        filename: `Laporan_Bulanan_${coverPageData?.month || 'Master'}_${new Date().toISOString().split('T')[0]}.doc`
+        filename: `Laporan_Bulanan_${coverPageData?.month || 'Master'}_${new Date().toISOString().split('T')[0]}.html`
     };
 };
 

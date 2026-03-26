@@ -320,8 +320,10 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 UnderlineType, ImageRun, TableLayoutType, PageOrientation,
             } = await import('docx');
 
-            // ── FETCH LOGOS as ArrayBuffer (HD embed) ────────────────────────
-            const emuCm = (v) => Math.round(v / 2.54 * 914400); // cm → EMU for ImageRun
+            // ImageRun.transformation expects PIXELS (96 DPI), NOT EMU.
+            // pxCm: cm → pixels at 96 DPI  (96/2.54 ≈ 37.795 px/cm)
+            // The old emuCm was giving ~1,150,748 for 3.2cm — 10,000× too large → corrupt OOXML.
+            const pxCm = (v) => Math.round(v / 2.54 * 96);
             let logoKemenBuf = null;
             let logoImigrBuf = null;
             try {
@@ -329,8 +331,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     fetch('/logo_kemenimipas.png'),
                     fetch('/logo_imigrasi.jpg'),
                 ]);
-                logoKemenBuf = await r1.arrayBuffer();
-                logoImigrBuf = await r2.arrayBuffer();
+                // Guard: only read buffer if fetch was successful
+                if (r1.ok) logoKemenBuf = await r1.arrayBuffer();
+                if (r2.ok) logoImigrBuf = await r2.arrayBuffer();
             } catch (e) {
                 console.warn('Logo fetch gagal, lanjut tanpa logo:', e);
             }
@@ -397,7 +400,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             const makeTable = (headers, rows, widths) => new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
-                layout: TableLayoutType ? TableLayoutType.FIXED : undefined,
                 rows: [
                     tRow(headers.map(h => ({ text: h, bold: true, center: true })), widths),
                     ...rows.map(r => tRow(r, widths)),
@@ -579,8 +581,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             // SECTION 2: COVER
             // ══════════════════════════════════════════════════════════════════
-            // ── COVER: logos side-by-side using a borderless 2-col table ───
-            const LOGO_SIZE = emuCm(3.2); // 3.2 cm per logo = HD
+            // Cover logo size: 3.2 cm = pxCm(3.2) ≈ 121 pixels (correct for ImageRun)
+            const LOGO_SIZE = pxCm(3.2); // ≈ 121 px — was wrongly emuCm(3.2)=1,150,748
             const coverLogoRow = new TableRow({
                 children: [
                     new TableCell({
@@ -623,8 +625,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 new Paragraph({ children: [TR(bNama.toUpperCase(), { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: 80 } }),
                 new Paragraph({ children: [TR(String(tahun), { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: cm(2) } }),
 
-                // HD Logos — centered via table
-                new Paragraph({ children: [], alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+                // HD Logos — centered via table (removed empty children:[] paragraph which is invalid)
                 coverLogoTable,
                 EMPTY(cm(1.5)),
 
@@ -835,78 +836,83 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             };
 
             // ── Helper: build TextRun from a DOM element (handle bold/italic/underline)
-            const nodeToRuns = (node) => {
+            // ── nodeToRuns: context-based (FIX: was spreading TextRun class instances → corrupt XML)
+            // Passes a plain `ctx` object {bold, italic, underline} down the DOM tree.
+            // TextRun is only constructed at TEXT_NODE leaves — never spread from an instance.
+            const nodeToRuns = (node, ctx = {}) => {
                 if (!node) return [];
                 if (node.nodeType === Node.TEXT_NODE) {
                     const txt = decodeHtmlEntities(node.textContent);
                     if (!txt) return [];
-                    return [TR(txt)];
+                    return [new TextRun({
+                        text: cleanXml(txt),
+                        font: FONT,
+                        size: F_BODY,
+                        bold: ctx.bold || false,
+                        italics: ctx.italic || false,
+                        underline: ctx.underline ? { type: UnderlineType.SINGLE } : undefined,
+                        color: '000000',
+                    })];
                 }
+                if (node.nodeType !== Node.ELEMENT_NODE) return [];
                 const tag = node.tagName?.toLowerCase() || '';
-                const childRuns = Array.from(node.childNodes).flatMap(nodeToRuns);
-                if (['strong', 'b'].includes(tag)) {
-                    return childRuns.map(r => new TextRun({ ...r, bold: true }));
-                }
-                if (['em', 'i'].includes(tag)) {
-                    return childRuns.map(r => new TextRun({ ...r, italics: true }));
-                }
-                if (tag === 'u') {
-                    return childRuns.map(r => new TextRun({ ...r, underline: { type: UnderlineType.SINGLE } }));
-                }
+                // Build new context merging inherited flags
+                const newCtx = { ...ctx };
+                if (tag === 'strong' || tag === 'b') newCtx.bold = true;
+                if (tag === 'em' || tag === 'i') newCtx.italic = true;
+                if (tag === 'u') newCtx.underline = true;
                 if (tag === 'br') {
                     return [new TextRun({ text: '', break: 1, font: FONT, size: F_BODY })];
                 }
-                return childRuns;
+                // Recurse into children with the updated context
+                return Array.from(node.childNodes).flatMap(child => nodeToRuns(child, newCtx));
             };
 
             // ── Helper: convert a <table> DOM element → docx Table (Grid-Aware)
             const htmlTableToDocx = (tableEl) => {
-                const rows = Array.from(tableEl.querySelectorAll('tr'));
-                if (rows.length === 0) return null;
+                const allTrs = Array.from(tableEl.querySelectorAll('tr'));
+                if (allTrs.length === 0) return null;
 
                 // 1. Calculate max columns across all rows (including colspans)
-                const maxCols = rows.reduce((max, row) => {
+                const maxCols = Math.max(1, allTrs.reduce((max, row) => {
                     const cells = Array.from(row.querySelectorAll('th, td'));
-                    const colCount = cells.reduce((sum, cell) => sum + (parseInt(cell.getAttribute('colspan') || '1', 10)), 0);
-                    return Math.max(max, colCount);
-                }, 1);
+                    const cnt = cells.reduce((s, c) => s + (parseInt(c.getAttribute('colspan') || '1', 10)), 0);
+                    return Math.max(max, cnt);
+                }, 1));
 
                 const colPct = Math.floor(100 / maxCols);
 
                 // 2. Track occupied cells for rowSpan
-                const occupied = Array.from({ length: rows.length }, () => Array(maxCols).fill(false));
+                const occupied = Array.from({ length: allTrs.length }, () => Array(maxCols).fill(false));
                 const docxRows = [];
 
-                rows.forEach((row, rowIdx) => {
+                allTrs.forEach((row, rowIdx) => {
                     const cells = Array.from(row.querySelectorAll('th, td'));
                     const docxCells = [];
                     let currentCol = 0;
 
                     cells.forEach((cell) => {
-                        // Skip cells already occupied by a rowSpan from above
-                        while (currentCol < maxCols && occupied[rowIdx][currentCol]) {
-                            currentCol++;
-                        }
+                        while (currentCol < maxCols && occupied[rowIdx][currentCol]) currentCol++;
                         if (currentCol >= maxCols) return;
 
                         const colSpan = Math.min(parseInt(cell.getAttribute('colspan') || '1', 10), maxCols - currentCol);
-                        const rowSpan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+                        const rowSpan = Math.max(1, parseInt(cell.getAttribute('rowspan') || '1', 10));
                         const isHeader = cell.tagName.toLowerCase() === 'th';
-                        const cellRuns = nodeToRuns(cell);
 
-                        // Mark occupied cells for current and future rows
+                        // FIX: pass empty ctx object to start context-based traversal
+                        const cellRuns = nodeToRuns(cell, {});
+
+                        // Mark occupied cells
                         for (let r = 0; r < rowSpan; r++) {
                             for (let c = 0; c < colSpan; c++) {
-                                if (rowIdx + r < rows.length) {
-                                    occupied[rowIdx + r][currentCol + c] = true;
-                                }
+                                if (rowIdx + r < allTrs.length) occupied[rowIdx + r][currentCol + c] = true;
                             }
                         }
 
                         docxCells.push(new TableCell({
                             columnSpan: colSpan > 1 ? colSpan : undefined,
                             rowSpan: rowSpan > 1 ? rowSpan : undefined,
-                            width: { size: Math.round(colPct * colSpan), type: WidthType.PERCENTAGE },
+                            width: { size: Math.max(1, Math.round(colPct * colSpan)), type: WidthType.PERCENTAGE },
                             shading: isHeader ? { fill: 'F5F5F5' } : undefined,
                             borders: {
                                 top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
@@ -914,8 +920,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                                 right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                             },
+                            // Always provide at least one paragraph child (DOCX requires it)
                             children: [new Paragraph({
-                                children: cellRuns.length > 0 ? cellRuns : [TR('')],
+                                children: cellRuns.length > 0 ? cellRuns : [new TextRun({ text: '', font: FONT, size: F_BODY })],
                                 alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
                                 spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
                             })],
@@ -924,6 +931,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         currentCol += colSpan;
                     });
 
+                    // Guard: only add row if it has cells (empty docxCells cause corrupt DOCX)
                     if (docxCells.length > 0) {
                         docxRows.push(new TableRow({
                             children: docxCells,
@@ -932,14 +940,23 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     }
                 });
 
-                return docxRows.length > 0 ? new Table({
+                if (docxRows.length === 0) return null;
+                return new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
+                    borders: {
+                        top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                        left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                        right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                        insideH: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+                        insideV: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+                    },
                     rows: docxRows,
-                }) : null;
+                });
             };
 
             // ── Helper: convert HTML string (from docx_html / mammoth output) → docx elements[]
-            // This is the KEY function that enables full-fidelity export of DOCX content including tables.
+            // FIX: nodeToRuns now uses context-based traversal — no TextRun instance spreading
             const htmlToDocxElements = (htmlStr) => {
                 if (!htmlStr || htmlStr.trim().length < 5) return [];
                 try {
@@ -954,15 +971,16 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             if (txt) elements.push(PARA(txt));
                             return;
                         }
+                        if (node.nodeType !== Node.ELEMENT_NODE) return;
                         const tag = node.tagName?.toLowerCase() || '';
 
                         if (tag === 'table') {
                             const tbl = htmlTableToDocx(node);
                             if (tbl) {
                                 elements.push(tbl);
-                                elements.push(EMPTY(120)); // space after table
+                                elements.push(EMPTY(120));
                             }
-                            return; // table processed, don't recurse
+                            return;
                         }
 
                         if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
@@ -972,7 +990,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         }
 
                         if (tag === 'p') {
-                            const runs = nodeToRuns(node);
+                            // Use context-based nodeToRuns (safe — no TextRun spreading)
+                            const runs = nodeToRuns(node, {});
                             const txt = decodeHtmlEntities(node.textContent || '').trim();
                             if (runs.length > 0 && txt) {
                                 elements.push(new Paragraph({
@@ -984,7 +1003,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             } else if (txt) {
                                 elements.push(PARA(txt));
                             } else {
-                                // Empty paragraph → preserve spacing
                                 elements.push(EMPTY(160));
                             }
                             return;
@@ -1006,11 +1024,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         }
 
                         if (['div', 'section', 'article', 'main', 'body'].includes(tag)) {
-                            // Recurse into container elements
                             Array.from(node.childNodes).forEach(processNode);
                             return;
                         }
-                        // For any other block: recurse
                         if (node.children?.length > 0) {
                             Array.from(node.childNodes).forEach(processNode);
                         }
@@ -1292,6 +1308,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             flushPortrait(portraitBuf);
                             continue;
                         }
+                        // Conversion returned empty — add visible placeholder so section isn't silently dropped
+                        console.warn('[GabungLaporan] docx_html conversion returned no elements for:', secName);
+                        portraitBuf.push(PARA(`[Konten laporan ${secName} tersedia sebagai file DOCX — buka di aplikasi untuk melihat.]`));
+                        portraitBuf.push(EMPTY(120));
+                        flushPortrait(portraitBuf);
+                        continue;
                     }
 
                     // ── Priority 2: content_json.blocks ──
