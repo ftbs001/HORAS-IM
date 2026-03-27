@@ -5,6 +5,17 @@ import { validateAllImages, logImageErrors } from '../../../utils/imageValidator
 import { exportToPdf } from '../../../utils/pdfExporter';
 import { validateMergeDocuments } from '../../../utils/structuredDocValidator';
 
+// ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
+// Dynamic import('docx') conflicts with static imports in other files and breaks
+// JSZip's browser-mode detection → "nodebuffer is not supported by this platform"
+import {
+    Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+    HeadingLevel, AlignmentType, PageBreak, Footer, Header,
+    PageNumber, NumberFormat, SectionType, BorderStyle,
+    WidthType, VerticalAlign, TabStopType, LeaderType,
+    UnderlineType, ImageRun, TableLayoutType, PageOrientation,
+} from 'docx';
+
 // ─── Month names ──────────────────────────────────────────────────────────────
 const BULAN_NAMES = [
     '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -82,6 +93,38 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     const [validating, setValidating] = useState(false);
     // v4: PDF export progress
     const [pdfProgress, setPdfProgress] = useState(0);
+
+    // ── Data dari Monthly Reports (Semua Laporan) ──────────────────────────────
+    const [coverLetterData, setCoverLetterData] = useState({});
+    const [coverPageData, setCoverPageData] = useState({});
+    const [forewordData, setForewordData] = useState({});
+
+    // Fetch monthly_reports data on mount so Surat Pengantar, Cover, & Kata Pengantar
+    // reflect what was saved in menu "Semua Laporan"
+    useEffect(() => {
+        const fetchMonthlyReportsData = async () => {
+            try {
+                const { data } = await supabase
+                    .from('monthly_reports')
+                    .select('section_key, content')
+                    .in('section_key', ['cover_letter', 'cover_page', 'foreword']);
+                if (!data) return;
+                data.forEach(item => {
+                    try {
+                        const parsed = typeof item.content === 'string'
+                            ? JSON.parse(item.content)
+                            : item.content;
+                        if (item.section_key === 'cover_letter') setCoverLetterData(parsed || {});
+                        if (item.section_key === 'cover_page')   setCoverPageData(parsed || {});
+                        if (item.section_key === 'foreword')      setForewordData(parsed || {});
+                    } catch { /* keep defaults */ }
+                });
+            } catch (e) {
+                console.warn('[GabungLaporan] fetch monthly_reports err:', e);
+            }
+        };
+        fetchMonthlyReportsData();
+    }, []);
 
 
     const showMsg = (type, text) => {
@@ -311,14 +354,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     // ══════════════════════════════════════════════════════════════════════════
     const doGenerate = async () => {
         try {
-
-            const {
-                Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-                HeadingLevel, AlignmentType, PageBreak, Footer, Header,
-                PageNumber, NumberFormat, SectionType, BorderStyle,
-                WidthType, VerticalAlign, TabStopType, LeaderType,
-                UnderlineType, ImageRun, TableLayoutType, PageOrientation,
-            } = await import('docx');
+            // All docx classes are imported statically at the top of this file.
+            // (Dynamic import was causing 'nodebuffer is not supported' in browsers)
 
             // ImageRun.transformation expects PIXELS (96 DPI), NOT EMU.
             // pxCm: cm → pixels at 96 DPI  (96/2.54 ≈ 37.795 px/cm)
@@ -326,14 +363,17 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const pxCm = (v) => Math.round(v / 2.54 * 96);
             let logoKemenBuf = null;
             let logoImigrBuf = null;
+            let logoCombinedBuf = null;
             try {
-                const [r1, r2] = await Promise.all([
+                const [r1, r2, r3] = await Promise.all([
                     fetch('/logo_kemenimipas.png'),
                     fetch('/logo_imigrasi.jpg'),
+                    fetch('/logos-combined.png'),
                 ]);
                 // Guard: only read buffer if fetch was successful
                 if (r1.ok) logoKemenBuf = await r1.arrayBuffer();
                 if (r2.ok) logoImigrBuf = await r2.arrayBuffer();
+                if (r3.ok) logoCombinedBuf = await r3.arrayBuffer();
             } catch (e) {
                 console.warn('Logo fetch gagal, lanjut tanpa logo:', e);
             }
@@ -373,8 +413,10 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             });
 
             // ── HELPER: empty line ───────────────────────────────────────────
+            // DOCX requires at least one run child — empty Paragraph is invalid OOXML
             const EMPTY = (after = 240) => new Paragraph({
-                children: [TR('')], spacing: { after },
+                children: [new TextRun({ text: '', font: FONT, size: F_BODY })],
+                spacing: { after },
             });
 
             // ── HELPER: page break ───────────────────────────────────────────
@@ -431,9 +473,10 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ── LETTERHEAD (kop surat) ───────────────────────────────────────
             // Build logo ImageRun helpers
+            // Normalize type: 'jpg' → 'jpeg' required by docx v9
             const mkLogo = (buf, type, w, h) => buf
-                ? new ImageRun({ data: buf, transformation: { width: w, height: h }, type })
-                : new TextRun({ text: '' });
+                ? new ImageRun({ data: buf, transformation: { width: w, height: h }, type: type === 'jpg' ? 'jpeg' : type })
+                : new TextRun({ text: '', font: FONT, size: F_SMALL });
 
             // KOP: 3-column borderless table — [logo-kemen | teks | logo-imigrasi]
             const NOB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }; // no border
@@ -485,10 +528,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             });
 
             // Thick double border line immediately below the kop table
+            // Double-border below kop: use a table row with bottom border instead of
+            // paragraph border (paragraph border is less reliable across Word versions)
             const kopBorderLine = new Paragraph({
-                children: [new TextRun({ text: '' })],
+                children: [new TextRun({ text: '', font: FONT, size: F_SMALL })],
                 border: {
-                    bottom: { style: BorderStyle.DOUBLE, size: 6, color: '000000' },
+                    bottom: { style: BorderStyle.DOUBLE, size: 6, color: '000000', space: 1 },
                 },
                 spacing: { before: 60, after: 120 },
             });
@@ -497,49 +542,66 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ══════════════════════════════════════════════════════════════════
             // SECTION 1: SURAT PENGANTAR
+            // Menggunakan data dari coverLetterData (Semua Laporan) jika ada
             // ══════════════════════════════════════════════════════════════════
+            // Helper: ambil nilai dari coverLetterData, fallback ke default
+            const clDate     = cleanXml(coverLetterData?.tanggal   || `Pematang Siantar, ${tgl}`);
+            const clNomor    = cleanXml(coverLetterData?.nomor      || `W5.IMI.02-IM.01.10-${String(now.getMonth() + 1).padStart(3, '0')}/${tahun}`);
+            const clSifat    = cleanXml(coverLetterData?.sifat      || 'Biasa');
+            const clLampiran = cleanXml(coverLetterData?.lampiran   || '1 (satu) Eksemplar');
+            const clHal      = cleanXml(coverLetterData?.hal        || `Laporan Kegiatan Bulan ${bNama} ${tahun}`);
+            const clIsi      = cleanXml(coverLetterData?.isi         || `Dengan hormat, disampaikan bahwa dalam rangka pelaksanaan tugas dan fungsi Kantor Imigrasi Kelas II TPI Pematang Siantar, bersama ini kami sampaikan Laporan Bulanan bulan ${bNama} ${tahun} yang memuat kegiatan operasional di bidang substantif maupun fasilitatif.\n\nLaporan ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas dan fungsi kantor serta sebagai bahan evaluasi kinerja dalam rangka peningkatan pelayanan keimigrasian kepada masyarakat.\n\nDemikian laporan ini kami sampaikan. Atas perhatian dan arahan Bapak/Ibu, kami mengucapkan terima kasih.`);
+            const clPenandatangan = cleanXml(coverLetterData?.penandatangan || '');
+
+            // Build Hal as possibly multi-line
+            const halLines = clHal.split('\n').filter(Boolean);
+
             const suratChildren = [
                 ...kopElements,
 
                 // Tanggal (kanan)
                 new Paragraph({
-                    children: [TR(`Pematang Siantar, ${tgl}`)],
+                    children: [TR(clDate)],
                     alignment: AlignmentType.RIGHT,
                     spacing: { after: 240, line: 240, lineRule: 'auto' },
                 }),
 
-                // Nomor / Sifat / Lampiran / Hal (kiri rata, tab stop)
-                ...['Nomor    ', 'Sifat    ', 'Lampiran ', 'Hal      '].map((label, i) => {
-                    const vals = [
-                        `W5.IMI.02-IM.01.10-${String(now.getMonth() + 1).padStart(3, '0')}/${tahun}`,
-                        'Biasa',
-                        '1 (satu) Eksemplar',
-                        `Laporan Kegiatan Bulan ${bNama} ${tahun}`,
-                    ];
-                    return new Paragraph({
-                        children: [
-                            TR(label), TR(': '), TR(vals[i]),
-                        ],
-                        spacing: { after: 60, line: 240, lineRule: 'auto' },
-                        indent: { left: 0 },
-                    });
-                }),
+                // Nomor / Sifat / Lampiran / Hal
+                ...[
+                    { label: 'Nomor    ', val: clNomor },
+                    { label: 'Sifat    ', val: clSifat },
+                    { label: 'Lampiran ', val: clLampiran },
+                    { label: 'Hal      ', val: halLines[0] || clHal },
+                ].map(({ label, val }) => new Paragraph({
+                    children: [TR(label), TR(': '), TR(val)],
+                    spacing: { after: 60, line: 240, lineRule: 'auto' },
+                    indent: { left: 0 },
+                })),
+                // Extra hal lines (if multi-line)
+                ...halLines.slice(1).map(line => new Paragraph({
+                    children: [TR('           '), TR('  '), TR(line)],
+                    spacing: { after: 60, line: 240, lineRule: 'auto' },
+                    indent: { left: 0 },
+                })),
 
                 EMPTY(240),
 
-                // Tujuan
-                PARA([TR('Yth.')], { noIndent: true }),
-                PARA([TR('Kepala Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan', { bold: true })], { noIndent: true }),
-                PARA([TR('Sumatera Utara')], { noIndent: true }),
-                PARA([TR('di —')], { noIndent: true }),
-                PARA([TR('Medan')], { noIndent: true }),
+                // Tujuan — from coverLetterData or default
+                ...(coverLetterData?.tujuan
+                    ? coverLetterData.tujuan.split('\n').filter(Boolean).map(line =>
+                        PARA([TR(cleanXml(line))], { noIndent: true }))
+                    : [
+                        PARA([TR('Yth.')], { noIndent: true }),
+                        PARA([TR('Kepala Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan', { bold: true })], { noIndent: true }),
+                        PARA([TR('Sumatera Utara')], { noIndent: true }),
+                        PARA([TR('di —')], { noIndent: true }),
+                        PARA([TR('Medan')], { noIndent: true }),
+                    ]),
 
                 EMPTY(200),
 
-                // Isi surat
-                PARA(`Dengan hormat, disampaikan bahwa dalam rangka pelaksanaan tugas dan fungsi Kantor Imigrasi Kelas II TPI Pematang Siantar, bersama ini kami sampaikan Laporan Bulanan bulan ${bNama} ${tahun} yang memuat kegiatan operasional di bidang substantif maupun fasilitatif.`),
-                PARA('Laporan ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas dan fungsi kantor serta sebagai bahan evaluasi kinerja dalam rangka peningkatan pelayanan keimigrasian kepada masyarakat.'),
-                PARA('Demikian laporan ini kami sampaikan. Atas perhatian dan arahan Bapak/Ibu, kami mengucapkan terima kasih.'),
+                // Isi surat — from coverLetterData or default
+                ...clIsi.split('\n\n').filter(s => s.trim()).map(para => PARA(para.trim())),
 
                 EMPTY(400),
 
@@ -550,16 +612,26 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     spacing: { after: 60, line: 240, lineRule: 'auto' },
                 }),
                 EMPTY(1200),
-                new Paragraph({
-                    children: [TR('_________________________', { bold: true, underline: { type: 'single' } })],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 60, line: 240, lineRule: 'auto' },
-                }),
-                new Paragraph({
-                    children: [TR('NIP. _____________________')],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 400, line: 240, lineRule: 'auto' },
-                }),
+                ...(clPenandatangan
+                    ? [
+                        new Paragraph({
+                            children: [TR(clPenandatangan, { bold: true, underline: { type: 'single' } })],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { after: 60, line: 240, lineRule: 'auto' },
+                        }),
+                    ]
+                    : [
+                        new Paragraph({
+                            children: [TR('_________________________', { bold: true, underline: { type: 'single' } })],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { after: 60, line: 240, lineRule: 'auto' },
+                        }),
+                        new Paragraph({
+                            children: [TR('NIP. _____________________')],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { after: 400, line: 240, lineRule: 'auto' },
+                        }),
+                    ]),
 
                 // Tembusan
                 new Paragraph({
@@ -580,40 +652,43 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ══════════════════════════════════════════════════════════════════
             // SECTION 2: COVER
+            // Menggunakan coverPageData dari Semua Laporan jika ada.
+            // Logo: logos-combined.png (gambar gabungan HD, 1 gambar lebih besar)
             // ══════════════════════════════════════════════════════════════════
-            // Cover logo size: 3.2 cm = pxCm(3.2) ≈ 121 pixels (correct for ImageRun)
-            const LOGO_SIZE = pxCm(3.2); // ≈ 121 px — was wrongly emuCm(3.2)=1,150,748
-            const coverLogoRow = new TableRow({
-                children: [
-                    new TableCell({
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
-                        children: [new Paragraph({
-                            children: logoKemenBuf
-                                ? [new ImageRun({ data: logoKemenBuf, transformation: { width: LOGO_SIZE, height: LOGO_SIZE }, type: 'png' })]
-                                : [new TextRun({ text: '[Logo Kementerian]', font: 'Arial', size: 18 })],
-                            alignment: AlignmentType.RIGHT,
-                            spacing: { after: 0 },
-                        })],
-                    }),
-                    new TableCell({
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
-                        children: [new Paragraph({
-                            children: logoImigrBuf
-                                ? [new ImageRun({ data: logoImigrBuf, transformation: { width: LOGO_SIZE, height: LOGO_SIZE }, type: 'jpg' })]
-                                : [new TextRun({ text: '[Logo Imigrasi]', font: 'Arial', size: 18 })],
-                            alignment: AlignmentType.LEFT,
-                            spacing: { after: 0 },
-                        })],
-                    }),
-                ],
-            });
-            const coverLogoTable = new Table({
-                width: { size: 60, type: WidthType.PERCENTAGE },
+
+            // Resolve bulan/tahun: prefer coverPageData, fallback ke filter GabungLaporan
+            const coverBulanNama = (() => {
+                const m = coverPageData?.month || '';
+                if (!m) return bNama.toUpperCase();
+                // If it's a number string, convert; otherwise use as-is
+                const idx = parseInt(m, 10);
+                if (!isNaN(idx) && idx >= 1 && idx <= 12) return BULAN_NAMES[idx].toUpperCase();
+                return cleanXml(m).toUpperCase();
+            })();
+            const coverTahunStr = cleanXml(String(coverPageData?.year || tahun));
+            const coverTitle    = cleanXml(coverPageData?.reportTitle || 'LAPORAN BULANAN');
+
+            // Cover logo: use logos-combined.png (both logos as one HD image, wider)
+            // Width: 9cm = pxCm(9) ≈ 340px; height auto-calculated (aspect ≈ 2:1)
+            const COVER_LOGO_W = pxCm(9);   // ≈ 340 px wide
+            const COVER_LOGO_H = pxCm(4.5); // ≈ 170 px (roughly maintaining combined logo aspect ratio)
+
+            const coverLogoPara = new Paragraph({
+                children: logoCombinedBuf
+                    ? [new ImageRun({
+                        data: logoCombinedBuf,
+                        transformation: { width: COVER_LOGO_W, height: COVER_LOGO_H },
+                        type: 'png',
+                    })]
+                    // Fallback: use two separate logos side-by-side if combined not available
+                    : [
+                        ...(logoKemenBuf ? [new ImageRun({ data: logoKemenBuf, transformation: { width: pxCm(3.8), height: pxCm(3.8) }, type: 'png' })] : []),
+                        new TextRun({ text: '   ', font: FONT, size: F_BODY }),
+                        ...(logoImigrBuf ? [new ImageRun({ data: logoImigrBuf, transformation: { width: pxCm(3.8), height: pxCm(3.8) }, type: 'jpeg' })] : []),
+                        ...(!logoKemenBuf && !logoImigrBuf ? [new TextRun({ text: '[Logo]', font: FONT, size: F_BODY })] : []),
+                    ],
                 alignment: AlignmentType.CENTER,
-                borders: { top: NOB, bottom: NOB, left: NOB, right: NOB, insideH: NOB, insideV: NOB },
-                rows: [coverLogoRow],
+                spacing: { before: 0, after: 0 },
             });
 
             const coverChildren = [
@@ -621,18 +696,58 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 new Paragraph({ children: [TR('KANTOR IMIGRASI KELAS II TPI', { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }),
                 new Paragraph({ children: [TR('PEMATANG SIANTAR', { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: cm(1) } }),
 
-                new Paragraph({ children: [TR('LAPORAN BULANAN', { bold: true, size: pt(20) })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
-                new Paragraph({ children: [TR(bNama.toUpperCase(), { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: 80 } }),
-                new Paragraph({ children: [TR(String(tahun), { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: cm(2) } }),
+                new Paragraph({ children: [TR(coverTitle, { bold: true, size: pt(20) })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+                new Paragraph({ children: [TR(coverBulanNama, { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: 80 } }),
+                new Paragraph({ children: [TR(coverTahunStr, { bold: true, size: pt(16) })], alignment: AlignmentType.CENTER, spacing: { after: cm(2) } }),
 
-                // HD Logos — centered via table (removed empty children:[] paragraph which is invalid)
-                coverLogoTable,
+                // HD Logo gabungan — satu gambar, lebih besar, centered
+                coverLogoPara,
                 EMPTY(cm(1.5)),
 
                 new Paragraph({ children: [TR('KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN', { bold: true, size: F_BODY })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }),
                 new Paragraph({ children: [TR('REPUBLIK INDONESIA', { bold: true, size: F_BODY })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }),
                 new Paragraph({ children: [TR('DIREKTORAT JENDERAL IMIGRASI', { bold: true, size: F_BODY })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }),
-                new Paragraph({ children: [TR(String(tahun), { bold: true, size: F_BODY })], alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+                new Paragraph({ children: [TR(coverTahunStr, { bold: true, size: F_BODY })], alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+            ];
+
+            // ══════════════════════════════════════════════════════════════════
+            // SECTION 2b: KATA PENGANTAR
+            // Menggunakan forewordData dari Semua Laporan jika ada
+            // ══════════════════════════════════════════════════════════════════
+            const defaultForeword = `Puji Syukur kami panjatkan kepada Tuhan Yang Maha Esa sehingga Laporan bulanan ini dapat selesai tepat pada waktunya. Ucapan terima kasih juga kami sampaikan kepada semua pihak yang telah membantu dalam penyajian dan penyusunan laporan bulanan ini sehingga laporan bulanan ini dapat disajikan sesuai dengan lengkap dan benar.\n\nKantor Imigrasi Kelas II TPI Pematang Siantar adalah salah satu unit pelaksana teknis di bidang keimigrasian yang berada di bawah Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan Sumatera Utara yang memiliki kewajiban menyusun Laporan Bulanan yang berisi seluruh kegiatan yang telah dilaksanakan dan kendala yang dialami oleh seluruh seksi dan bagian yang ada selama satu periode.\n\nLaporan ini diharapkan dapat memberikan informasi yang berguna kepada para pemakai laporan khususnya sebagai sarana untuk meningkatkan kinerja, akuntabilitas / pertanggung jawaban dan transparansi pelaksanaan tugas pokok dan fungsi Kantor Imigrasi Kelas II TPI Pematang Siantar.`;
+
+            const forewordText = cleanXml(forewordData?.content || defaultForeword);
+            const forewordChildren = [
+                new Paragraph({
+                    children: [TR('KATA PENGANTAR', { bold: true, size: F_HEAD })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 0, after: 480, line: 276, lineRule: 'auto' },
+                }),
+                ...forewordText.split('\n\n').filter(s => s.trim()).map(para =>
+                    new Paragraph({
+                        children: [TR(para.trim())],
+                        alignment: AlignmentType.JUSTIFIED,
+                        spacing: { ...LS_15, after: 200 },
+                        indent: { firstLine: INDENT_1 },
+                    })
+                ),
+                EMPTY(600),
+                new Paragraph({
+                    children: [TR(`Pematang Siantar,    ${tgl}`)],
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { after: 60, line: 240, lineRule: 'auto' },
+                }),
+                new Paragraph({
+                    children: [TR('Kepala Kantor,', { bold: true })],
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { after: 60, line: 240, lineRule: 'auto' },
+                }),
+                EMPTY(1000),
+                new Paragraph({
+                    children: [TR(cleanXml(coverLetterData?.penandatangan || ''), { bold: true })],
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { after: 0, line: 240, lineRule: 'auto' },
+                }),
             ];
 
             // ══════════════════════════════════════════════════════════════════
@@ -1179,46 +1294,75 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         ] : [];
                     }
                     case 'image': {
-                        if (!block.base64) return [];
-                        try {
-                            // Ensure the base64 string has the data: prefix
-                            const dataUrl = block.base64.startsWith('data:')
-                                ? block.base64
-                                : `data:image/png;base64,${block.base64}`;
-                            const b64 = dataUrl.split(',')[1];
-                            if (!b64) return [];
-                            const bin = atob(b64);
-                            const buf = new Uint8Array(bin.length);
-                            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-
-                            // Bug5 fix: ImageRun.transformation expects PIXELS (96 DPI),
-                            // not twips. 1 cm = 37.795 px at 96 DPI.
-                            const PX_PER_CM = 37.795;
-                            const MAX_W_PX = Math.round(14 * PX_PER_CM); // 14cm max
-                            const wPx = block.widthCm
-                                ? Math.min(Math.round(block.widthCm * PX_PER_CM), MAX_W_PX)
+                        // Support both base64 inline images AND URL-referenced images (Supabase storage)
+                        const PX_PER_CM = 37.795;
+                        const MAX_W_PX = Math.round(14 * PX_PER_CM); // 14cm max
+                        const calcDims = (widthCm, heightCm) => {
+                            const wPx = widthCm
+                                ? Math.min(Math.round(widthCm * PX_PER_CM), MAX_W_PX)
                                 : MAX_W_PX;
-                            const aspectRatio = (block.heightCm && block.widthCm && block.widthCm > 0)
-                                ? block.heightCm / block.widthCm
-                                : 0.75; // default 4:3
-                            const hPx = Math.round(wPx * aspectRatio);
-
-                            const mimeRaw = (dataUrl.match(/^data:image\/([a-z+]+);base64,/) || [])[1] || 'png';
-                            const mime = mimeRaw === 'jpg' ? 'jpeg' : mimeRaw;
-                            const elements = [new Paragraph({
-                                children: [new ImageRun({ data: buf.buffer, type: mime, transformation: { width: wPx, height: hPx } })],
+                            const ar = (heightCm && widthCm && widthCm > 0) ? heightCm / widthCm : 0.75;
+                            return { wPx, hPx: Math.round(wPx * ar) };
+                        };
+                        const buildImgElements = (buf, mime, wPx, hPx) => {
+                            const els = [new Paragraph({
+                                children: [new ImageRun({ data: buf, type: mime, transformation: { width: wPx, height: hPx } })],
                                 alignment: AlignmentType.CENTER,
                                 spacing: { before: 120, after: 120 },
                             })];
-                            // Add caption if present
                             if (block.caption) {
-                                elements.push(new Paragraph({
+                                els.push(new Paragraph({
                                     children: [TR(block.caption, { italics: true, size: F_SMALL })],
                                     alignment: AlignmentType.CENTER,
                                     spacing: { before: 0, after: 120 },
                                 }));
                             }
-                            return elements;
+                            return els;
+                        };
+
+                        try {
+                            const { wPx, hPx } = calcDims(block.widthCm, block.heightCm);
+
+                            // Path A: base64 inline (most common for DOCX exports)
+                            if (block.base64) {
+                                const dataUrl = block.base64.startsWith('data:')
+                                    ? block.base64
+                                    : `data:image/png;base64,${block.base64}`;
+                                const b64 = dataUrl.split(',')[1];
+                                if (!b64) return [];
+                                const bin = atob(b64);
+                                const buf = new Uint8Array(bin.length);
+                                for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+                                const mimeRaw = (dataUrl.match(/^data:image\/([a-z+]+);base64,/) || [])[1] || 'png';
+                                const mime = mimeRaw === 'jpg' ? 'jpeg' : mimeRaw;
+                                return buildImgElements(buf.buffer, mime, wPx, hPx);
+                            }
+
+                            // Path B: URL-referenced image (e.g. Supabase public storage URL)
+                            if (block.url) {
+                                try {
+                                    const resp = await fetch(block.url);
+                                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                                    const arrBuf = await resp.arrayBuffer();
+                                    // Infer mime from URL extension or content-type header
+                                    const ct = resp.headers.get('content-type') || '';
+                                    let mime = 'png';
+                                    if (ct.includes('jpeg') || ct.includes('jpg') || block.url.match(/\.(jpg|jpeg)(\?|$)/i)) mime = 'jpeg';
+                                    else if (ct.includes('gif') || block.url.match(/\.gif(\?|$)/i)) mime = 'gif';
+                                    else if (ct.includes('webp') || block.url.match(/\.webp(\?|$)/i)) mime = 'png'; // fallback
+                                    return buildImgElements(arrBuf, mime, wPx, hPx);
+                                } catch (fetchErr) {
+                                    console.warn('[GabungLaporan] image URL fetch failed:', block.url, fetchErr.message);
+                                    // Return a text placeholder so the section isn't silently skipped
+                                    return [new Paragraph({
+                                        children: [TR(`[Gambar tidak dapat dimuat: ${block.caption || block.url}]`, { italics: true, size: F_SMALL })],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 60, after: 120 },
+                                    })];
+                                }
+                            }
+
+                            return []; // no base64 and no URL
                         } catch (imgErr) {
                             console.warn('[GabungLaporan] structured image embed err:', imgErr);
                             return [];
@@ -1602,23 +1746,25 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 styles: {
                     default: {
                         document: {
+                            // DOCX v9: default run/paragraph styles
+                            // Do NOT spread LS_15 object here — use explicit values
                             run: { font: FONT, size: F_BODY, color: '000000' },
                             paragraph: {
-                                spacing: { ...LS_15, after: 240 },
+                                spacing: { line: 360, lineRule: 'auto', after: 240 },
                                 alignment: AlignmentType.JUSTIFIED,
                             },
                         },
                         heading1: {
                             run: { font: FONT, size: F_HEAD, bold: true, color: '000000' },
-                            paragraph: { alignment: AlignmentType.CENTER, spacing: { ...LS_15 } },
+                            paragraph: { alignment: AlignmentType.CENTER, spacing: { line: 360, lineRule: 'auto', after: 240 } },
                         },
                         heading2: {
                             run: { font: FONT, size: F_SUBBAB, bold: true, color: '000000' },
-                            paragraph: { alignment: AlignmentType.LEFT, spacing: { ...LS_15 } },
+                            paragraph: { alignment: AlignmentType.LEFT, spacing: { line: 360, lineRule: 'auto', after: 120 } },
                         },
                         heading3: {
                             run: { font: FONT, size: F_BODY, bold: true, color: '000000' },
-                            paragraph: { alignment: AlignmentType.LEFT, spacing: { ...LS_15 } },
+                            paragraph: { alignment: AlignmentType.LEFT, spacing: { line: 360, lineRule: 'auto', after: 80 } },
                         },
                     },
                 },
@@ -1629,10 +1775,17 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
                         children: suratChildren,
                     },
-                    // 2. Cover
+                    // 2. Cover Page
                     {
                         properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
                         children: coverChildren,
+                    },
+                    // 2b. Kata Pengantar
+                    {
+                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        headers: { default: makeHeader() },
+                        footers: { default: makeFooter() },
+                        children: forewordChildren,
                     },
                     // 3. Daftar Isi
                     {
@@ -1676,8 +1829,14 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             });
 
 
-            const buffer = await Packer.toBlob(doc);
-            const url = URL.createObjectURL(buffer);
+            // Use Packer.toBlob() — browser-compatible (toBuffer is Node.js only).
+            // Then re-wrap the blob with the correct Word MIME type to ensure
+            // Microsoft Word opens it without "experienced an error" dialog.
+            const rawBlob = await Packer.toBlob(doc);
+            const blob = new Blob([rawBlob], {
+                type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             // Timestamp suffix prevents "file in use" error when Word still has a previous download open
@@ -1686,7 +1845,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
 
             // Log activity
             try {
