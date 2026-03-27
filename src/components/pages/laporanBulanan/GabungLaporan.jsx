@@ -32,6 +32,7 @@ const F_BODY = pt(11);    // 22 hp — body text (11pt)
 const F_HEAD = pt(14);    // 28 hp — BAB heading (14pt)
 const F_SUBBAB = pt(12);  // 24 hp — Sub-BAB heading (12pt)
 const F_SMALL = pt(10);   // 20 hp — small text
+const F_TABLE = pt(10);   // 20 hp — table cell text (10pt, compact)
 const MARGIN = { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) };  // LOCKED: 2cm all sides
 const LS_15 = { line: 360, lineRule: 'auto' };  // 1.5 line spacing — LOCKED
 const INDENT_1 = cm(1.25); // first-line indent for body paragraphs
@@ -1205,50 +1206,54 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         // Default fallback: evenly distributed
                         const defaultColPct = Math.floor(100 / maxCols);
 
-                        // Helper: build cell child runs — uses per-run rich text if available
+                        // ── Cell run builder: 10pt font, richtext-aware, header bold+center ──
                         const buildCellRuns = (cell, isHeader) => {
                             if (cell.runs && cell.runs.length > 0) {
                                 return cell.runs.map(r => new TextRun({
                                     text: cleanXml(r.text || ''),
-                                    font: FONT, size: F_BODY,
-                                    bold: r.bold || isHeader,
-                                    italics: r.italic || false,
+                                    font: FONT,
+                                    size: F_TABLE,
+                                    bold: !!(r.bold || isHeader),
+                                    italics: !!(r.italic),
                                     underline: r.underline ? { type: UnderlineType.SINGLE } : undefined,
+                                    color: r.color || undefined,
                                 }));
                             }
-                            return [TR(cleanXml(cell.text || ''), { bold: isHeader || !!cell.bold })];
+                            const rawText = cleanXml(cell.text || '');
+                            return [new TextRun({
+                                text: rawText,
+                                font: FONT,
+                                size: F_TABLE,
+                                bold: !!(isHeader || cell.bold),
+                            })];
                         };
 
-                        // Track occupied for rowSpan in structured JSON
+                        // Track occupied grid for rowSpan
                         const occupied = Array.from({ length: rows.length }, () => Array(maxCols).fill(false));
                         const docxRows = [];
 
                         rows.forEach((row, ri) => {
                             const docxCells = [];
                             let currentCol = 0;
+                            const isHeaderRow = ri === 0;
 
                             row.forEach((cell) => {
-                                // Important: skip cells that are flagged as vContinue/merged
-                                if (cell.vContinue) return;
+                                if (cell.vContinue) return; // skip vMerge continuations
 
-                                // Respect the logical grid
-                                while (currentCol < maxCols && occupied[ri][currentCol]) {
-                                    currentCol++;
-                                }
+                                while (currentCol < maxCols && occupied[ri][currentCol]) currentCol++;
                                 if (currentCol >= maxCols) return;
 
-                                const isHeader = ri === 0;
                                 const colSpan = Math.min(cell.colspan || 1, maxCols - currentCol);
                                 const rowSpan = cell.rowspan || 1;
 
-                                // Mark occupied
+                                // Mark occupied cells
                                 for (let r = 0; r < rowSpan; r++) {
                                     for (let c = 0; c < colSpan; c++) {
                                         if (ri + r < rows.length) occupied[ri + r][currentCol + c] = true;
                                     }
                                 }
 
-                                // Calculate actual percentage from extracted w:tblGrid colWidths
+                                // Proportional width from tblGrid colWidths (if available)
                                 let cellWidthPct = defaultColPct * colSpan;
                                 if (colWidths && colWidths.length > 0) {
                                     cellWidthPct = 0;
@@ -1258,25 +1263,34 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                     }
                                 }
 
+                                // Cell alignment: header always center; body follows cell.align
+                                const cellAlign = cell.align === 'center' ? AlignmentType.CENTER
+                                    : cell.align === 'right' ? AlignmentType.RIGHT
+                                        : isHeaderRow ? AlignmentType.CENTER
+                                            : AlignmentType.LEFT;
+
+                                // Professional header shading: blue-gray for row 0
+                                const shadeFill = isHeaderRow ? 'DDE8F4'
+                                    : (ri % 2 === 0 ? undefined : 'F8FBFF'); // subtle alternating rows
+
                                 docxCells.push(new TableCell({
                                     columnSpan: colSpan > 1 ? colSpan : undefined,
                                     rowSpan: rowSpan > 1 ? rowSpan : undefined,
-                                    width: { size: Math.round(cellWidthPct), type: WidthType.PERCENTAGE },
-                                    shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                                    width: { size: Math.max(1, Math.round(cellWidthPct)), type: WidthType.PERCENTAGE },
+                                    shading: shadeFill ? { fill: shadeFill, color: 'auto' } : undefined,
                                     borders: {
-                                        top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                        left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                                        right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        top: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                        left: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                        right: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
                                     },
                                     children: [new Paragraph({
-                                        children: buildCellRuns(cell, isHeader),
-                                        alignment: cell.align === 'center' ? AlignmentType.CENTER
-                                            : cell.align === 'right' ? AlignmentType.RIGHT
-                                                : isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
-                                        spacing: { after: 60, before: 60, line: 240, lineRule: 'auto' },
+                                        children: buildCellRuns(cell, isHeaderRow),
+                                        alignment: cellAlign,
+                                        spacing: { after: 40, before: 40, line: 240, lineRule: 'auto' },
                                     })],
                                 }));
+
                                 currentCol += colSpan;
                             });
 
@@ -1284,13 +1298,26 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 docxRows.push(new TableRow({
                                     children: docxCells,
                                     tableHeader: ri === 0,
+                                    height: { value: 350, rule: 'atLeast' }, // min row height
                                 }));
                             }
                         });
 
                         return docxRows.length > 0 ? [
-                            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: docxRows }),
-                            EMPTY(120),
+                            new Table({
+                                width: { size: 100, type: WidthType.PERCENTAGE },
+                                layout: TableLayoutType.FIXED,
+                                borders: {
+                                    top: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                                    bottom: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                                    left: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                                    right: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                                    insideH: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                    insideV: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                },
+                                rows: docxRows,
+                            }),
+                            EMPTY(160),
                         ] : [];
                     }
                     case 'image': {
@@ -1427,7 +1454,26 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             const pageElems = await buildStructuredPageElements(page);
                             if (pageElems.length === 0) continue;
 
-                            const orient = page.orientation === 'landscape' ? 'landscape' : 'portrait';
+                            // ── Auto-detect landscape ──────────────────────────────────────────
+                            // Explicit landscape from parser always wins.
+                            // Fallback: detect wide tables (≥6 cols or colWidths suggests >17cm).
+                            let orient = page.orientation === 'landscape' ? 'landscape' : 'portrait';
+                            if (orient === 'portrait') {
+                                const pageTables = (page.content || []).filter(b => b.type === 'table');
+                                const hasWideTbl = pageTables.some(tbl => {
+                                    // Count effective columns
+                                    const maxCols = (tbl.rows || []).reduce((m, row) => {
+                                        const c = row.reduce((s, cell) => s + (cell.colspan || 1), 0);
+                                        return Math.max(m, c);
+                                    }, 0);
+                                    return maxCols >= 7; // ≥7 cols → landscape
+                                });
+                                // Also landscape if page is ONLY tables (no paragraph text)
+                                const onlyTables = pageTables.length > 0 &&
+                                    (page.content || []).every(b => b.type === 'table' || b.type === 'page_break' ||
+                                        (b.type === 'paragraph' && !b.text?.trim()));
+                                if (hasWideTbl || onlyTables) orient = 'landscape';
+                            }
 
                             if (orient === 'landscape') {
                                 // Flush any accumulated portrait content first
