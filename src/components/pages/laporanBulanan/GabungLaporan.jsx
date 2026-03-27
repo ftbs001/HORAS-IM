@@ -14,6 +14,7 @@ import {
     PageNumber, NumberFormat, SectionType, BorderStyle,
     WidthType, VerticalAlign, TabStopType, LeaderType,
     UnderlineType, ImageRun, TableLayoutType, PageOrientation,
+    TableOfContents,
 } from 'docx';
 
 // ─── Month names ──────────────────────────────────────────────────────────────
@@ -752,52 +753,32 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             ];
 
             // ══════════════════════════════════════════════════════════════════
-            // SECTION 3: DAFTAR ISI
+            // SECTION 3: DAFTAR ISI — Word native auto-updating TOC
+            // Open in Microsoft Word → Ctrl+A → F9 to update page numbers.
             // ══════════════════════════════════════════════════════════════════
-            const TOC_ENTRIES = [
-                { label: 'BAB I PENDAHULUAN', page: 4, level: 0 },
-                { label: '   A. PENGANTAR', page: 4, level: 1 },
-                { label: '      1. Gambaran Umum', page: 4, level: 2 },
-                { label: '      2. Wilayah Kerja', page: 4, level: 2 },
-                { label: '      3. Pelaksanaan Tugas', page: 4, level: 2 },
-                { label: '   B. DASAR HUKUM', page: 4, level: 1 },
-                { label: '   C. RUANG LINGKUP', page: 4, level: 1 },
-                { label: 'BAB II PELAKSANAAN TUGAS', page: 5, level: 0 },
-                { label: '   A. BIDANG SUBSTANTIF', page: 5, level: 1 },
-                { label: '      1. Penerbitan Dokumen Perjalanan', page: 5, level: 2 },
-                { label: '      2. Penerbitan Izin Tinggal', page: 5, level: 2 },
-                { label: '      3. Rekapitulasi Data Perlintasan', page: 5, level: 2 },
-                { label: '      4. Intelijen dan Penindakan', page: 5, level: 2 },
-                { label: '      5. Informasi dan Komunikasi Keimigrasian', page: 5, level: 2 },
-                { label: '      6. Pengaduan Masyarakat', page: 5, level: 2 },
-                { label: '   B. BIDANG FASILITATIF', page: 5, level: 1 },
-                { label: '      1. Urusan Keuangan', page: 5, level: 2 },
-                { label: '      2. Urusan Kepegawaian', page: 5, level: 2 },
-                { label: '      3. Urusan Umum', page: 5, level: 2 },
-                { label: 'BAB III PERMASALAHAN', page: 6, level: 0 },
-                { label: 'BAB IV PENUTUP', page: 7, level: 0 },
-                { label: '   A. SARAN', page: 7, level: 1 },
-                { label: '   B. KESIMPULAN', page: 7, level: 1 },
-                { label: 'BAB V LAMPIRAN', page: 8, level: 0 },
-            ];
-
-            const TAB_POS = CONTENT_W;
-
             const daftarChildren = [
                 new Paragraph({
                     children: [TR('DAFTAR ISI', { bold: true, size: F_HEAD })],
                     alignment: AlignmentType.CENTER,
                     spacing: { before: 0, after: 400, line: 240, lineRule: 'auto' },
                 }),
-                ...TOC_ENTRIES.map(e => new Paragraph({
-                    children: [
-                        TR(e.label, { bold: e.level === 0, size: F_BODY }),
-                        new TextRun({ text: '\t', font: FONT }),
-                        TR(String(e.page), { size: F_BODY }),
+                new TableOfContents('Daftar Isi', {
+                    headingStyleRange: '1-3',
+                    stylesWithLevels: [
+                        { styleName: 'Heading 1', level: 1 },
+                        { styleName: 'Heading 2', level: 2 },
+                        { styleName: 'Heading 3', level: 3 },
+                        { styleName: 'GovernmentBAB', level: 1 },
+                        { styleName: 'GovernmentSubBAB', level: 2 },
+                        { styleName: 'GovernmentSubSubBAB', level: 3 },
                     ],
-                    tabStops: [{ type: TabStopType.RIGHT, position: TAB_POS, leader: LeaderType.DOT }],
-                    spacing: { before: 0, after: e.level === 0 ? 80 : 40, line: 276, lineRule: 'auto' },
-                })),
+                }),
+                new Paragraph({
+                    children: [TR('[ Buka di Microsoft Word, tekan Ctrl+A lalu F9 untuk memperbarui nomor halaman ]',
+                        { italics: true, size: F_SMALL })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 200, after: 80 },
+                }),
             ];
 
             // ══════════════════════════════════════════════════════════════════
@@ -1047,28 +1028,31 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         currentCol += colSpan;
                     });
 
-                    // Guard: only add row if it has cells (empty docxCells cause corrupt DOCX)
                     if (docxCells.length > 0) {
                         docxRows.push(new TableRow({
                             children: docxCells,
                             tableHeader: rowIdx === 0,
+                            height: { value: 350, rule: 'atLeast' },
                         }));
                     }
                 });
 
                 if (docxRows.length === 0) return null;
-                return new Table({
+                const tbl = new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
                     borders: {
-                        top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                        left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                        right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-                        insideH: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
-                        insideV: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+                        top: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                        bottom: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                        left: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                        right: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
+                        insideH: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                        insideV: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
                     },
                     rows: docxRows,
                 });
+                tbl._colCount = maxCols;
+                return tbl;
             };
 
             // ── Helper: convert HTML string (from docx_html / mammoth output) → docx elements[]
@@ -1466,7 +1450,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                         const c = row.reduce((s, cell) => s + (cell.colspan || 1), 0);
                                         return Math.max(m, c);
                                     }, 0);
-                                    return maxCols >= 7; // ≥7 cols → landscape
+                                    return maxCols >= 5; // ≥5 effective cols → landscape
                                 });
                                 // Also landscape if page is ONLY tables (no paragraph text)
                                 const onlyTables = pageTables.length > 0 &&
@@ -1494,8 +1478,17 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     if (docxHtml && docxHtml.trim().length > 10) {
                         const htmlElements = htmlToDocxElements(docxHtml);
                         if (htmlElements.length > 0) {
-                            portraitBuf.push(...htmlElements, EMPTY(120));
-                            flushPortrait(portraitBuf);
+                            // Auto-detect wide tables → landscape section
+                            const hasWideTbl = htmlElements.some(el =>
+                                el instanceof Table && (el._colCount || 0) >= 5
+                            );
+                            if (hasWideTbl) {
+                                flushPortrait(portraitBuf);
+                                allChunks.push({ orientation: 'landscape', elements: [...htmlElements, EMPTY(120)] });
+                            } else {
+                                portraitBuf.push(...htmlElements, EMPTY(120));
+                                flushPortrait(portraitBuf);
+                            }
                             continue;
                         }
                         // Conversion returned empty — add visible placeholder so section isn't silently dropped
