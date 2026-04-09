@@ -32,7 +32,9 @@ const COLORS = {
 /* ── Style builders ────────────────────────────────────────────────────────── */
 
 const pageContainerStyle = (page, compact) => {
-    const isLandscape = page.orientation === 'landscape';
+    // Auto-compute landscape for pages with tables (mirrors DOCX export rule)
+    const hasTable = (page.content || []).some(b => b.type === 'table');
+    const isLandscape = hasTable || page.orientation === 'landscape';
     const w = isLandscape ? PAGE_W_LANDSCAPE : PAGE_W_PORTRAIT;
     const m = page.margin || { top: 2.54, right: 3.18, bottom: 2.54, left: 3.18 };
     // cm → px @ 96dpi (1cm = 37.8px)
@@ -270,8 +272,12 @@ function renderBlock(block, idx) {
 /* ── Page component ────────────────────────────────────────────────────────── */
 
 function PageContainer({ page, index, showPageNumbers, compact }) {
-    const isLandscape = page.orientation === 'landscape';
+    // Mirror DOCX export rule: any page with a table → landscape
+    const hasTable = (page.content || []).some(b => b.type === 'table');
+    const isLandscape = hasTable || page.orientation === 'landscape';
     const w = isLandscape ? PAGE_W_LANDSCAPE : PAGE_W_PORTRAIT;
+    // Build a page object with computed orientation for style builder
+    const pageWithOrient = { ...page, orientation: isLandscape ? 'landscape' : 'portrait' };
 
     return (
         <div style={{ maxWidth: `${w + 48}px`, margin: '0 auto' }}>
@@ -374,8 +380,10 @@ export default function PagedDocumentViewer({
 
     if (!pages.length) return <EmptyState />;
 
-    // Determine if any page is landscape (for scrollbar width hint)
-    const hasLandscape = pages.some(p => p.orientation === 'landscape');
+    // Determine if any page is landscape (includes pages with tables that auto-landscape)
+    const hasLandscape = pages.some(p =>
+        p.orientation === 'landscape' || (p.content || []).some(b => b.type === 'table')
+    );
 
     return (
         <div style={{ fontFamily: 'inherit' }}>

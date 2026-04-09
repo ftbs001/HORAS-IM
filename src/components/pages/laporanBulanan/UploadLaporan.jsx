@@ -511,6 +511,8 @@ export default function UploadLaporan() {
                     ...parsedDocx.styleMetadata,
                     ...(docxValidation?.info || {}),
                     parsedAt: new Date().toISOString(),
+                    // Include orientation detected from structured parser for export
+                    orientation: structuredJson?.metadata?.orientation || 'portrait',
                 } : null,
                 // NEW: Structured JSON pages[]
                 structuredJson: structuredJson || null,

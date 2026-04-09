@@ -113,14 +113,26 @@ export const SectionProvider = ({ children }) => {
         setLoading(false);
     };
 
+    // Kolom yang diizinkan untuk di-update ke Supabase
+    const ALLOWED_UPDATE_FIELDS = [
+        'name', 'alias', 'description', 'vision',
+        'head_name', 'head_nip',
+        'staff', 'performance', 'perf_target', 'budget_real',
+        'programs', 'prog_planned', 'prog_inprogress', 'prog_completed',
+        'notes', 'icon'
+    ];
+
     const updateSection = async (id, updatedData) => {
         try {
+            // Filter hanya kolom yang valid agar tidak error jika ada kolom belum di-migrate
+            const payload = Object.fromEntries(
+                Object.entries(updatedData).filter(([key]) => ALLOWED_UPDATE_FIELDS.includes(key))
+            );
+            payload.updated_at = new Date().toISOString();
+
             const { error } = await supabase
                 .from('sections')
-                .update({
-                    ...updatedData,
-                    updated_at: new Date().toISOString()
-                })
+                .update(payload)
                 .eq('id', id);
 
             if (error) {
