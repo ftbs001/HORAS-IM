@@ -20,8 +20,8 @@ import logosCombined from '../../assets/logos-combined.png';
 // Import DOCX exporter for template-based Word export
 import { generateDocx } from '../../utils/docxExporter';
 
-// Template Paspor Lalintalkim (embedded in TOC)
-import TemplateLaporanEmbedded from '../pages/laporanBulanan/TemplateLaporan';
+// Template Lalintalkim (Paspor, Izin Tinggal, Perlintasan — embedded in TOC)
+import TemplateLalintalkim from '../pages/laporanBulanan/TemplateLalintalkim';
 // Template Inteldakim (Pro Justitia, TAK, TIMPORA — embedded in TOC)
 import TemplateInteldakimEmbedded from '../pages/laporanBulanan/TemplateInteldakim';
 // Template Infokim & Pengaduan (Seksi 5 dan 6 — embedded in TOC)
@@ -80,26 +80,13 @@ const toc = [
                 id: 'bab2_substantif', label: 'A. BIDANG SUBSTANTIF', type: 'folder', children: [
                     {
                         id: 'bab2_substantif_dokumen', label: '1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA', type: 'folder', children: [
-                            { id: 'bab2_substantif_dokumen_paspor_template', label: '📊 Template Data Penerbitan Paspor', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor48_siantar', label: 'a. Paspor 48 Hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor48_tebing', label: 'b. Paspor 48 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor48_uuk', label: 'c. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor24_siantar', label: 'd. Paspor 24 Hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor24_tebing', label: 'e. Paspor 24 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor24_uuk', label: 'f. Paspor 24 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_plb', label: 'g. Pas Lintas Batas (PLB)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_splp', label: 'h. Surat Perjalanan Laksana Paspor (SPLP)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor', label: 'a. Penerbitan Paspor', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_izintinggal_itk', label: 'b. Izin Kunjungan (ITK)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_izintinggal_itas', label: 'c. Izin Tinggal Terbatas (ITAS)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_izintinggal_itap', label: 'd. Izin Tinggal Tetap (ITAP)', type: 'file' },
                         ]
                     },
-                    {
-                        id: 'bab2_substantif_izintinggal', label: '2. PENERBITAN IZIN TINGGAL', type: 'folder', children: [
-                            { id: 'bab2_substantif_izintinggal_itk', label: 'a. Izin Kunjungan (ITK)', type: 'file' },
-                            { id: 'bab2_substantif_izintinggal_itas', label: 'b. Izin Tinggal Terbatas (ITAS)', type: 'file' },
-                            { id: 'bab2_substantif_izintinggal_itap', label: 'c. Izin Tinggal Tetap (ITAP)', type: 'file' },
-                            { id: 'bab2_substantif_izintinggal_lain', label: 'd. Lain-lain', type: 'file' },
-                        ]
-                    },
-                    { id: 'bab2_substantif_rekapitulasi', label: '3. REKAPITULASI DATA PERLINTASAN', type: 'file' },
+                    { id: 'bab2_substantif_rekapitulasi', label: '2. REKAPITULASI DATA PERLINTASAN', type: 'file' },
                     {
                         id: 'bab2_substantif_intel', label: '4. INTELIJEN DAN PENINDAKAN KEIMIGRASIAN', type: 'folder', children: [
                             { id: 'bab2_substantif_intel_yustisia', label: 'a. Projustisia', type: 'file' },
@@ -1611,8 +1598,18 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             <Foreword />
                         ) : activeSection === 'toc' ? (
                             <TableOfContents />
-                        ) : activeSection === 'bab2_substantif_dokumen_paspor_template' ? (
-                            <TemplateLaporanEmbedded key={activeSection} embedded seksiAlias="lalintalkim" />
+                        ) : activeSection === 'bab2_substantif_dokumen_paspor' || 
+                            activeSection === 'bab2_substantif_dokumen_izintinggal_itk' ||
+                            activeSection === 'bab2_substantif_dokumen_izintinggal_itas' ||
+                            activeSection === 'bab2_substantif_dokumen_izintinggal_itap' ? (
+                            <TemplateLalintalkim key={activeSection} embedded
+                                defaultTab={
+                                    activeSection === 'bab2_substantif_dokumen_paspor' ? 'paspor' :
+                                    activeSection === 'bab2_substantif_rekapitulasi' ? 'perlintasan' : 'izin'
+                                }
+                            />
+                        ) : activeSection === 'bab2_substantif_rekapitulasi' ? (
+                            <TemplateLalintalkim key={activeSection} embedded defaultTab="perlintasan" />
                         ) : activeSection === 'bab2_substantif_intel_yustisia' ? (
                             <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="projus" />
                         ) : activeSection === 'bab2_substantif_intel_admin' ? (
