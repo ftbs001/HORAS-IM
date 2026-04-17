@@ -556,10 +556,10 @@ function TabelPerlintasan({ data, onChange, isPreview, loading, tableName, schem
                         const t = (c) => isTotal ? totalSubCell(row.id, c, true) : <>{miniInput(row.id, c, 'l', disabled)}{miniInput(row.id, c, 'p', disabled)}</>;
                         return (
                             <tr key={row.id}>
-                                {t('ked_p_wni')} {t('ked_p_wna')} {subTotalCell(row.id, ['ked_p_wni','ked_p_wna'], bg)}
-                                {t('ked_c_wni')} {t('ked_c_wna')} {subTotalCell(row.id, ['ked_c_wni','ked_c_wna'], bg)}
-                                {t('keb_p_wni')} {t('keb_p_wna')} {subTotalCell(row.id, ['keb_p_wni','keb_p_wna'], bg)}
-                                {t('keb_c_wni')} {t('keb_c_wna')} {subTotalCell(row.id, ['keb_c_wni','keb_c_wna'], bg)}
+                                {t('ked_p_wni')}{t('ked_p_wna')}{subTotalCell(row.id, ['ked_p_wni','ked_p_wna'], bg)}
+                                {t('ked_c_wni')}{t('ked_c_wna')}{subTotalCell(row.id, ['ked_c_wni','ked_c_wna'], bg)}
+                                {t('keb_p_wni')}{t('keb_p_wna')}{subTotalCell(row.id, ['keb_p_wni','keb_p_wna'], bg)}
+                                {t('keb_c_wni')}{t('keb_c_wna')}{subTotalCell(row.id, ['keb_c_wni','keb_c_wna'], bg)}
                                 {overallTotalCell(row.id, isTotal)}
                             </tr>
                         );
@@ -587,8 +587,8 @@ const Section = ({ title, subtitle, children, isPreview }) => (
 // ────────────────────────────────────────────────────────────────────────────
 const TABS = [
     { id: 'paspor', label: '📄 Penerbitan Paspor' },
-    { id: 'izin', label: '🪪 Izin Tinggal' },
     { id: 'perlintasan', label: '🚶 Data Perlintasan' },
+    { id: 'izin', label: '🪪 Izin Tinggal' },
 ];
 
 export default function TemplateLalintalkim({ embedded = false, defaultTab = 'paspor' }) {
@@ -800,9 +800,25 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
                     </div>
                 )}
 
+                {activeTab === 'perlintasan' && (
+                    <div>
+                        <Section title="2. REKAPITULASI DATA PERLINTASAN" isPreview={isPreview}>
+                            <div style={{ marginBottom: '40px' }}>
+                                <TabelPerlintasan data={tabelUdara} onChange={w(setTabelUdara)} isPreview={isPreview} loading={loading} tableName="udara" schemaRows={TABEL_PERLINTASAN_ROWS} customHeader="A. BANDARA SILANGIT (UDARA)" />
+                            </div>
+                            <div style={{ marginBottom: '40px' }}>
+                                <TabelPerlintasan data={tabelLaut} onChange={w(setTabelLaut)} isPreview={isPreview} loading={loading} tableName="laut" schemaRows={TABEL_PERLINTASAN_ROWS} customHeader="B. PELABUHAN TANJUNG BALAI ASAHAN (LAUT)" />
+                            </div>
+                            <div style={{ marginBottom: '20px' }}>
+                                <TabelPerlintasan data={tabelDarat} onChange={w(setTabelDarat)} isPreview={isPreview} loading={loading} tableName="darat" schemaRows={TABEL_PERLINTASAN_ROWS} customHeader="C. POS LINTAS BATAS NEGARA (DARAT)" />
+                            </div>
+                        </Section>
+                    </div>
+                )}
+
                 {activeTab === 'izin' && (
                     <div>
-                        {isPreview && <h3 style={{ fontFamily: FONT, fontSize: '12pt', fontWeight: 'bold', marginBottom: '16px' }}>2. PENERBITAN IZIN TINGGAL</h3>}
+                        {isPreview && <h3 style={{ fontFamily: FONT, fontSize: '12pt', fontWeight: 'bold', marginBottom: '16px' }}>3. PENERBITAN IZIN TINGGAL</h3>}
                         
                         <Section title="a. Izin Kunjungan (ITK)" isPreview={isPreview}>
                             <TabelSimple data={tabelItk} onChange={w(setTabelItk)} isPreview={isPreview} loading={loading} tableName="itk" schemaRows={TABEL_ITK_ROWS} />

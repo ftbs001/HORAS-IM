@@ -14,10 +14,10 @@ export const useReport = () => {
 
 // Mapping table for Sections to TOC Chapters
 export const SECTION_TOC_MAPPING = {
-    'inteldakim': ['bab2_substantif_intel'],
-    'lalintalkim': ['bab2_substantif_dokumen', 'bab2_substantif_dokumen_paspor_template', 'bab2_substantif_izintinggal'],
-    'tikim': ['bab2_substantif_infokim', 'bab2_substantif_pengaduan'],
-    'tata_usaha': ['bab1', 'bab2_fasilitatif', 'bab4', 'bab5']
+    'inteldakim': ['bab2_substantif_intel', 'bab3_inteldakim'],
+    'lalintalkim': ['bab2_substantif_dokumen', 'bab2_substantif_izintinggal', 'bab2_substantif_rekapitulasi', 'bab3_lalintalkim'],
+    'tikim': ['bab2_substantif_infokim', 'bab2_substantif_pengaduan', 'bab3_tikim'],
+    'tata_usaha': ['bab2_fasilitatif', 'bab3_kepegawaian', 'bab3_keuangan', 'bab3_umum']
 };
 
 export const ReportProvider = ({ children }) => {

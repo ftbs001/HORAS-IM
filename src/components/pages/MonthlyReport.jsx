@@ -81,12 +81,17 @@ const toc = [
                     {
                         id: 'bab2_substantif_dokumen', label: '1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA', type: 'folder', children: [
                             { id: 'bab2_substantif_dokumen_paspor', label: 'a. Penerbitan Paspor', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_izintinggal_itk', label: 'b. Izin Kunjungan (ITK)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_izintinggal_itas', label: 'c. Izin Tinggal Terbatas (ITAS)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_izintinggal_itap', label: 'd. Izin Tinggal Tetap (ITAP)', type: 'file' },
                         ]
                     },
                     { id: 'bab2_substantif_rekapitulasi', label: '2. REKAPITULASI DATA PERLINTASAN', type: 'file' },
+                    {
+                        id: 'bab2_substantif_izintinggal', label: '3. PENERBITAN IZIN TINGGAL', type: 'folder', children: [
+                            { id: 'bab2_substantif_dokumen_izintinggal_itk', label: 'a. Izin Kunjungan (ITK)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_izintinggal_itas', label: 'b. Izin Tinggal Terbatas (ITAS)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_izintinggal_itap', label: 'c. Izin Tinggal Tetap (ITAP)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_izintinggal_lain', label: 'd. Lain-lain', type: 'file' },
+                        ]
+                    },
                     {
                         id: 'bab2_substantif_intel', label: '4. INTELIJEN DAN PENINDAKAN KEIMIGRASIAN', type: 'folder', children: [
                             { id: 'bab2_substantif_intel_yustisia', label: 'a. Projustisia', type: 'file' },
@@ -138,6 +143,8 @@ const toc = [
             { id: 'bab3_keuangan', label: '2. Urusan Keuangan', type: 'file' },
             { id: 'bab3_umum', label: '3. Urusan Umum', type: 'file' },
             { id: 'bab3_lalintalkim', label: '4. Seksi Lalu Lintas dan Izin Tinggal Keimigrasian', type: 'file' },
+            { id: 'bab3_inteldakim', label: '5. Seksi Intelijen dan Penindakan Keimigrasian', type: 'file' },
+            { id: 'bab3_tikim', label: '6. Seksi Teknologi Informasi dan Komunikasi Keimigrasian', type: 'file' },
         ]
     },
     {
@@ -407,10 +414,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
 
     // Nodes to explicitly exclude per sectionFilter (deny-list)
-    const SECTION_EXCLUDE_MAP = {
-        'tikim': ['bab2_substantif_rekapitulasi'],
-        'lalintalkim': ['bab2_substantif_rekapitulasi'],
-    };
+    const SECTION_EXCLUDE_MAP = {};
 
     // TOC Filtering Logic
     const filteredToc = useMemo(() => {
