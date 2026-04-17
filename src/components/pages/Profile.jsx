@@ -150,6 +150,7 @@ const Profile = ({ onLogout }) => {
     const isSupabase = user?.source === 'supabase';
 
     return (
+        <div className="page-scroll">
         <div className="space-y-8 animate-fade-in relative">
             {/* Header Banner */}
             <div className="relative h-56 rounded-2xl overflow-hidden shadow-2xl">
@@ -455,6 +456,7 @@ const Profile = ({ onLogout }) => {
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     );
 };

@@ -32,11 +32,10 @@ const COLORS = {
 /* ── Style builders ────────────────────────────────────────────────────────── */
 
 const pageContainerStyle = (page, compact) => {
-    // Auto-compute landscape for pages with tables (mirrors DOCX export rule)
-    const hasTable = (page.content || []).some(b => b.type === 'table');
-    const isLandscape = hasTable || page.orientation === 'landscape';
+    // Landscape only if explicitly set — table-count heuristic removed (was too aggressive)
+    const isLandscape = page.orientation === 'landscape';
     const w = isLandscape ? PAGE_W_LANDSCAPE : PAGE_W_PORTRAIT;
-    const m = page.margin || { top: 2.54, right: 3.18, bottom: 2.54, left: 3.18 };
+    const m = page.margin || { top: 2.5, right: 2.5, bottom: 2.5, left: 3.0 };
     // cm → px @ 96dpi (1cm = 37.8px)
     const toPx = (cm) => `${(cm * 37.8).toFixed(0)}px`;
     return {
@@ -133,43 +132,62 @@ function renderTable(block, idx) {
     const { rows = [] } = block;
     if (rows.length === 0) return null;
 
+    // Check if any row has 5+ columns to decide landscape auto-detect per table (mirrors export rule)
+    const maxCols = Math.max(...rows.map(r => r.filter(c => !c?.vContinue).length));
+    const isWideTable = maxCols >= 5;
+
     return (
-        <table key={idx} style={{
-            borderCollapse: 'collapse',
-            width: '100%',
-            margin: '0.6em 0',
-            fontSize: '11pt',
-            fontFamily: '"Times New Roman", Calibri, Arial, sans-serif',
-            tableLayout: 'auto',
-        }}>
-            <tbody>
-                {rows.map((row, ri) => (
-                    <tr key={ri} style={{ background: ri === 0 ? '#f5f5f5' : '#fff' }}>
-                        {row.map((cell, ci) => {
-                            const Tag = ri === 0 ? 'th' : 'td';
-                            return (
-                                <Tag key={ci}
-                                    colSpan={cell.colspan || 1}
-                                    rowSpan={cell.rowspan || 1}
-                                    style={{
-                                        border: '1px solid #000',
-                                        padding: '4px 7px',
-                                        verticalAlign: 'top',
-                                        fontWeight: ri === 0 || cell.bold ? 'bold' : 'normal',
-                                        textAlign: cell.align || (ri === 0 ? 'center' : 'left'),
-                                        whiteSpace: 'pre-wrap',
-                                        lineHeight: '1.4',
-                                        fontSize: '11pt',
-                                    }}
-                                >
-                                    {cell.text || ''}
-                                </Tag>
-                            );
-                        })}
-                    </tr>
-                ))}
-            </tbody>
-        </table>
+        <div key={idx} style={{ overflowX: isWideTable ? 'auto' : 'visible', margin: '0.6em 0' }}>
+            <table style={{
+                borderCollapse: 'collapse',
+                width: '100%',
+                minWidth: isWideTable ? '700px' : undefined,
+                fontSize: '11pt',
+                fontFamily: '"Times New Roman", Calibri, Arial, sans-serif',
+                tableLayout: 'auto',
+            }}>
+                <tbody>
+                    {rows.map((row, ri) => (
+                        <tr key={ri} style={{ background: ri === 0 ? '#f5f5f5' : '#fff' }}>
+                            {row.map((cell, ci) => {
+                                // Skip continuation cells (rendered via rowspan on the start cell)
+                                if (cell?.vContinue) return null;
+                                const Tag = ri === 0 ? 'th' : 'td';
+                                return (
+                                    <Tag key={ci}
+                                        colSpan={cell?.colspan || 1}
+                                        rowSpan={cell?.rowspan || 1}
+                                        style={{
+                                            border: '1px solid #000',
+                                            padding: '4px 7px',
+                                            verticalAlign: 'top',
+                                            fontWeight: ri === 0 || cell?.bold ? 'bold' : 'normal',
+                                            textAlign: cell?.align || (ri === 0 ? 'center' : 'left'),
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: '1.4',
+                                            fontSize: '11pt',
+                                        }}
+                                    >
+                                        {/* Render rich-text runs if available, otherwise plain text */}
+                                        {cell?.runs?.length > 0
+                                            ? cell.runs.map((run, rIdx) => (
+                                                <span key={rIdx} style={{
+                                                    fontWeight: run.bold ? 'bold' : undefined,
+                                                    fontStyle: run.italic ? 'italic' : undefined,
+                                                    textDecoration: run.underline ? 'underline' : undefined,
+                                                    fontSize: run.fontSize ? `${run.fontSize}pt` : undefined,
+                                                }}>{run.text}</span>
+                                            ))
+                                            : (cell?.text || '')
+                                        }
+                                    </Tag>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     );
 }
 
@@ -272,40 +290,39 @@ function renderBlock(block, idx) {
 /* ── Page component ────────────────────────────────────────────────────────── */
 
 function PageContainer({ page, index, showPageNumbers, compact }) {
-    // Mirror DOCX export rule: any page with a table → landscape
-    const hasTable = (page.content || []).some(b => b.type === 'table');
-    const isLandscape = hasTable || page.orientation === 'landscape';
+    // No longer auto-landscape based on table presence — use orientation from page data
+    const isLandscape = page.orientation === 'landscape';
     const w = isLandscape ? PAGE_W_LANDSCAPE : PAGE_W_PORTRAIT;
     // Build a page object with computed orientation for style builder
     const pageWithOrient = { ...page, orientation: isLandscape ? 'landscape' : 'portrait' };
 
     return (
-        <div style={{ maxWidth: `${w + 48}px`, margin: '0 auto' }}>
-            {/* Orientation label */}
-            {showPageNumbers && (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '8px',
-                    fontSize: '11px',
-                    color: '#94a3b8',
-                    userSelect: 'none',
-                }}>
-                    <span>Halaman {page.pageNumber}</span>
-                    <span style={{
-                        background: isLandscape ? COLORS.orientBadge.landscape : COLORS.orientBadge.portrait,
-                        color: '#fff',
-                        padding: '2px 8px',
-                        borderRadius: '99px',
-                        fontWeight: 700,
-                        fontSize: '10px',
+                <div style={{ maxWidth: `${w + 48}px`, margin: '0 auto' }}>
+                {/* Orientation label */}
+                {showPageNumbers && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        fontSize: '11px',
+                        color: '#94a3b8',
+                        userSelect: 'none',
                     }}>
-                        {isLandscape ? '🔄 Landscape' : '📄 Portrait'}
-                        {page.widthCm ? ` · ${page.widthCm}×${page.heightCm} cm` : ''}
-                    </span>
-                </div>
-            )}
+                        <span>Halaman {page.pageNumber}</span>
+                        <span style={{
+                            background: isLandscape ? COLORS.orientBadge.landscape : COLORS.orientBadge.portrait,
+                            color: '#fff',
+                            padding: '2px 8px',
+                            borderRadius: '99px',
+                            fontWeight: 700,
+                            fontSize: '10px',
+                        }}>
+                            {isLandscape ? '🔄 Landscape' : '📄 Portrait'}
+                            {page.widthCm ? ` · ${page.widthCm}×${page.heightCm} cm` : ''}
+                        </span>
+                    </div>
+                )}
 
             {/* Page paper */}
             <div style={pageContainerStyle(page, compact)}>
@@ -380,10 +397,8 @@ export default function PagedDocumentViewer({
 
     if (!pages.length) return <EmptyState />;
 
-    // Determine if any page is landscape (includes pages with tables that auto-landscape)
-    const hasLandscape = pages.some(p =>
-        p.orientation === 'landscape' || (p.content || []).some(b => b.type === 'table')
-    );
+    // Determine if any page is landscape
+    const hasLandscape = pages.some(p => p.orientation === 'landscape');
 
     return (
         <div style={{ fontFamily: 'inherit' }}>

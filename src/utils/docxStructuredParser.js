@@ -220,6 +220,21 @@ async function buildImageRelMap(buffer) {
     return map;
 }
 
+/** Extract document title from docProps/core.xml (used for auto tab-mapping) */
+async function extractDocumentTitle(buffer) {
+    try {
+        const coreXml = await readZipEntry(buffer, 'docProps/core.xml');
+        if (!coreXml) return null;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(coreXml, 'text/xml');
+        const title = doc.querySelector('title')?.textContent?.trim() ||
+                      doc.querySelector('dc\\:title')?.textContent?.trim() ||
+                      doc.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/', 'title')[0]?.textContent?.trim();
+        return title || null;
+    } catch { return null; }
+}
+
+
 /** Convert image bytes + mime → base64 data URL */
 function bytesToBase64DataUrl(bytes, mime) {
     const CHUNK = 8192;
@@ -501,11 +516,17 @@ function parseTable(tblEl) {
                 gridSpan?.getAttribute('w:val') || gridSpan?.getAttribute('val') || '1', 10
             );
 
-            // vMerge for rowspan: 'restart' = first cell; no-val = continuation
+            // vMerge for rowspan: 'restart' = first cell; no-val or empty = continuation
             const vMerge = tcPr?.getElementsByTagNameNS(ns, 'vMerge')[0];
-            const vMergeVal = vMerge?.getAttribute('w:val') || vMerge?.getAttribute('val') || '';
+            const vMergeVal = vMerge ? (vMerge.getAttribute('w:val') || vMerge.getAttribute('val') || '') : null;
+            // vMerge present without val (or val='') means continuation; val='restart' means start
             const isVStart = vMerge && vMergeVal === 'restart';
             const isVContinue = vMerge && vMergeVal !== 'restart';
+
+            // If this is a vMerge restart, reset tracking for this col group
+            if (isVStart) {
+                for (let c = 0; c < colSpan; c++) columnRowspanRemaining[colIdx + c] = 1;
+            }
 
             // Collect rich-text runs (preserves bold/italic/underline per run)
             const cellParas = tc.getElementsByTagNameNS(ns, 'p');
@@ -751,6 +772,7 @@ export async function parseDocxStructured(file) {
         if (!docXml) throw new Error('word/document.xml tidak ditemukan dalam file DOCX.');
 
         const imageRelMap = await buildImageRelMap(buffer);
+        const docTitle = await extractDocumentTitle(buffer);
         const headerInfo = await extractHeaderFooter(buffer, 'header');
         const footerInfo = await extractHeaderFooter(buffer, 'footer');
 
@@ -911,6 +933,8 @@ export async function parseDocxStructured(file) {
                 hasTables: pages.some(p => p.content.some(c => c.type === 'table')),
                 hasHeaders: !!headerInfo.text,
                 hasFooters: !!footerInfo.text,
+                // Document title from core.xml — used for auto tab-mapping
+                title: docTitle || null,
             },
         };
 

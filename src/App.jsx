@@ -20,6 +20,7 @@ import WorkProgramInput from './components/pages/WorkProgramInput';
 import MonthlyReport from './components/pages/MonthlyReport';
 
 import VerificationDashboard from './components/pages/VerificationDashboard';
+import TemplateStatusDashboard from './components/pages/TemplateStatusDashboard';
 import Archive from './components/pages/Archive';
 
 // NEW: Laporan Bulanan RBAC Pages
@@ -123,6 +124,7 @@ function AppContent() {
       case 'report-input-tu': return <MonthlyReport sectionFilter="tata_usaha" />;
 
       // ---- Lainnya ----
+      case 'template-status': return <TemplateStatusDashboard />;
       case 'verification': return <VerificationDashboard onNavigate={handleNavigate} />;
       case 'archive': return <Archive />;
 

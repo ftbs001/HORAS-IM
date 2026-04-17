@@ -17,14 +17,15 @@
 
 import React from 'react';
 
-// ── Document constants (match DOCX export locked settings) ────────────────────
-const FONT_FAMILY = '"Arial", "Arial Narrow", sans-serif';
-const FONT_SIZE_BODY = '11pt';
+// ── Document constants (match government document standard) ──────────────────
+const FONT_FAMILY = '"Times New Roman", Georgia, serif';
+const FONT_SIZE_BODY = '12pt';
 const FONT_SIZE_SMALL = '10pt';
 const LINE_HEIGHT = '1.5';
 const COLOR_TEXT = '#000';
 
-// ── A4 page frame ─────────────────────────────────────────────────────────────
+// ── A4 page frame (government standard margins) ───────────────────────────────
+// top: 2.5cm, bottom: 2.5cm, left: 3cm, right: 2.5cm
 const PAGE_STYLE = {
     fontFamily: FONT_FAMILY,
     fontSize: FONT_SIZE_BODY,
@@ -405,12 +406,14 @@ const renderBlock = (block, idx) => {
 
 const renderPage = (page, pageIdx, totalPages, showPageNumbers) => {
     const marginStyle = page.margin ? {
-        paddingTop: `${page.margin.top || 2.54}cm`,
-        paddingRight: `${page.margin.right || 3.18}cm`,
-        paddingBottom: `${page.margin.bottom || 2.54}cm`,
-        paddingLeft: `${page.margin.left || 3.18}cm`,
+        paddingTop: `${page.margin.top || 2.5}cm`,
+        paddingRight: `${page.margin.right || 2.5}cm`,
+        paddingBottom: `${page.margin.bottom || 2.5}cm`,
+        paddingLeft: `${page.margin.left || 3.0}cm`,
     } : {
-        padding: '2.54cm 3.18cm',
+        // Government standard: top/bottom 2.5cm, left 3cm, right 2.5cm
+        paddingTop: '2.5cm', paddingRight: '2.5cm',
+        paddingBottom: '2.5cm', paddingLeft: '3cm',
     };
 
     const orientation = page.orientation || 'portrait';
@@ -541,7 +544,9 @@ const ContentBlockRenderer = ({
 
     const pageStyle = {
         ...PAGE_STYLE,
-        padding: '3cm 3cm 3cm 4cm', // gov left margin 4cm
+        // Government standard: top/bottom 2.5cm, left 3cm, right 2.5cm
+        paddingTop: '2.5cm', paddingRight: '2.5cm',
+        paddingBottom: '2.5cm', paddingLeft: '3cm',
     };
 
     return (

@@ -764,8 +764,85 @@ const buildChapter = async (title, sections, isFirst = false) => {
     for (const section of (sections || [])) {
         if (section.level === 3) {
             elems.push(buildSubSubBabHeader(section.title));
-        } else if (section.title) {
+        } else if (section.title && !section.isLalintalkimTemplate) {
+            // For templates, the template generator already provides heading
             elems.push(buildSubBabHeader(section.title));
+        }
+
+        if (section.isLalintalkimTemplate) {
+            if (section.templateData) {
+                // Import the template builder and generate native DOCX tables
+                const { getLalintalkimDocxElements } = await import('./templateDocxExporter.js');
+                const templateElems = getLalintalkimDocxElements(section.templateData);
+                if (templateElems.length > 0) elems.push(...templateElems);
+            } else {
+                elems.push(para('[Data Template belum terisi pada bulan ini]', { alignment: AlignmentType.CENTER, italics: true }));
+            }
+            continue;
+        }
+
+        if (section.isInteldakimTemplate) {
+            if (section.templateData) {
+                const { getInteldakimDocxElements } = await import('./templateDocxExporter.js');
+                const intElems = getInteldakimDocxElements(
+                    section.inteldakimPart,
+                    section.templateData,
+                    section.bulanName || '',
+                    section.tahun || new Date().getFullYear()
+                );
+                if (intElems.length > 0) elems.push(...intElems);
+            } else {
+                elems.push(para('[Data Inteldakim belum terisi pada bulan ini]', { alignment: AlignmentType.CENTER, italics: true }));
+            }
+            continue;
+        }
+
+        if (section.isInfokimTemplate) {
+            const { getInfokimDocxElements } = await import('./templateDocxExporter.js');
+            const ikElems = getInfokimDocxElements(
+                section.infokimPart,
+                section.templateData,
+                section.bulanName || '',
+                section.tahun || new Date().getFullYear()
+            );
+            if (ikElems.length > 0) elems.push(...ikElems);
+            continue;
+        }
+
+        if (section.isKeuanganTemplate) {
+            const { getKeuanganDocxElements } = await import('./templateDocxExporter.js');
+            const kElems = getKeuanganDocxElements(
+                section.keuanganPart,
+                section.templateData,
+                section.bulanName || '',
+                section.tahun || new Date().getFullYear()
+            );
+            if (kElems.length > 0) elems.push(...kElems);
+            continue;
+        }
+
+        if (section.isKepegawaianTemplate) {
+            const { getKepegawaianDocxElements } = await import('./templateDocxExporter.js');
+            const kpElems = getKepegawaianDocxElements(
+                section.kepegawaianPart,
+                section.templateData,
+                section.bulanName || '',
+                section.tahun || new Date().getFullYear()
+            );
+            if (kpElems.length > 0) elems.push(...kpElems);
+            continue;
+        }
+
+        if (section.isUmumTemplate) {
+            const { getUmumDocxElements } = await import('./templateDocxExporter.js');
+            const umElems = getUmumDocxElements(
+                section.umumPart,
+                section.templateData,
+                section.bulanName || '',
+                section.tahun || new Date().getFullYear()
+            );
+            if (umElems.length > 0) elems.push(...umElems);
+            continue;
         }
 
         // Priority 1: content_json blocks (rich content with images)
@@ -804,98 +881,293 @@ const buildChapter = async (title, sections, isFirst = false) => {
 };
 
 
+// ==================== STRUCTURED JSON → DOCX ELEMENTS ====================
+/**
+ * Convert a structured pages[] JSON (from docxStructuredParser) into an array
+ * of DOCX elements (Paragraph / Table) suitable for embedding in a report section.
+ *
+ * @param {object} structuredJson  — { version: '3.0', pages: [...] }
+ * @returns {Promise<Array>}  Array of docx Paragraph / Table
+ */
+export const structuredJsonToDocxElements = async (structuredJson) => {
+    if (!structuredJson?.pages?.length) return [];
+    const elements = [];
+
+    for (const page of structuredJson.pages) {
+        for (const block of (page.content || [])) {
+            const blockElems = await structuredBlockToDocx(block);
+            elements.push(...blockElems);
+        }
+        elements.push(emptyLine());
+    }
+
+    return elements;
+};
+
+/** Convert a single structured block to DOCX elements array */
+async function structuredBlockToDocx(block) {
+    if (!block) return [];
+
+    switch (block.type) {
+        case 'paragraph': {
+            if (!block.text?.trim() && !block.runs?.length) return [];
+            const runs = block.runs?.length
+                ? block.runs.map(r => new TextRun({
+                    text: cleanXml(r.text || ''),
+                    font: FONT.NAME,
+                    size: r.fontSize ? r.fontSize * 2 : FONT.SIZE.BODY,
+                    bold: r.bold ?? false,
+                    italics: r.italic ?? false,
+                    underline: r.underline ? { type: UnderlineType.SINGLE } : undefined,
+                    color: '000000',
+                }))
+                : [tr(block.text || '')];
+            const align =
+                block.style?.align === 'center' ? AlignmentType.CENTER :
+                block.style?.align === 'right' ? AlignmentType.RIGHT :
+                block.style?.align === 'justify' ? AlignmentType.JUSTIFIED :
+                AlignmentType.BOTH;
+            return [new Paragraph({
+                style: STYLE_ID.NORMAL,
+                children: runs,
+                alignment: align,
+                spacing: { before: 0, after: SPACING.PARA_SPACING_PT, line: SPACING.LINE_1_5 },
+            })];
+        }
+
+        case 'heading': {
+            const text = block.text?.trim();
+            if (!text) return [];
+            if (block.level === 1) return [buildBabHeader(text)];
+            if (block.level === 2) return [buildSubBabHeader(text)];
+            return [buildSubSubBabHeader(text)];
+        }
+
+        case 'table': {
+            const { rows = [] } = block;
+            if (!rows.length) return [];
+
+            const maxCols = Math.max(...rows.map(r => r.filter(c => !c?.vContinue).length), 1);
+            const colWidthPct = Math.floor(100 / maxCols);
+
+            const tableRows = rows.map(row => {
+                const docxCells = row
+                    .filter(cell => !cell?.vContinue)
+                    .map(cell => {
+                        const isBold = cell?.bold ?? false;
+                        const alignType = cell?.align === 'center' ? AlignmentType.CENTER
+                            : cell?.align === 'right' ? AlignmentType.RIGHT
+                            : AlignmentType.LEFT;
+                        const colSpan = cell?.colspan || 1;
+                        const rowSpan = cell?.rowspan || 1;
+                        const cellWidthPct = colWidthPct * colSpan;
+
+                        const cellRuns = cell?.runs?.length
+                            ? cell.runs.map(r => new TextRun({
+                                text: cleanXml(r.text || ''),
+                                font: FONT.NAME,
+                                size: r.fontSize ? r.fontSize * 2 : 20,
+                                bold: r.bold ?? isBold,
+                                italics: r.italic ?? false,
+                                underline: r.underline ? { type: UnderlineType.SINGLE } : undefined,
+                                color: '000000',
+                            }))
+                            : [new TextRun({
+                                text: cleanXml(cell?.text || ''),
+                                font: FONT.NAME,
+                                size: 20,
+                                bold: isBold,
+                                color: '000000',
+                            })];
+
+                        return new TableCell({
+                            children: [new Paragraph({
+                                children: cellRuns,
+                                alignment: alignType,
+                                spacing: { before: 0, after: 0, line: SPACING.LINE_1 },
+                            })],
+                            columnSpan: colSpan > 1 ? colSpan : undefined,
+                            rowSpan: rowSpan > 1 ? rowSpan : undefined,
+                            width: { size: Math.min(cellWidthPct, 100), type: WidthType.PERCENTAGE },
+                            borders: CELL_BORDER,
+                            verticalAlign: VerticalAlign.TOP,
+                        });
+                    });
+
+                if (!docxCells.length) return null;
+                return new TableRow({ children: docxCells });
+            }).filter(Boolean);
+
+            if (!tableRows.length) return [];
+
+            return [
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    rows: tableRows,
+                    borders: {
+                        top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        insideH: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+                        insideV: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+                    },
+                }),
+                emptyLine(),
+            ];
+        }
+
+        case 'image': {
+            if (!block.base64) return [];
+            try {
+                const imgBuf = base64ToArrayBuffer(block.base64);
+                if (!imgBuf) return [];
+                const mime = getMimeFromBase64(block.base64);
+                const MAX_EMU = Math.round(14 / 2.54 * 914400);
+                const origW = block.widthPx || MAX_EMU;
+                const origH = block.heightPx || Math.round(MAX_EMU * 0.75);
+                const { width: scaledW, height: scaledH } = scaleToMaxWidth(origW, origH, MAX_EMU);
+                return [new Paragraph({
+                    children: [new ImageRun({ data: imgBuf, type: mime, transformation: { width: scaledW, height: scaledH } })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 120, after: 120 },
+                })];
+            } catch {
+                return [];
+            }
+        }
+
+        case 'list': {
+            return (block.items || []).map(item =>
+                new Paragraph({
+                    style: STYLE_ID.NORMAL,
+                    children: [tr(`${block.ordered ? '1.' : '•'} ${item.text || item || ''}`)],
+                    indent: { left: INDENT?.SUB_BAB || 720 },
+                    spacing: { before: 0, after: 60 },
+                })
+            );
+        }
+
+        case 'page_break':
+            return [new Paragraph({ children: [new PageBreak()] })];
+
+        default:
+            return [];
+    }
+}
+
 // ==================== MAIN EXPORT FUNCTION ====================
+
+// A4 portrait: 11906 × 16838 twips  |  A4 landscape: 16838 × 11906 twips
+const A4_P = { width: 11906, height: 16838 };
+const A4_L = { width: 16838, height: 11906 };
+
+// Chapters that should be rendered in LANDSCAPE orientation
+const LANDSCAPE_CHAPTERS = ['BAB II', 'BAB V'];
+
+const isLandscapeChapter = (title = '') =>
+    LANDSCAPE_CHAPTERS.some(prefix => title.toUpperCase().startsWith(prefix));
+
+const buildSectionProps = (landscape, pageStart = null, includePageNumbers = true) => {
+    const pageSize = landscape ? A4_L : A4_P;
+    return {
+        type: SectionType.NEXT_PAGE,
+        page: {
+            size: pageSize,
+            margin: MARGINS,
+            ...(includePageNumbers && pageStart !== null
+                ? { pageNumbers: { start: pageStart, formatType: NumberFormat.DECIMAL } }
+                : includePageNumbers
+                    ? { pageNumbers: { formatType: NumberFormat.DECIMAL } }
+                    : {}),
+        },
+    };
+};
 
 /**
  * Generates and downloads a government monthly report .docx.
  *
- * Document structure (two-section, required for split page numbering):
+ * Document structure:
+ *  Section 1 (portrait, roman page numbers) — Front matter
+ *    Cover Letter → Cover Page → Kata Pengantar → Daftar Isi
  *
- *  Section 1 — Front matter (roman: i, ii, iii — bottom center)
- *    Cover Letter  → Cover Page  → Kata Pengantar  → Daftar Isi (auto-TOC)
- *
- *  Section 2 — Chapters (arabic: 1, 2, 3 — bottom center)
- *    BAB I … BAB V
- *
- * Named styles embedded in PARAGRAPH_STYLES prevent any inline-override drift.
- * updateFields: true causes Word to auto-populate TOC on open.
+ *  Section 2+ (per-chapter, mixed orientation) — Chapters
+ *    BAB I      → portrait
+ *    BAB II     → landscape  ← Pelaksanaan Tugas (tables)
+ *    BAB III    → portrait
+ *    BAB IV     → portrait
+ *    BAB V      → landscape  ← Lampiran/Struktur Organisasi
  */
 export const generateDocx = async ({
     coverLetterData,
     coverPageData,
     forewordData,
-    tocItems,          // kept for fallback, but auto-TOC is primary
+    tocItems,
     chapters,
     filename,
     logoPath,
     coverLogoPath,
 }) => {
-    // ── Section 1: Front matter ──────────────────────────────────────────────
-    const sec1 = [];
+    // ── Section 1: Front matter (roman) ──────────────────────────────────────
+    const sec1Children = [];
 
     const coverLetterElems = await buildCoverLetter(coverLetterData, logoPath);
-    sec1.push(...coverLetterElems);
+    sec1Children.push(...coverLetterElems);
 
     const coverPageElems = await buildCoverPage(coverPageData, coverLogoPath);
-    sec1.push(...coverPageElems);
-    sec1.push(pageBreak());
+    sec1Children.push(...coverPageElems);
+    sec1Children.push(pageBreak());
 
-    sec1.push(...buildForeword(forewordData));
-    sec1.push(...buildAutoTOC());
+    sec1Children.push(...buildForeword(forewordData));
+    sec1Children.push(...buildAutoTOC());
 
-    // ── Section 2: Chapters (await each — buildChapter is now async for image embedding) ─
-    const sec2 = [];
+    const sections = [
+        // Section 1: roman page numbers (i, ii, iii)
+        {
+            properties: {
+                type: SectionType.NEXT_PAGE,
+                page: {
+                    size: A4_P,
+                    margin: MARGINS,
+                    pageNumbers: { start: 1, formatType: NumberFormat.LOWER_ROMAN },
+                },
+                titlePage: true,
+            },
+            footers: {
+                default: buildPageFooter(),
+                first: new Footer({ children: [new Paragraph({ children: [] })] }),
+            },
+            children: sec1Children,
+        },
+    ];
+
+    // ── Section 2+: One Word section per BAB ─────────────────────────────────
+    let arabicPageStart = 1; // reset arabic counter at first chapter
+
     for (const [idx, chapter] of (chapters || []).entries()) {
         const chapElems = await buildChapter(chapter.title, chapter.sections, idx === 0);
-        sec2.push(...chapElems);
+        const landscape = isLandscapeChapter(chapter.title);
+
+        sections.push({
+            properties: {
+                ...buildSectionProps(landscape, idx === 0 ? arabicPageStart : null, true),
+                ...(idx === 0 ? {} : {}), // page numbering continues automatically
+            },
+            footers: {
+                default: buildPageFooter(),
+            },
+            children: chapElems,
+        });
     }
 
     // ── Assemble document ────────────────────────────────────────────────────
     const doc = new Document({
-        // v3: Named styles embedded — single source of formatting truth
         styles: {
             ...GOVERNMENT_STYLES,
             paragraphStyles: PARAGRAPH_STYLES,
         },
-
-        // Word auto-updates TOC page numbers on open
         features: { updateFields: true },
-
-        sections: [
-            // Section 1: roman page numbers (i, ii, iii)
-            {
-                properties: {
-                    type: SectionType.NEXT_PAGE,
-                    page: {
-                        size: { width: 11906, height: 16838 },
-                        margin: MARGINS,
-                        pageNumbers: { start: 1, formatType: NumberFormat.LOWER_ROMAN },
-                    },
-                    titlePage: true,
-                },
-                footers: {
-                    default: buildPageFooter(),
-                    first: new Footer({ children: [new Paragraph({ children: [] })] }),
-                },
-                children: sec1,
-            },
-
-            // Section 2: arabic page numbers (1, 2, 3)
-            {
-                properties: {
-                    type: SectionType.NEXT_PAGE,
-                    page: {
-                        size: { width: 11906, height: 16838 },
-                        margin: MARGINS,
-                        pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL },
-                    },
-                },
-                footers: {
-                    default: buildPageFooter(),
-                },
-                children: sec2,
-            },
-        ],
+        sections,
     });
 
     const blob = await Packer.toBlob(doc);
@@ -904,3 +1176,4 @@ export const generateDocx = async ({
 };
 
 export default { generateDocx };
+

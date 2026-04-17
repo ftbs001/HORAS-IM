@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { validateAllImages, logImageErrors } from '../../../utils/imageValidator';
@@ -1579,6 +1579,66 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const substantifChunks = substantif.length > 0 ? await buildSectionChunks(substantif) : [];
             const fasilitatifChunks = fasilitatif.length > 0 ? await buildSectionChunks(fasilitatif) : [];
 
+            // ── INJECT TEMPLATES FROM laporan_template DB ──────────────────────────────────
+            const { data: tmplRows } = await supabase
+                .from('laporan_template')
+                .select('seksi_id, template_data')
+                .eq('bulan', bulan)
+                .eq('tahun', tahun);
+
+            const allTemplateData = {};
+            if (tmplRows) {
+                tmplRows.forEach(r => {
+                    if (r.template_data) allTemplateData[r.seksi_id] = r.template_data;
+                });
+            }
+            const tmplLalin = allTemplateData[2] || null;
+            const tmplIntel = allTemplateData[1] || null;
+            const tmplTikim = allTemplateData[3] || null;
+            const tmplTU    = allTemplateData[4] || null;
+
+            const { 
+                getLalintalkimDocxElements, getInteldakimDocxElements, getInfokimDocxElements,
+                getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements
+            } = await import('../../../utils/templateDocxExporter.js');
+
+            // Collect Substantif Templates (Landscape)
+            const substantifTemplateElems = [];
+            if (tmplLalin) substantifTemplateElems.push(...getLalintalkimDocxElements(tmplLalin));
+            if (tmplIntel) {
+                substantifTemplateElems.push(...getInteldakimDocxElements('projus', tmplIntel, bNama, tahun));
+                substantifTemplateElems.push(...getInteldakimDocxElements('tak', tmplIntel, bNama, tahun));
+                substantifTemplateElems.push(...getInteldakimDocxElements('timpora', tmplIntel, bNama, tahun));
+            }
+            if (tmplTikim) {
+                substantifTemplateElems.push(...getInfokimDocxElements('infokim', tmplTikim, bNama, tahun));
+                substantifTemplateElems.push(...getInfokimDocxElements('pengaduan', tmplTikim, bNama, tahun));
+            }
+            if (substantifTemplateElems.length > 0) {
+                substantifChunks.push({ orientation: 'landscape', elements: substantifTemplateElems });
+            }
+
+            // Collect Fasilitatif Templates (Landscape)
+            const fasilitatifTemplateElems = [];
+            if (tmplTU) {
+                fasilitatifTemplateElems.push(...getKepegawaianDocxElements('bezetting', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKepegawaianDocxElements('rekap', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKepegawaianDocxElements('cuti', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKepegawaianDocxElements('pembinaan', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKepegawaianDocxElements('persuratan', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKeuanganDocxElements('rm', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKeuanganDocxElements('pnp', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKeuanganDocxElements('gabungan', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getKeuanganDocxElements('bendahara', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getUmumDocxElements('kendaraan', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getUmumDocxElements('sarana', tmplTU, bNama, tahun));
+                fasilitatifTemplateElems.push(...getUmumDocxElements('gedung', tmplTU, bNama, tahun));
+            }
+            if (fasilitatifTemplateElems.length > 0) {
+                fasilitatifChunks.push({ orientation: 'landscape', elements: fasilitatifTemplateElems });
+            }
+            // ────────────────────────────────────────────────────────────────────────────────
+
             // ── Helper: convert orientation-tagged chunks → DOCX sections ───────
             // A new DOCX section is created whenever orientation changes.
             // Portrait sections use the standard MARGIN (2cm all sides).
@@ -1882,7 +1942,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Log activity
             try {
                 await supabase.from('activity_logs').insert({
-                    user_id: user.id, user_name: user.nama, action: 'gabung_laporan',
+                    user_id: user?.id, user_name: user?.nama, action: 'gabung_laporan',
                     entity_type: 'laporan_bulanan',
                     detail: `Gabung laporan ${bNama} ${tahun} (${approved.length} seksi) — format resmi kedinasan`,
                 });
@@ -1914,6 +1974,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     const allPassed = validationResults && validationResults.every(r => r.pass);
 
     return (
+        <div className="page-scroll">
         <div style={{ padding: '24px', maxWidth: '920px', margin: '0 auto' }}>
 
             {/* ── Validation Gate Modal ──────────────────────────────────────── */}
@@ -2175,6 +2236,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         : '📑 Export PDF'}
                 </button>
             </div>
+        </div>
         </div>
     );
 }

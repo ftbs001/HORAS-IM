@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNotification } from '../../../contexts/NotificationContext';
@@ -8,6 +8,7 @@ import { parseDocxFile } from '../../../utils/docxParser';
 import { validateDocxFile } from '../../../utils/docxValidator';
 import { parseDocxStructured } from '../../../utils/docxStructuredParser';
 import { parsePdfStructured } from '../../../utils/pdfStructuredParser';
+import { detectTabMapping, TAB_OPTIONS } from '../../../utils/tabMapper';
 import DocxPreviewRenderer from '../../common/DocxPreviewRenderer';
 import PagedDocumentViewer from '../../common/PagedDocumentViewer';
 import PagedDocumentEditor from '../../common/PagedDocumentEditor';
@@ -275,7 +276,15 @@ export default function UploadLaporan() {
     const [showDocxPreview, setShowDocxPreview] = useState(false);
     // Structured JSON — new single source of truth (pages[] format)
     const [structuredJson, setStructuredJson] = useState(null);
+    // Edit/Preview tab state
     const [docViewTab, setDocViewTab] = useState('preview'); // 'preview' | 'edit'
+    // Local editable copy of structured JSON (for PagedDocumentEditor)
+    const [editableStructuredJson, setEditableStructuredJson] = useState(null);
+    // Auto tab mapping
+    const [autoMapping, setAutoMapping] = useState(null);         // detectTabMapping result
+    const [selectedTabMapping, setSelectedTabMapping] = useState(''); // override
+    const [showMappingSelector, setShowMappingSelector] = useState(false);
+    const [savingJson, setSavingJson] = useState(false);
     const imageRef = useRef();
     const uploadSectionRef = useRef();
 
@@ -417,10 +426,16 @@ export default function UploadLaporan() {
                 const structured = await parseDocxStructured(file);
                 if (!structured.error && structured.pages.length > 0) {
                     setStructuredJson(structured);
+                    setEditableStructuredJson(JSON.parse(JSON.stringify(structured)));
                     setShowDocxPreview(true);
+                    // Auto-detect tab mapping — include core.xml title as highest priority hint
+                    const titleHint = structured.metadata?.title || judulLaporan || file.name;
+                    const mapping = detectTabMapping(structured, titleHint);
+                    setAutoMapping(mapping);
+                    setSelectedTabMapping(mapping?.tabId || '');
                     const pgCount = structured.pages.length;
                     const orient = structured.metadata?.orientation || 'portrait';
-                    showMsg('success', `✅ DOCX berhasil diparse — ${pgCount} halaman, ${orient}.`);
+                    showMsg('success', `✅ DOCX berhasil diparse — ${pgCount} halaman, ${orient}.${mapping ? ` 🗂 Terdeteksi: ${mapping.tabLabel}` : ''}`);
                 } else if (parsed.error && structured.error) {
                     showMsg('error', `❌ Parse DOCX gagal: ${structured.error}`);
                 }
@@ -440,8 +455,13 @@ export default function UploadLaporan() {
                 const structured = await parsePdfStructured(file);
                 if (!structured.error && structured.pages.length > 0) {
                     setStructuredJson(structured);
+                    setEditableStructuredJson(JSON.parse(JSON.stringify(structured)));
                     setShowDocxPreview(true);
-                    showMsg('success', `✅ PDF diparse — ${structured.pages.length} halaman.`);
+                    const titleHint = structured.metadata?.title || judulLaporan || file.name;
+                    const mapping = detectTabMapping(structured, titleHint);
+                    setAutoMapping(mapping);
+                    setSelectedTabMapping(mapping?.tabId || '');
+                    showMsg('success', `✅ PDF diparse — ${structured.pages.length} halaman.${mapping ? ` 🗂 Terdeteksi: ${mapping.tabLabel}` : ''}`);
                 } else {
                     // PDF parse failed — just show file name, upload still works
                     showMsg('info', 'ℹ️ PDF akan diupload tanpa structured preview.');
@@ -513,7 +533,18 @@ export default function UploadLaporan() {
                     parsedAt: new Date().toISOString(),
                     // Include orientation detected from structured parser for export
                     orientation: structuredJson?.metadata?.orientation || 'portrait',
-                } : null,
+                    // Include detected tab_id for GabungLaporan routing
+                    tab_id: selectedTabMapping || autoMapping?.tabId || null,
+                    tab_label: autoMapping?.tabLabel || null,
+                    doc_title: structuredJson?.metadata?.title || null,
+                } : {
+                    // For PDF or non-mammoth cases, still save tab mapping info
+                    parsedAt: new Date().toISOString(),
+                    orientation: structuredJson?.metadata?.orientation || 'portrait',
+                    tab_id: selectedTabMapping || autoMapping?.tabId || null,
+                    tab_label: autoMapping?.tabLabel || null,
+                    doc_title: structuredJson?.metadata?.title || null,
+                },
                 // NEW: Structured JSON pages[]
                 structuredJson: structuredJson || null,
             });
@@ -527,6 +558,10 @@ export default function UploadLaporan() {
             setParsedDocx(null);
             setDocxValidation(null);
             setShowDocxPreview(false);
+            setStructuredJson(null);
+            setEditableStructuredJson(null);
+            setAutoMapping(null);
+            setSelectedTabMapping('');
             if (fileRef.current) fileRef.current.value = '';
             await reloadLaporan(resolvedSeksiId);
             if (user) fetchLaporanNotifs(user);
@@ -603,6 +638,28 @@ export default function UploadLaporan() {
         }
     };
 
+    /* ── SIMPAN STRUCTURED JSON kembali ke Supabase ─────────────────────── */
+    const handleSaveStructuredJson = useCallback(async (laporanId, updatedJson) => {
+        if (!laporanId || !updatedJson) return;
+        setSavingJson(true);
+        try {
+            const { error } = await supabase
+                .from('laporan_bulanan')
+                .update({ structured_json: updatedJson, updated_at: new Date().toISOString() })
+                .eq('id', laporanId);
+            if (error) throw error;
+            showMsg('success', '✅ Perubahan dokumen berhasil disimpan ke database.');
+            // Sync local state
+            setEditableStructuredJson(JSON.parse(JSON.stringify(updatedJson)));
+            // Refresh list
+            await reloadLaporan(resolvedSeksiId);
+        } catch (err) {
+            showMsg('error', `❌ Gagal menyimpan: ${err.message}`);
+        } finally {
+            setSavingJson(false);
+        }
+    }, [resolvedSeksiId, reloadLaporan]);
+
     /* ── HAPUS ────────────────────────────────────────────────────────────── */
     const handleHapus = async () => {
         if (!hapusTarget) return;
@@ -640,6 +697,7 @@ export default function UploadLaporan() {
 
     /* ── RENDER ──────────────────────────────────────────────────────────── */
     return (
+        <div className="page-scroll">
         <div style={{ padding: '24px', maxWidth: '960px', margin: '0 auto' }}>
 
             {/* Header */}
@@ -928,16 +986,160 @@ export default function UploadLaporan() {
                     </div>
                 )}
 
-                {/* ── DOCX Fidelity Engine: Inline Preview ───────────────── */}
-                {showDocxPreview && parsedDocx?.html && (
-                    <div style={{ marginBottom: '16px' }}>
-                        <DocxPreviewRenderer
-                            html={parsedDocx.html}
-                            styleMetadata={parsedDocx.styleMetadata || {}}
-                            preserveLayout={true}
-                            maxHeight="60vh"
-                            showToolbar={true}
-                        />
+                {/* ── Structured Document Preview & Editor Panel ─────────── */}
+                {showDocxPreview && structuredJson && (
+                    <div style={{
+                        marginBottom: '16px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                    }}>
+                        {/* ── Auto-mapping banner ──────────────────────────── */}
+                        <div style={{
+                            padding: '10px 16px',
+                            background: autoMapping ? '#f0fdf4' : '#f8fafc',
+                            borderBottom: '1px solid #e2e8f0',
+                            display: 'flex', alignItems: 'center',
+                            flexWrap: 'wrap', gap: '8px',
+                        }}>
+                            {autoMapping ? (
+                                <>
+                                    <span style={{
+                                        padding: '3px 10px', borderRadius: '99px',
+                                        background: '#22c55e', color: '#fff',
+                                        fontSize: '12px', fontWeight: 700,
+                                    }}>🗂 Terdeteksi</span>
+                                    <span style={{ fontSize: '13px', color: '#166534', fontWeight: 600 }}>
+                                        {autoMapping.tabLabel}
+                                    </span>
+                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                        ({Math.round(autoMapping.confidence * 100)}% keyakinan)
+                                    </span>
+                                    <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', flex: 1 }}>
+                                        via: "{autoMapping.matchedHeading?.slice(0, 60)}"
+                                    </span>
+                                </>
+                            ) : (
+                                <span style={{ fontSize: '13px', color: '#64748b' }}>
+                                    🔍 Tab tidak terdeteksi otomatis — pilih manual
+                                </span>
+                            )}
+                            <button
+                                onClick={() => setShowMappingSelector(v => !v)}
+                                style={{
+                                    padding: '4px 12px', borderRadius: '6px',
+                                    border: '1px solid #cbd5e1', background: '#fff',
+                                    fontSize: '12px', cursor: 'pointer', fontWeight: 600,
+                                    color: '#475569',
+                                }}
+                            >
+                                {showMappingSelector ? '✕ Tutup' : '⚙️ Ubah Mapping'}
+                            </button>
+                        </div>
+
+                        {/* ── Manual mapping selector ──────────────────────── */}
+                        {showMappingSelector && (
+                            <div style={{
+                                padding: '12px 16px',
+                                background: '#fafafa',
+                                borderBottom: '1px solid #e2e8f0',
+                                display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+                            }}>
+                                <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>
+                                    Tab Tujuan:
+                                </label>
+                                <select
+                                    value={selectedTabMapping}
+                                    onChange={e => setSelectedTabMapping(e.target.value)}
+                                    style={{
+                                        padding: '6px 10px', borderRadius: '6px',
+                                        border: '1px solid #cbd5e1', fontSize: '13px',
+                                        minWidth: '260px', background: '#fff',
+                                    }}
+                                >
+                                    <option value="">— Pilih tab laporan —</option>
+                                    {TAB_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                    Mapping disimpan saat upload
+                                </span>
+                            </div>
+                        )}
+
+                        {/* ── Tab switcher: Preview / Edit ─────────────────── */}
+                        <div style={{
+                            display: 'flex', padding: '0 16px',
+                            background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+                        }}>
+                            {[
+                                { id: 'preview', label: '👁️ Preview', icon: '📄' },
+                                { id: 'edit',    label: '✏️ Edit Dokumen', icon: '✏️' },
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setDocViewTab(tab.id)}
+                                    style={{
+                                        padding: '10px 18px',
+                                        border: 'none',
+                                        borderBottom: docViewTab === tab.id ? '3px solid #2563eb' : '3px solid transparent',
+                                        background: 'transparent',
+                                        color: docViewTab === tab.id ? '#1d4ed8' : '#64748b',
+                                        fontWeight: docViewTab === tab.id ? 700 : 500,
+                                        fontSize: '13px', cursor: 'pointer',
+                                        transition: 'all 0.15s',
+                                    }}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                            <div style={{ flex: 1 }} />
+                            <span style={{ fontSize: '11px', color: '#94a3b8', alignSelf: 'center', marginRight: '4px' }}>
+                                {structuredJson.pages?.length || 0} halaman ·{' '}
+                                {structuredJson.metadata?.orientation || 'portrait'}
+                            </span>
+                        </div>
+
+                        {/* ── Preview tab ───────────────────────────────────── */}
+                        {docViewTab === 'preview' && (
+                            <div style={{ background: '#f1f5f9', padding: '16px' }}>
+                                <PagedDocumentViewer
+                                    structuredJson={structuredJson}
+                                    maxHeight="65vh"
+                                    showPageNumbers={true}
+                                />
+                            </div>
+                        )}
+
+                        {/* ── Edit tab ─────────────────────────────────────── */}
+                        {docViewTab === 'edit' && (
+                            <PagedDocumentEditor
+                                structuredJson={editableStructuredJson || structuredJson}
+                                onChange={(updated) => {
+                                    setEditableStructuredJson(updated);
+                                    setStructuredJson(updated); // sync so upload uses latest
+                                    // If we have a laporan ID (already uploaded), save to DB
+                                    if (laporanBulanIni?.id) {
+                                        return handleSaveStructuredJson(laporanBulanIni.id, updated);
+                                    }
+                                }}
+                                readOnly={false}
+                                maxHeight="65vh"
+                            />
+                        )}
+
+                        {savingJson && (
+                            <div style={{
+                                padding: '8px 16px',
+                                background: '#eff6ff', color: '#1d4ed8',
+                                fontSize: '12px', textAlign: 'center',
+                                borderTop: '1px solid #bfdbfe',
+                            }}>
+                                ⏳ Menyimpan perubahan ke database...
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1275,6 +1477,7 @@ export default function UploadLaporan() {
                     onCancel={() => setHapusTarget(null)}
                 />
             )}
+        </div>
         </div>
     );
 }

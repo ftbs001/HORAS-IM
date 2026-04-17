@@ -172,7 +172,9 @@ const SectionData = ({ initialSectionFilter = null }) => {
        RENDER
     ══════════════════════════════════════════════════════ */
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="page-scroll">
+        <div className="space-y-8 animate-fade-in p-8">
+
 
             {/* ── Page Header ── */}
             <div className="relative bg-gradient-to-r from-imigrasi-navy to-[#1a2d4d] rounded-2xl p-8 overflow-hidden shadow-xl text-white">
@@ -825,6 +827,7 @@ const SectionData = ({ initialSectionFilter = null }) => {
                     )}
                 </div>
             )}
+        </div>
         </div>
     );
 };

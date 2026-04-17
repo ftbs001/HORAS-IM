@@ -14,9 +14,9 @@ export const useReport = () => {
 
 // Mapping table for Sections to TOC Chapters
 export const SECTION_TOC_MAPPING = {
-    'inteldakim': ['bab2_substantif_intel', 'bab2_substantif_pengaduan'],
-    'lalintalkim': ['bab2_substantif_dokumen', 'bab2_substantif_izintinggal'],
-    'tikim': ['bab2_substantif_rekapitulasi', 'bab2_substantif_infokim'],
+    'inteldakim': ['bab2_substantif_intel'],
+    'lalintalkim': ['bab2_substantif_dokumen', 'bab2_substantif_dokumen_paspor_template', 'bab2_substantif_izintinggal'],
+    'tikim': ['bab2_substantif_infokim', 'bab2_substantif_pengaduan'],
     'tata_usaha': ['bab1', 'bab2_fasilitatif', 'bab4', 'bab5']
 };
 

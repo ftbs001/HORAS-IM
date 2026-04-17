@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLaporan } from '../../../contexts/LaporanContext';
@@ -180,14 +180,14 @@ export default function MonitoringLaporan({ onNavigate }) {
             const updateData = {
                 status: action === 'approve' ? 'Disetujui' : 'Perlu Revisi',
                 catatan_revisi: action === 'revisi' ? catatan.trim() : null,
-                reviewed_by: user.id,
+                reviewed_by: user?.id,
                 approved_at: action === 'approve' ? new Date().toISOString() : null,
             };
             const { error } = await supabase.from('laporan_bulanan').update(updateData).eq('id', l.id);
             if (error) throw error;
 
             await supabase.from('activity_logs').insert({
-                user_id: user.id, user_name: user.nama,
+                user_id: user?.id, user_name: user?.nama,
                 action: action === 'approve' ? 'approve' : 'revisi',
                 entity_type: 'laporan_bulanan', entity_id: l.id,
                 detail: `${action === 'approve' ? 'Setujui' : 'Minta revisi'} laporan seksi_id=${l.seksi_id} ${BULAN_NAMES[bulan]} ${tahun}`,
@@ -255,7 +255,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                 .eq('id', l.id);
             if (error) throw error;
             await supabase.from('activity_logs').insert({
-                user_id: user.id, user_name: user.nama, action: 'unlock_final',
+                user_id: user?.id, user_name: user?.nama, action: 'unlock_final',
                 entity_type: 'laporan_bulanan', entity_id: l.id,
                 detail: `Buka kunci laporan seksi_id=${l.seksi_id} ${BULAN_NAMES[bulan]} ${tahun}`,
             });
@@ -400,7 +400,7 @@ export default function MonitoringLaporan({ onNavigate }) {
             if (error) throw error;
 
             await supabase.from('activity_logs').insert({
-                user_id: user.id, user_name: user.nama, action: 'finalisasi',
+                user_id: user?.id, user_name: user?.nama, action: 'finalisasi',
                 entity_type: 'laporan_bulanan',
                 detail: `Finalisasi laporan ${BULAN_NAMES[bulan]} ${tahun}`,
             });
@@ -427,6 +427,7 @@ export default function MonitoringLaporan({ onNavigate }) {
     const belumUpload = rows.filter(r => !r.laporan).map(r => r.name);
 
     return (
+        <div className="page-scroll">
         <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
 
             {/* DOCX Inline Preview Modal — with PagedDocumentViewer for images */}
@@ -839,6 +840,7 @@ export default function MonitoringLaporan({ onNavigate }) {
                     onCancel={() => setHapusTarget(null)}
                 />
             )}
+        </div>
         </div>
     );
 }

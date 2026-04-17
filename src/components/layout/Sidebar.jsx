@@ -165,48 +165,17 @@ const Sidebar = ({ onNavigate, currentView, onLogout }) => {
           );
         })()}
 
-        {/* RBAC: Laporan Bulanan (BARU) */}
-        <p className={menuHeaderClass}>Laporan Bulanan</p>
 
-        {/* Admin Seksi: Upload Laporan */}
-        {isAdminSeksi && (
-          <div
-            className={`${menuItemClass} ${currentView === 'upload-laporan' ? activeClass : ''}`}
-            onClick={() => onNavigate('upload-laporan')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-            <span>Upload Laporan Saya</span>
-          </div>
-        )}
 
-        {/* Super Admin: Monitoring & Gabung */}
-        {isSuperAdmin && (
-          <>
-            <div
-              className={`${menuItemClass} ${currentView === 'monitoring-laporan' ? activeClass : ''}`}
-              onClick={() => onNavigate('monitoring-laporan')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-              <span>Monitoring Laporan</span>
-            </div>
-            <div
-              className={`${menuItemClass} ${currentView === 'gabung-laporan' ? activeClass : ''}`}
-              onClick={() => onNavigate('gabung-laporan')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-              <span>Gabungkan Laporan</span>
-            </div>
-          </>
-        )}
 
-        {/* 6. Verifikasi */}
-        <p className={menuHeaderClass}>Persetujuan</p>
+        {/* Status Pengisian Template — replaces Verifikasi */}
+        <p className={menuHeaderClass}>Status</p>
         <div
-          className={`${menuItemClass} ${currentView === 'verification' ? activeClass : ''}`}
-          onClick={() => onNavigate('verification')}
+          className={`${menuItemClass} ${currentView === 'template-status' ? activeClass : ''}`}
+          onClick={() => onNavigate('template-status')}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <span>Verifikasi & Review</span>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+          <span>Status Pengisian Template</span>
         </div>
 
         {/* 7. Cetak & Export (Archive) */}

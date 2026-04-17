@@ -197,6 +197,7 @@ const WorkProgramInput = ({ initialMode = 'list' }) => {
     };
 
     return (
+        <div className="page-scroll">
         <div className="space-y-8 animate-fade-in relative">
             {/* 1. Header & Stats Section */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -767,6 +768,7 @@ const WorkProgramInput = ({ initialMode = 'list' }) => {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 };

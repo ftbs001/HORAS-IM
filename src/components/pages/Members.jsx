@@ -97,7 +97,8 @@ function SuperAdminMembers({ user }) {
     };
 
     return (
-        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        <div className="page-scroll">
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
             {/* Header */}
             <div style={{ background: 'linear-gradient(135deg, #0f2440 0%, #1a3a6b 100%)', borderRadius: '16px', padding: '26px 32px', color: '#fff', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
                 <div>
@@ -267,6 +268,7 @@ function SuperAdminMembers({ user }) {
                 </div>
             )}
         </div>
+        </div>
     );
 }
 
@@ -341,7 +343,8 @@ function AdminSeksiMembers({ user, onNavigate }) {
     };
 
     return (
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div className="page-scroll">
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
             {/* Header */}
             <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)', borderRadius: '16px', padding: '24px 28px', color: '#fff', marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0 }}>👤 Profil & Tim Seksi</h1>
@@ -535,6 +538,7 @@ function AdminSeksiMembers({ user, onNavigate }) {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 }

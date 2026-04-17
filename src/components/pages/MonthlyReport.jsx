@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useReport, SECTION_TOC_MAPPING } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import ReactQuill from 'react-quill-new';
@@ -18,6 +19,20 @@ import logosCombined from '../../assets/logos-combined.png';
 
 // Import DOCX exporter for template-based Word export
 import { generateDocx } from '../../utils/docxExporter';
+
+// Template Paspor Lalintalkim (embedded in TOC)
+import TemplateLaporanEmbedded from '../pages/laporanBulanan/TemplateLaporan';
+// Template Inteldakim (Pro Justitia, TAK, TIMPORA — embedded in TOC)
+import TemplateInteldakimEmbedded from '../pages/laporanBulanan/TemplateInteldakim';
+// Template Infokim & Pengaduan (Seksi 5 dan 6 — embedded in TOC)
+import TemplateInfokimEmbedded from '../pages/laporanBulanan/TemplateInfokimPengaduan';
+// Template Tata Usaha (Keuangan & PNBP — embedded in TOC)
+import TemplateKeuanganEmbedded from '../pages/laporanBulanan/TemplateKeuangan';
+// Template Kepegawaian Bezetting (TU)
+import TemplateKepegawaianEmbedded from '../pages/laporanBulanan/TemplateKepegawaian';
+// Template Urusan Umum (Kendaraan & Sarana - TU)
+import TemplateUmumEmbedded from '../pages/laporanBulanan/TemplateUmum';
+
 
 // Register custom fonts
 const Font = Quill.import('formats/font');
@@ -65,6 +80,7 @@ const toc = [
                 id: 'bab2_substantif', label: 'A. BIDANG SUBSTANTIF', type: 'folder', children: [
                     {
                         id: 'bab2_substantif_dokumen', label: '1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA', type: 'folder', children: [
+                            { id: 'bab2_substantif_dokumen_paspor_template', label: '📊 Template Data Penerbitan Paspor', type: 'file' },
                             { id: 'bab2_substantif_dokumen_paspor48_siantar', label: 'a. Paspor 48 Hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar', type: 'file' },
                             { id: 'bab2_substantif_dokumen_paspor48_tebing', label: 'b. Paspor 48 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi', type: 'file' },
                             { id: 'bab2_substantif_dokumen_paspor48_uuk', label: 'c. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul', type: 'file' },
@@ -364,6 +380,7 @@ const TableOfContentsPreview = () => {
 };
 
 const MonthlyReport = ({ sectionFilter = null }) => {
+    const { user } = useAuth();
     const { reportData, updateSection, clearSection, reportAttachments, addAttachment, removeAttachment, getAttachments, coverLetterData, coverPageData, forewordData } = useReport();
     const { showNotification } = useNotification();
     const quillRef = useRef(null);
@@ -402,14 +419,24 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
 
 
+    // Nodes to explicitly exclude per sectionFilter (deny-list)
+    const SECTION_EXCLUDE_MAP = {
+        'tikim': ['bab2_substantif_rekapitulasi'],
+        'lalintalkim': ['bab2_substantif_rekapitulasi'],
+    };
+
     // TOC Filtering Logic
     const filteredToc = useMemo(() => {
         if (!sectionFilter) return toc;
 
         const allowedIds = SECTION_TOC_MAPPING[sectionFilter] || [];
+        const excludedIds = SECTION_EXCLUDE_MAP[sectionFilter] || [];
 
         const filterNodes = (nodes) => {
             return nodes.reduce((acc, node) => {
+                // Deny-list: explicitly excluded nodes are always hidden
+                if (excludedIds.includes(node.id)) return acc;
+
                 // Check if this node is explicitly allowed
                 const isExplicitlyAllowed = allowedIds.includes(node.id);
 
@@ -423,7 +450,6 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 if (node.children) {
                     const filteredChildren = filterNodes(node.children);
                     if (filteredChildren.length > 0) {
-                        // Cloning the node to avoid mutating original TOC structure references
                         acc.push({ ...node, children: filteredChildren });
                     }
                 }
@@ -433,6 +459,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         };
 
         return filterNodes(toc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [toc, sectionFilter]);
 
     // Initialize special sections content if empty (TOC and BAB III)
@@ -892,6 +919,39 @@ const MonthlyReport = ({ sectionFilter = null }) => {
             };
             buildTocItems(filteredToc, 0);
 
+            // Prepare template data for ALL seksi (case-insensitive month match)
+            let allTemplateData = {};
+            try {
+                const rawMonth = coverPageData?.month || '';
+                const rawYear  = coverPageData?.year  || new Date().getFullYear();
+                const tahunInt = parseInt(rawYear) || new Date().getFullYear();
+
+                // Case-insensitive lookup: 'APRIL' → 4, 'April' → 4
+                const monthUpper = String(rawMonth).toUpperCase();
+                const mIndex = BULAN_NAMES.findIndex((n, i) => i > 0 && n.toUpperCase() === monthUpper);
+                const finalBulan = mIndex > 0 ? mIndex : (parseInt(rawMonth) || new Date().getMonth() + 1);
+
+                const { data: tmplRows } = await supabase
+                    .from('laporan_template')
+                    .select('seksi_id, template_data')
+                    .eq('bulan', finalBulan)
+                    .eq('tahun', tahunInt);
+
+                if (tmplRows && tmplRows.length > 0) {
+                    tmplRows.forEach(row => {
+                        if (row.template_data) allTemplateData[row.seksi_id] = row.template_data;
+                    });
+                }
+            } catch (err) {
+                console.warn('Gagal memuat data laporan_template:', err);
+            }
+            // seksi_id 1 = Inteldakim, seksi_id 2 = Lalintalkim, seksi_id 3 = Tikim, seksi_id 4 = TU
+            const templateData = allTemplateData[2] || null;
+            const inteldakimTemplateData = allTemplateData[1] || null;
+            const tikimTemplateData = allTemplateData[3] || null;
+            const tuTemplateData = allTemplateData[4] || null;
+
+
             // Build chapters with section hierarchy
             const buildChapters = (nodes) => {
                 if (!nodes) return;
@@ -919,7 +979,84 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                 } else {
                                     // Content item
                                     const htmlContent = reportData[child.id] || '';
-                                    if (htmlContent && htmlContent.trim() && !htmlContent.includes('[Belum ada konten]')) {
+                                    if (child.id === 'bab2_substantif_dokumen_paspor_template') {
+                                        // Special injection for Lalintalkim Template
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isLalintalkimTemplate: true,
+                                            templateData: templateData
+                                        });
+                                    } else if (child.id === 'bab2_substantif_intel_yustisia') {
+                                        // Pro Justitia template
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isInteldakimTemplate: true,
+                                            inteldakimPart: 'projus',
+                                            templateData: inteldakimTemplateData
+                                        });
+                                    } else if (child.id === 'bab2_substantif_intel_admin') {
+                                        // Tindakan Administratif template
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isInteldakimTemplate: true,
+                                            inteldakimPart: 'tak',
+                                            templateData: inteldakimTemplateData
+                                        });
+                                    } else if (child.id === 'bab2_substantif_intel_timpora') {
+                                        // TIMPORA template
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isInteldakimTemplate: true,
+                                            inteldakimPart: 'timpora',
+                                            templateData: inteldakimTemplateData
+                                        });
+                                    } else if (child.id === 'bab2_substantif_infokim') {
+                                        // Infokim template (seksi tikim)
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isInfokimTemplate: true,
+                                            infokimPart: 'infokim',
+                                            templateData: tikimTemplateData
+                                        });
+                                    } else if (child.id === 'bab2_substantif_pengaduan') {
+                                        // Pengaduan Masyarakat (stored under tikim)
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isInfokimTemplate: true,
+                                            infokimPart: 'pengaduan',
+                                            templateData: tikimTemplateData
+                                        });
+                                    } else if (child.id === 'bab2_fasilitatif_keuangan_rm') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKeuanganTemplate: true, keuanganPart: 'rm', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_keuangan_pnp') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKeuanganTemplate: true, keuanganPart: 'pnp', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_keuangan_gabungan') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKeuanganTemplate: true, keuanganPart: 'gabungan', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_keuangan_pnbp') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKeuanganTemplate: true, keuanganPart: 'bendahara', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_kepegawaian_bezetting') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKepegawaianTemplate: true, kepegawaianPart: 'bezetting', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_kepegawaian_rekap') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKepegawaianTemplate: true, kepegawaianPart: 'rekap', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_kepegawaian_cuti') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKepegawaianTemplate: true, kepegawaianPart: 'cuti', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_kepegawaian_pembinaan') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKepegawaianTemplate: true, kepegawaianPart: 'pembinaan', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_kepegawaian_persuratan') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isKepegawaianTemplate: true, kepegawaianPart: 'persuratan', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_umum_kendaraan') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isUmumTemplate: true, umumPart: 'kendaraan', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_umum_sarana') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isUmumTemplate: true, umumPart: 'sarana', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab2_fasilitatif_umum_gedung') {
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isUmumTemplate: true, umumPart: 'gedung', templateData: tuTemplateData });
+                                    } else if (htmlContent && htmlContent.trim() && !htmlContent.includes('[Belum ada konten]')) {
                                         chapter.sections.push({
                                             title: child.label,
                                             level: sectionLevel,
@@ -1070,7 +1207,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         }
 
         return nodes.map(node => (
-            <div key={node.id} className={node.type === 'folder' ? 'mt-4' : 'mb-4'}>
+            <div key={node.id} id={`preview-section-${node.id}`} className={node.type === 'folder' ? 'mt-4' : 'mb-4'}>
                 <h4 className={`font - bold ${node.type === 'folder' ? 'text-lg text-imigrasi-navy underline' : 'text-md text-gray-800'} `}>
                     {node.label}
                 </h4>
@@ -1148,19 +1285,53 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         const isActive = activeSection === node.id;
         const paddingLeft = `${level * 1.5 + 1}rem`;
 
+        // Only render folders up to level 5 (BAB → Sub-BAB → Sub-Sub-BAB etc)
+        // Keeps sidebar clean while still showing enough context for deep structures like Keuangan
+        const MAX_VISIBLE_DEPTH = 5;
+
+        const TEMPLATE_FOLDERS = [
+            'bab2_fasilitatif_keuangan', 'bab2_fasilitatif_kepegawaian', 'bab2_fasilitatif_umum',
+            'bab2_substantif_infokim', 'bab2_substantif_pengaduan'
+        ];
+
+        const scrollToTop = () => {
+            // Double-attempt: first immediate, then after render
+            const contentArea = document.getElementById('content-main-area');
+            if (contentArea) contentArea.scrollTop = 0;
+            setTimeout(() => {
+                const area = document.getElementById('content-main-area');
+                if (area) area.scrollTop = 0;
+            }, 80);
+        };
+
+        const handleClick = () => {
+            if (node.type === 'folder' && !TEMPLATE_FOLDERS.includes(node.id)) {
+                // Regular folder: toggle expand
+                setExpandedNodes(prev => prev.includes(node.id)
+                    ? prev.filter(n => n !== node.id)
+                    : [...prev, node.id]);
+                // Also auto-expand and navigate to first file child if exists
+            } else if (viewMode === 'preview') {
+                setActiveSection(node.id);
+                const el = document.getElementById(`preview-section-${node.id}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                setActiveSection(node.id);
+                setViewMode('edit');
+                scrollToTop();
+                // Expand parent if it's a folder
+                if (node.type === 'folder') {
+                    setExpandedNodes(prev => prev.includes(node.id) ? prev : [...prev, node.id]);
+                }
+            }
+        };
+
         return (
             <div>
                 <div
                     className={`flex items-center gap-2 py-2 pr-4 cursor-pointer hover:bg-white/5 transition-colors border-l-4 ${isActive ? 'border-imigrasi-gold bg-white/10 text-imigrasi-gold font-bold' : 'border-transparent text-gray-400'}`}
                     style={{ paddingLeft }}
-                    onClick={() => {
-                        if (node.type === 'folder') {
-                            setExpandedNodes(prev => prev.includes(node.id) ? prev.filter(n => n !== node.id) : [...prev, node.id]);
-                        } else {
-                            setActiveSection(node.id);
-                            setViewMode('edit');
-                        }
-                    }}
+                    onClick={handleClick}
                 >
                     {node.type === 'folder' && (
                         <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
@@ -1170,13 +1341,15 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                     )}
                     <span className="truncate text-sm">{node.label}</span>
                 </div>
-                {node.type === 'folder' && isExpanded && node.children?.map(child => (
+                {/* Only show children up to MAX_VISIBLE_DEPTH to keep sidebar clean */}
+                {node.type === 'folder' && isExpanded && level < MAX_VISIBLE_DEPTH && node.children?.map(child => (
                     <TreeItem key={child.id} node={child} level={level + 1} />
                 ))}
             </div>
         );
 
     };
+
 
     // ── Inner SectionEditor component ─────────────────────────────────────────
     const SectionEditor = () => {
@@ -1188,7 +1361,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         const hasImportedContent = content.includes('docx-imported') || content.includes('pdf-imported') || /<table/i.test(content);
 
         return (
-            <div className="flex flex-col h-full bg-gray-100">
+            <div className="flex flex-col min-h-full bg-gray-100">
                 {/* ── Top Toolbar ── */}
                 <div className="bg-white border-b border-gray-200 px-4 py-2 flex flex-wrap items-center gap-2 shadow-sm">
                     <div className="text-xs font-bold text-gray-500 uppercase truncate max-w-xs">
@@ -1351,7 +1524,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     // ── End SectionEditor ──────────────────────────────────────────────────────
 
     return (
-        <div className="flex flex-col h-full bg-gray-100 animate-fade-in">
+        <div className="flex flex-1 flex-col min-h-0 bg-gray-100 animate-fade-in">
             {/* Main Header */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm z-10 gap-4">
                 <div className="flex items-center gap-4">
@@ -1371,27 +1544,44 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                     )}
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleExportWord}
-                        className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
-                        title="Export ke Microsoft Word"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        Ekspor Word
-                    </button>
-                    <button
-                        onClick={handleExportPDF}
-                        className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
-                        title="Export ke PDF (akan membuka dialog print)"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                        Ekspor PDF
-                    </button>
+                    {/* Super admin: full export */}
+                    {user?.role === 'super_admin' && (
+                        <>
+                            <button
+                                onClick={handleExportWord}
+                                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
+                                title="Export semua laporan ke Microsoft Word"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                Ekspor Word
+                            </button>
+                            <button
+                                onClick={handleExportPDF}
+                                className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
+                                title="Export ke PDF"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                Ekspor PDF
+                            </button>
+                        </>
+                    )}
+                    {/* Admin seksi: export their own section */}
+                    {user?.role !== 'super_admin' && user?.role !== 'viewer' && (
+                        <button
+                            onClick={handleExportWord}
+                            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
+                            title="Export template seksi ini ke Word"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            📄 Ekspor Word Saya
+                        </button>
+                    )}
                 </div>
             </div>
 
-            <div className="flex-1 flex overflow-hidden">
-                {/* TOC Sidebar */}
+            {/* Two-column layout: sidebar + content. Sidebar stays fixed, content scrolls. */}
+            <div className="flex flex-1 min-h-0">
+                {/* TOC Sidebar — visible in edit AND preview modes */}
                 {viewMode !== 'dashboard' && (
                     <div className="w-80 bg-[#1e293b] flex-shrink-0 overflow-y-auto border-r border-gray-700 custom-scrollbar">
                         <div className="p-4 space-y-1">
@@ -1401,8 +1591,15 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                     </div>
                 )}
 
-                {/* Main Action Area */}
-                <div className="flex-1 overflow-y-auto">
+                {/* Main Action Area — independent scroll so sidebar stays fixed */}
+                <div
+                    id="content-main-area"
+                    className="flex-1 overflow-y-auto"
+                    ref={el => {
+                        // Auto-scroll to top whenever activeSection changes
+                        if (el) el._scrollRef = el;
+                    }}
+                >
                     {viewMode === 'dashboard' ? (
                         <DashboardView />
                     ) : viewMode === 'edit' ? (
@@ -1414,27 +1611,69 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             <Foreword />
                         ) : activeSection === 'toc' ? (
                             <TableOfContents />
+                        ) : activeSection === 'bab2_substantif_dokumen_paspor_template' ? (
+                            <TemplateLaporanEmbedded key={activeSection} embedded seksiAlias="lalintalkim" />
+                        ) : activeSection === 'bab2_substantif_intel_yustisia' ? (
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="projus" />
+                        ) : activeSection === 'bab2_substantif_intel_admin' ? (
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="tak" />
+                        ) : activeSection === 'bab2_substantif_intel_timpora' ? (
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="timpora" />
+                        ) : activeSection === 'bab2_substantif_infokim' ? (
+                            <TemplateInfokimEmbedded key={activeSection} embedded mode="infokim" />
+                        ) : activeSection === 'bab2_substantif_pengaduan' ? (
+                            <TemplateInfokimEmbedded key={activeSection} embedded mode="pengaduan" />
+                        ) : activeSection === 'bab2_fasilitatif_keuangan_rm' || 
+                            activeSection === 'bab2_fasilitatif_keuangan_pnp' || 
+                            activeSection === 'bab2_fasilitatif_keuangan_gabungan' ? (
+                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="realisasi" />
+                        ) : activeSection === 'bab2_fasilitatif_keuangan_pnbp' ? (
+                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="pnbp" />
+                        ) : activeSection === 'bab2_fasilitatif_kepegawaian_bezetting' ? (
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="detail" />
+                        ) : activeSection === 'bab2_fasilitatif_kepegawaian_rekap' ? (
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="summary" />
+                        ) : activeSection === 'bab2_fasilitatif_kepegawaian_cuti' ? (
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" />
+                        ) : activeSection === 'bab2_fasilitatif_kepegawaian_pembinaan' ? (
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" />
+                        ) : activeSection === 'bab2_fasilitatif_kepegawaian_persuratan' ? (
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" />
+                        ) : activeSection === 'bab2_fasilitatif_umum_kendaraan' ? (
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="kendaraan" />
+                        ) : activeSection === 'bab2_fasilitatif_umum_sarana' ? (
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="sarana" />
+                        ) : activeSection === 'bab2_fasilitatif_umum_gedung' ? (
+                            <TemplateUmumEmbedded embedded defaultTab="gedung" />
                         ) : (
                             <SectionEditor />
                         )
                     ) : (
-                        // PREVIEW MODE
+                        // PREVIEW MODE — sidebar stays visible on scroll
                         <div id="preview-container" className="p-8 bg-gray-200 min-h-full print:bg-white print:p-0">
                             <div className="max-w-[210mm] mx-auto bg-white shadow-2xl p-[30mm] min-h-[297mm] font-serif print:p-0 print:shadow-none">
                                 {/* Cover Letter Preview */}
-                                <CoverLetterPreview />
+                                <div id="preview-section-cover_letter">
+                                    <CoverLetterPreview />
+                                </div>
 
                                 {/* Cover Page Preview */}
-                                <CoverPagePreview />
+                                <div id="preview-section-cover_page">
+                                    <CoverPagePreview />
+                                </div>
 
                                 {/* Foreword Preview */}
-                                <ForewordPreview />
+                                <div id="preview-section-foreword">
+                                    <ForewordPreview />
+                                </div>
 
                                 {/* Table of Contents Preview */}
-                                <TableOfContentsPreview />
+                                <div id="preview-section-toc">
+                                    <TableOfContentsPreview />
+                                </div>
 
                                 {filteredToc && filteredToc.filter(chapter => chapter.id !== 'cover_letter' && chapter.id !== 'cover_page' && chapter.id !== 'foreword' && chapter.id !== 'toc').map(chapter => (
-                                    <div key={chapter.id} className="mb-12">
+                                    <div key={chapter.id} id={`preview-section-${chapter.id}`} className="mb-12">
                                         <h3 className="text-2xl font-bold uppercase text-center mb-8 bg-gray-100 py-2 border-y border-black">{chapter.label}</h3>
                                         <div className="space-y-6">
                                             {renderPreviewNodes(chapter.children)}

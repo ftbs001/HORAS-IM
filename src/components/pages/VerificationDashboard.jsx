@@ -100,7 +100,7 @@ function SuperAdminVerification({ user, onNavigate }) {
             const { error } = await supabase.from('laporan_bulanan').update({
                 status: newStatus,
                 catatan_revisi: action === 'revisi' ? catatan : null,
-                reviewed_by: user.id,
+                reviewed_by: user?.id,
                 approved_at: action === 'approve' ? new Date().toISOString() : null,
                 updated_at: new Date().toISOString(),
             }).eq('id', reviewModal.laporan.id);
@@ -108,7 +108,7 @@ function SuperAdminVerification({ user, onNavigate }) {
 
             // Log aktivitas
             await supabase.from('activity_logs').insert({
-                user_id: user.id, user_name: user.nama,
+                user_id: user?.id, user_name: user?.nama,
                 action: action === 'approve' ? 'approve' : 'revisi',
                 entity_type: 'laporan_bulanan',
                 detail: `${newStatus} laporan ${reviewModal.name} — ${BULAN_NAMES[bulan]} ${tahun}${catatan ? ` | Catatan: ${catatan}` : ''}`,
@@ -137,7 +137,7 @@ function SuperAdminVerification({ user, onNavigate }) {
                 }).eq('id', r.laporan.id);
             }
             await supabase.from('activity_logs').insert({
-                user_id: user.id, user_name: user.nama,
+                user_id: user?.id, user_name: user?.nama,
                 action: 'finalisasi', entity_type: 'laporan_bulanan',
                 detail: `Finalisasi ${approved.length} laporan — ${BULAN_NAMES[bulan]} ${tahun}`,
             }).catch(() => { });
@@ -160,7 +160,8 @@ function SuperAdminVerification({ user, onNavigate }) {
     };
 
     return (
-        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        <div className="page-scroll">
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
             {/* Header */}
             <div style={{ background: 'linear-gradient(135deg, #0f2440 0%, #1a3a6b 100%)', borderRadius: '16px', padding: '28px 32px', color: '#fff', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
@@ -378,6 +379,7 @@ function SuperAdminVerification({ user, onNavigate }) {
                 </div>
             )}
         </div>
+        </div>
     );
 }
 
@@ -440,7 +442,8 @@ function AdminSeksiVerification({ user, onNavigate }) {
     const isRevisi = currentStatus === 'Perlu Revisi';
 
     return (
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div className="page-scroll">
+        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px' }}>
             {/* Header */}
             <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)', borderRadius: '16px', padding: '24px 28px', color: '#fff', marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0 }}>📋 Status Laporan Saya</h1>
@@ -603,6 +606,7 @@ function AdminSeksiVerification({ user, onNavigate }) {
                     </div>
                 </>
             )}
+        </div>
         </div>
     );
 }

@@ -25,6 +25,12 @@ export const viewNameMap = {
     'activity-log': 'Log Aktivitas',
     'report-history': 'Riwayat Laporan',
     'add-report-type': 'Tambah Jenis Laporan',
+
+    // RBAC Laporan Bulanan
+    'upload-laporan': 'Upload Laporan',
+    'monitoring-laporan': 'Monitoring Laporan',
+    'gabung-laporan': 'Gabungkan Laporan',
+    'template-laporan': 'Template Laporan Paspor',
 };
 
 export const getViewDisplayName = (viewKey) => {
