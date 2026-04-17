@@ -4,6 +4,10 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { validateAllImages, logImageErrors } from '../../../utils/imageValidator';
 import { exportToPdf } from '../../../utils/pdfExporter';
 import { validateMergeDocuments } from '../../../utils/structuredDocValidator';
+import {
+    getLalintalkimDocxElements, getInteldakimDocxElements, getInfokimDocxElements,
+    getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements,
+} from '../../../utils/templateDocxExporter.js';
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
 // Dynamic import('docx') conflicts with static imports in other files and breaks
@@ -1597,11 +1601,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const tmplTikim = allTemplateData[3] || null;
             const tmplTU    = allTemplateData[4] || null;
 
-            const { 
-                getLalintalkimDocxElements, getInteldakimDocxElements, getInfokimDocxElements,
-                getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements
-            } = await import('../../../utils/templateDocxExporter.js');
-
             // Collect Substantif Templates (Landscape)
             const substantifTemplateElems = [];
             if (tmplLalin) substantifTemplateElems.push(...getLalintalkimDocxElements(tmplLalin));
@@ -1689,47 +1688,54 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 }));
             };
 
-            // ── BAB II: Assemble orientation-aware sections ───────────────────
+            // ══════════════════════════════════════════════════════════════════
+            // BAB II: PELAKSANAAN TUGAS
+            // WAJIB LANDSCAPE: BAB II selalu menggunakan kertas Landscape
+            // ══════════════════════════════════════════════════════════════════
             const bab2HeaderElems = babTitle('II', 'PELAKSANAAN TUGAS');
             const subBabAElems = subBab('A.  BIDANG SUBSTANTIF', '');
             const subBabBElems = subBab('B.  BIDANG FASILITATIF', '');
 
-            // Substantif: header + content chunks
-            const substantifAllChunks = [
-                { orientation: 'portrait', elements: [...bab2HeaderElems, ...subBabAElems] },
-                ...(substantifChunks.length > 0
-                    ? substantifChunks
-                    : [{ orientation: 'portrait', elements: [PARA(`Tidak ada laporan seksi substantif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)] }]
-                ),
-            ];
-
-            // Fasilitatif: sub-bab header + content chunks
-            const fasilitatifAllChunks = [
-                { orientation: 'portrait', elements: [...subBabBElems] },
-                ...(fasilitatifChunks.length > 0
-                    ? fasilitatifChunks
-                    : [{ orientation: 'portrait', elements: [PARA(`Tidak ada laporan seksi fasilitatif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)] }]
-                ),
-            ];
-
-            // Full BAB II sections — filtered for empty, guaranteed ≥1 section
-            const bab2Sections = [
-                ...chunksToSections(substantifAllChunks),
-                ...chunksToSections(fasilitatifAllChunks),
-            ];
-
-            // Safety net: if somehow bab2Sections is empty, use a single portrait section
-            if (bab2Sections.length === 0) {
-                bab2Sections.push({
-                    properties: mkSecProps(false),
-                    headers: { default: makeHeader() },
-                    footers: { default: makeFooter() },
-                    children: [
-                        ...bab2HeaderElems,
-                        PARA(`Belum ada laporan yang tersedia untuk periode ${bNama} ${tahun}.`),
-                    ],
-                });
+            // Kumpulkan semua elemen konten (laporan yang disetujui)
+            const substantifBodyElems = [];
+            for (const chunk of substantifChunks) {
+                substantifBodyElems.push(...(chunk.elements || []));
             }
+            const fasilitatifBodyElems = [];
+            for (const chunk of fasilitatifChunks) {
+                fasilitatifBodyElems.push(...(chunk.elements || []));
+            }
+
+            // Semua konten BAB II digabung dalam satu section LANDSCAPE
+            const bab2AllElems = [
+                ...bab2HeaderElems,
+                ...subBabAElems,
+                ...(substantifBodyElems.length > 0
+                    ? substantifBodyElems
+                    : [PARA(`Tidak ada laporan seksi substantif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)]
+                ),
+                // Template tabel substantif
+                ...(substantifTemplateElems.length > 0 ? [EMPTY(80), ...substantifTemplateElems] : []),
+                EMPTY(120),
+                ...subBabBElems,
+                ...(fasilitatifBodyElems.length > 0
+                    ? fasilitatifBodyElems
+                    : [PARA(`Tidak ada laporan seksi fasilitatif yang disetujui untuk periode ${bNama} ${tahun}.`), EMPTY(120)]
+                ),
+                // Template tabel fasilitatif
+                ...(fasilitatifTemplateElems.length > 0 ? [EMPTY(80), ...fasilitatifTemplateElems] : []),
+            ];
+
+            // BAB II = SATU section landscape
+            const bab2Sections = [{
+                properties: mkSecProps(true), // LANDSCAPE wajib
+                headers: { default: makeHeader() },
+                footers: { default: makeFooter() },
+                children: bab2AllElems.length > 0 ? bab2AllElems : [
+                    ...bab2HeaderElems,
+                    PARA(`Belum ada laporan yang tersedia untuk periode ${bNama} ${tahun}.`),
+                ],
+            }];
 
 
             // ══════════════════════════════════════════════════════════════════
@@ -1886,33 +1892,32 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         footers: { default: makeFooter() },
                         children: daftarChildren,
                     },
-                    // 4. BAB I PENDAHULUAN (portrait)
+                    // 4. BAB I PENDAHULUAN → PORTRAIT
                     {
-                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        properties: mkSecProps(false),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab1,
                     },
-                    // 5+. BAB II — inline mixed portrait/landscape sections
-                    //      Each orientation change creates a new DOCX section
+                    // 5. BAB II PELAKSANAAN TUGAS → LANDSCAPE (wajib)
                     ...bab2Sections,
-                    // BAB III PERMASALAHAN (portrait)
+                    // 6. BAB III PERMASALAHAN → PORTRAIT (wajib)
                     {
-                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        properties: mkSecProps(false),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab3,
                     },
-                    // BAB IV PENUTUP (portrait)
+                    // 7. BAB IV PENUTUP → PORTRAIT (wajib)
                     {
-                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        properties: mkSecProps(false),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab4,
                     },
-                    // BAB V LAMPIRAN (portrait)
+                    // 8. BAB V LAMPIRAN → LANDSCAPE (wajib)
                     {
-                        properties: { type: SectionType.NEXT_PAGE, page: { margin: MARGIN } },
+                        properties: mkSecProps(true),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab5,
