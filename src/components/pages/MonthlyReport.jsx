@@ -80,7 +80,14 @@ const toc = [
                 id: 'bab2_substantif', label: 'A. BIDANG SUBSTANTIF', type: 'folder', children: [
                     {
                         id: 'bab2_substantif_dokumen', label: '1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA', type: 'folder', children: [
-                            { id: 'bab2_substantif_dokumen_paspor', label: 'a. Penerbitan Paspor', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor', label: 'a. Paspor – Kanim Pematangsiantar', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_b', label: 'b. Paspor – ULP Tebing Tinggi', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_c', label: 'c. Paspor – UKK Dolok Sanggul', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_d', label: 'd. Paspor – UKK Tarutung (48 Hal)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_e', label: 'e. Paspor – ULP Tebing Tinggi (24 Hal)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_f', label: 'f. Paspor – UKK Tarutung (24 Hal)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_g', label: 'g. Pas Lintas Batas (PLB)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_h', label: 'h. Surat Perjalanan Laksana Paspor (SPLP)', type: 'file' },
                         ]
                     },
                     { id: 'bab2_substantif_rekapitulasi', label: '2. REKAPITULASI DATA PERLINTASAN', type: 'file' },
@@ -1603,14 +1610,20 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                         ) : activeSection === 'toc' ? (
                             <TableOfContents />
                         ) : activeSection === 'bab2_substantif_dokumen_paspor' || 
+                            activeSection === 'bab2_substantif_dokumen_paspor_b' ||
+                            activeSection === 'bab2_substantif_dokumen_paspor_c' ||
+                            activeSection === 'bab2_substantif_dokumen_paspor_d' ||
+                            activeSection === 'bab2_substantif_dokumen_paspor_e' ||
+                            activeSection === 'bab2_substantif_dokumen_paspor_f' ||
+                            activeSection === 'bab2_substantif_dokumen_paspor_g' ||
+                            activeSection === 'bab2_substantif_dokumen_paspor_h' ||
                             activeSection === 'bab2_substantif_dokumen_izintinggal_itk' ||
                             activeSection === 'bab2_substantif_dokumen_izintinggal_itas' ||
-                            activeSection === 'bab2_substantif_dokumen_izintinggal_itap' ? (
+                            activeSection === 'bab2_substantif_dokumen_izintinggal_itap' ||
+                            activeSection === 'bab2_substantif_dokumen_izintinggal_lain' ? (
                             <TemplateLalintalkim key={activeSection} embedded
-                                defaultTab={
-                                    activeSection === 'bab2_substantif_dokumen_paspor' ? 'paspor' :
-                                    activeSection === 'bab2_substantif_rekapitulasi' ? 'perlintasan' : 'izin'
-                                }
+                                defaultTab="paspor"
+                                defaultSubSection={activeSection}
                             />
                         ) : activeSection === 'bab2_substantif_rekapitulasi' ? (
                             <TemplateLalintalkim key={activeSection} embedded defaultTab="perlintasan" />

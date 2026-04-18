@@ -570,8 +570,8 @@ function TabelPerlintasan({ data, onChange, isPreview, loading, tableName, schem
     );
 }
 
-const Section = ({ title, subtitle, children, isPreview }) => (
-    <div style={{ marginBottom: '28px' }}>
+const Section = ({ id, title, subtitle, children, isPreview }) => (
+    <div id={id} style={{ marginBottom: '28px', scrollMarginTop: '16px' }}>
         <div style={{
             fontFamily: FONT, fontSize: isPreview ? '11pt' : '13px', fontWeight: 'bold',
             marginBottom: '8px', color: isPreview ? '#000' : '#1e293b',
@@ -591,7 +591,7 @@ const TABS = [
     { id: 'izin', label: '🪪 Izin Tinggal' },
 ];
 
-export default function TemplateLalintalkim({ embedded = false, defaultTab = 'paspor' }) {
+export default function TemplateLalintalkim({ embedded = false, defaultTab = 'paspor', defaultSubSection = null }) {
     const { user } = useAuth();
     const [msg, showMsg] = useMsg();
 
@@ -601,7 +601,74 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
-    const [activeTab, setActiveTab] = useState(defaultTab);
+
+    // Map defaultSubSection to correct tab
+    const getTabFromSubSection = (ss) => {
+        if (!ss) return defaultTab;
+        if (['bab2_substantif_dokumen_izintinggal_itk','bab2_substantif_dokumen_izintinggal_itas',
+             'bab2_substantif_dokumen_izintinggal_itap','bab2_substantif_dokumen_izintinggal_lain'].includes(ss)) return 'izin';
+        if (ss === 'bab2_substantif_rekapitulasi') return 'perlintasan';
+        return 'paspor';
+    };
+
+    const [activeTab, setActiveTab] = useState(getTabFromSubSection(defaultSubSection));
+
+    // After mount, scroll to correct sub-section
+    useEffect(() => {
+        if (!defaultSubSection) return;
+        // Wait for content to render
+        const t = setTimeout(() => {
+            const sectionMap = {
+                'bab2_substantif_dokumen_paspor': 'section_a',
+                'bab2_substantif_dokumen_paspor_b': 'section_b',
+                'bab2_substantif_dokumen_paspor_c': 'section_c',
+                'bab2_substantif_dokumen_paspor_d': 'section_d',
+                'bab2_substantif_dokumen_paspor_e': 'section_e',
+                'bab2_substantif_dokumen_paspor_f': 'section_f',
+                'bab2_substantif_dokumen_paspor_g': 'section_g',
+                'bab2_substantif_dokumen_paspor_h': 'section_h',
+                'bab2_substantif_dokumen_izintinggal_itk': 'section_itk',
+                'bab2_substantif_dokumen_izintinggal_itas': 'section_itas',
+                'bab2_substantif_dokumen_izintinggal_itap': 'section_itap',
+                'bab2_substantif_dokumen_izintinggal_lain': 'section_lain',
+            };
+            const anchorId = sectionMap[defaultSubSection];
+            if (anchorId) {
+                const el = document.getElementById(anchorId);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 400);
+        return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultSubSection]);
+
+    // Export Word for admin seksi Lalintalkim
+    const handleExportWord = async () => {
+        try {
+            showMsg('info', '⏳ Mempersiapkan file Word...');
+            const { getLalintalKimDocxElements } = await import('../../../utils/templateDocxExporter');
+            const { Packer } = await import('docx');
+            const elements = await getLalintalKimDocxElements({
+                tabel_a: tabelA, tabel_b: tabelB, tabel_c: tabelC,
+                tabel_d: tabelD, tabel_e: tabelE, tabel_f: tabelF,
+                tabel_g: tabelG, tabel_h: tabelH,
+                tabel_itk: tabelItk, tabel_itas: tabelItas, tabel_itap: tabelItap, tabel_lain: tabelLain,
+                tabel_udara: tabelUdara, tabel_laut: tabelLaut, tabel_darat: tabelDarat,
+            }, bulan, tahun);
+            const { Document } = await import('docx');
+            const doc = new Document({ sections: [{ children: elements }] });
+            const blob = await Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Template_Lalintalkim_${BULAN_NAMES[bulan]}_${tahun}.docx`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showMsg('success', '✅ File Word berhasil didownload!');
+        } catch (err) {
+            showMsg('error', `❌ Gagal export: ${err.message}`);
+        }
+    };
 
     // State untuk masing-masing tabel
     const [tabelA, setTabelA] = useState({});
@@ -731,6 +798,10 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
                     style={{ ...toolBtn('primary'), opacity: (saving || loading) ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
                     {saving ? '💾 Menyimpan...' : '💾 Simpan'}
                 </button>
+                <button onClick={handleExportWord}
+                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: '12px', fontWeight: 'bold', background: '#2563eb', color: '#fff' }}>
+                    📄 Ekspor Word
+                </button>
             </div>
 
             {/* ── TABS ────────────────────────────────────────────────────────── */}
@@ -766,35 +837,35 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
                     <div>
                         {isPreview && <h3 style={{ fontFamily: FONT, fontSize: '12pt', fontWeight: 'bold', marginBottom: '16px' }}>1. PENERBITAN DOKUMEN PERJALANAN INDONESIA</h3>}
 
-                        <Section title="a. Paspor 48 Hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar" isPreview={isPreview}>
+                        <Section id="section_a" title="a. Paspor 48 Hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar" isPreview={isPreview}>
                             <TabelA data={tabelA} onChange={w(setTabelA)} isPreview={isPreview} loading={loading} />
                         </Section>
 
-                        <Section title="b. Paspor 48 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi" isPreview={isPreview}>
+                        <Section id="section_b" title="b. Paspor 48 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi" isPreview={isPreview}>
                             <TabelB data={tabelB} onChange={w(setTabelB)} isPreview={isPreview} loading={loading} />
                         </Section>
 
-                        <Section title="c. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul" isPreview={isPreview}>
+                        <Section id="section_c" title="c. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul" isPreview={isPreview}>
                             <TabelC data={tabelC} onChange={w(setTabelC)} isPreview={isPreview} loading={loading} />
                         </Section>
 
-                        <Section title="d. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Tarutung" isPreview={isPreview}>
+                        <Section id="section_d" title="d. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Tarutung" isPreview={isPreview}>
                             <TabelMultiHeader data={tabelD} onChange={w(setTabelD)} isPreview={isPreview} loading={loading} tableName="d" schemaRows={TABEL_D_ROWS} />
                         </Section>
 
-                        <Section title="e. Paspor 24 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi" isPreview={isPreview}>
+                        <Section id="section_e" title="e. Paspor 24 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi" isPreview={isPreview}>
                             <TabelMultiHeader data={tabelE} onChange={w(setTabelE)} isPreview={isPreview} loading={loading} tableName="e" schemaRows={TABEL_E_ROWS} />
                         </Section>
 
-                        <Section title="f. Paspor 24 Hal pada Unit Kerja Kantor (UKK) Tarutung" isPreview={isPreview}>
+                        <Section id="section_f" title="f. Paspor 24 Hal pada Unit Kerja Kantor (UKK) Tarutung" isPreview={isPreview}>
                             <TabelMultiHeader data={tabelF} onChange={w(setTabelF)} isPreview={isPreview} loading={loading} tableName="f" schemaRows={TABEL_F_ROWS} />
                         </Section>
 
-                        <Section title="g. Pas Lintas Batas (PLB)" isPreview={isPreview}>
+                        <Section id="section_g" title="g. Pas Lintas Batas (PLB)" isPreview={isPreview}>
                             <TabelSimple data={tabelG} onChange={w(setTabelG)} isPreview={isPreview} loading={loading} tableName="g" schemaRows={TABEL_G_ROWS} />
                         </Section>
 
-                        <Section title="h. Surat Perjalanan Laksana Paspor (SPLP)" isPreview={isPreview}>
+                        <Section id="section_h" title="h. Surat Perjalanan Laksana Paspor (SPLP)" isPreview={isPreview}>
                             <TabelSimple data={tabelH} onChange={w(setTabelH)} isPreview={isPreview} loading={loading} tableName="h" schemaRows={TABEL_H_ROWS} />
                         </Section>
                     </div>
