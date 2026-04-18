@@ -351,7 +351,7 @@ function TabelTimpora({ data, onChange, isPreview, loading, bulan, tahun }) {
 }
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded = false }) {
+export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded = false, defaultSubSection = null }) {
     const { user } = useAuth();
     const [msg, showMsg] = useMsg();
 
@@ -361,6 +361,24 @@ export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+
+    // Scroll to sub-section after mount
+    useEffect(() => {
+        if (!defaultSubSection) return;
+        const sectionMap = {
+            'bab2_substantif_intel_yustisia': 'section_projus',
+            'bab2_substantif_intel_admin': 'section_tak',
+            'bab2_substantif_intel_timpora': 'section_timpora',
+        };
+        const anchorId = sectionMap[defaultSubSection];
+        if (!anchorId) return;
+        const t = setTimeout(() => {
+            const el = document.getElementById(anchorId);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+        return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultSubSection]);
 
     // Template data state
     const [dataProjus, setDataProjus] = useState(getDefaultInteldakimData().projus);
@@ -479,19 +497,19 @@ export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded
             )}
 
             {/* A. PRO JUSTITIA */}
-            <div style={{ marginBottom: '20px' }}>
+            <div id="section_projus" style={{ marginBottom: '20px', scrollMarginTop: '16px' }}>
                 <p style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>a. Projus {BULAN_NAMES[bulan]} {tahun})</p>
                 <TabelProjus data={dataProjus} onChange={wrap(setDataProjus)} isPreview={isPreview} loading={loading} />
             </div>
 
             {/* B. TINDAKAN ADMINISTRATIF */}
-            <div style={{ marginBottom: '20px' }}>
+            <div id="section_tak" style={{ marginBottom: '20px', scrollMarginTop: '16px' }}>
                 <p style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>b. Tindakan Administratif Keimigrasian</p>
                 <TabelTAK data={dataTAK} onChange={wrap(setDataTAK)} isPreview={isPreview} loading={loading} />
             </div>
 
             {/* C. TIMPORA */}
-            <div style={{ marginBottom: '20px' }}>
+            <div id="section_timpora" style={{ marginBottom: '20px', scrollMarginTop: '16px' }}>
                 <TabelTimpora data={dataTimpora} onChange={wrap(setDataTimpora)} isPreview={isPreview} loading={loading} bulan={bulan} tahun={tahun} />
             </div>
         </div>

@@ -240,7 +240,7 @@ function AdminTableGeneric({ data, columns, keys, types, onChange, disabled }) {
     );
 }
 
-export default function TemplateKepegawaian({ embedded = false, defaultTab = 'detail' }) {
+export default function TemplateKepegawaian({ embedded = false, defaultTab = 'detail', defaultSubSection = null }) {
     const [msg, showMsg] = useMsg();
     const [bulan, setBulan] = useState(new Date().getMonth() + 1);
     const [tahun, setTahun] = useState(new Date().getFullYear());
@@ -262,6 +262,25 @@ export default function TemplateKepegawaian({ embedded = false, defaultTab = 'de
     }, [showMsg]);
 
     useEffect(() => { loadData(bulan, tahun); }, [bulan, tahun, loadData]);
+
+    // Deep link scroll
+    useEffect(() => {
+        if (!defaultSubSection) return;
+        const sectionMap = {
+            'bab2_fasilitatif_kepegawaian_rekap': 'sec_rekap_pegawai',
+            'bab2_fasilitatif_kepegawaian_cuti': 'sec_cuti',
+            'bab2_fasilitatif_kepegawaian_pembinaan': 'sec_pembinaan',
+            'bab2_fasilitatif_kepegawaian_persuratan': 'sec_persuratan',
+        };
+        const anchorId = sectionMap[defaultSubSection];
+        if (!anchorId) return;
+        const t = setTimeout(() => {
+            const el = document.getElementById(anchorId);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+        return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultSubSection]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -402,22 +421,22 @@ export default function TemplateKepegawaian({ embedded = false, defaultTab = 'de
 
             {(activeTab === 'lainnya' || isPreview) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                    <div id="sec_rekap_pegawai" style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto', scrollMarginTop: '16px' }}>
                         <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '12px' }}>2. Rekapitulasi Pegawai</div>
                         <AdminTableRekapitulasi data={kData.rekap_pegawai} onChange={v => updateSection('rekap_pegawai', v)} disabled={isPreview || loading} />
                     </div>
 
-                    <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                    <div id="sec_cuti" style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto', scrollMarginTop: '16px' }}>
                         <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '12px' }}>3. Data Cuti Pegawai</div>
                         <AdminTableCuti data={kData.cuti} onChange={v => updateSection('cuti', v)} disabled={isPreview || loading} total={totals.cuti} />
                     </div>
 
-                    <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                    <div id="sec_pembinaan" style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto', scrollMarginTop: '16px' }}>
                         <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '12px' }}>4. Pembinaan Pegawai</div>
                         <AdminTableGeneric data={kData.pembinaan} onChange={v => updateSection('pembinaan', v)} columns={['JENIS KEGIATAN', 'KETERANGAN']} keys={['nama', 'ket']} disabled={isPreview || loading} />
                     </div>
 
-                    <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                    <div id="sec_persuratan" style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto', scrollMarginTop: '16px' }}>
                         <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '12px' }}>5. Tata Usaha (Persuratan)</div>
                         <AdminTableGeneric data={kData.tata_usaha} onChange={v => updateSection('tata_usaha', v)} columns={['JENIS KEGIATAN', 'JUMLAH']} keys={['nama', 'jumlah']} types={['text', 'number']} disabled={isPreview || loading} />
                     </div>

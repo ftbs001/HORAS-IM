@@ -177,7 +177,12 @@ function TabelPengaduan({ rows, onChange, isPreview, loading }) {
 }
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-export default function TemplateInfokimPengaduan({ mode = 'infokim', embedded = false }) {
+export default function TemplateInfokimPengaduan({ mode: initialMode = 'infokim', embedded = false, defaultSubSection = null }) {
+    // Allow defaultSubSection to override the initial mode if provided
+    const resolvedMode = defaultSubSection === 'bab2_substantif_pengaduan' ? 'pengaduan'
+        : defaultSubSection === 'bab2_substantif_infokim' ? 'infokim'
+        : initialMode;
+    const mode = resolvedMode;
     const [msg, showMsg] = useMsg();
 
     const [bulan, setBulan] = useState(new Date().getMonth() + 1);

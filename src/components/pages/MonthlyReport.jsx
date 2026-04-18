@@ -1563,17 +1563,6 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             </button>
                         </>
                     )}
-                    {/* Admin seksi: export their own section */}
-                    {user?.role !== 'super_admin' && user?.role !== 'viewer' && (
-                        <button
-                            onClick={handleExportWord}
-                            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
-                            title="Export template seksi ini ke Word"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            📄 Ekspor Word Saya
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -1628,37 +1617,37 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                         ) : activeSection === 'bab2_substantif_rekapitulasi' ? (
                             <TemplateLalintalkim key={activeSection} embedded defaultTab="perlintasan" />
                         ) : activeSection === 'bab2_substantif_intel_yustisia' ? (
-                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="projus" />
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_intel_admin' ? (
-                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="tak" />
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_intel_timpora' ? (
-                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultTab="timpora" />
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_infokim' ? (
-                            <TemplateInfokimEmbedded key={activeSection} embedded mode="infokim" />
+                            <TemplateInfokimEmbedded key={activeSection} embedded defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_pengaduan' ? (
-                            <TemplateInfokimEmbedded key={activeSection} embedded mode="pengaduan" />
+                            <TemplateInfokimEmbedded key={activeSection} embedded defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_keuangan_rm' || 
                             activeSection === 'bab2_fasilitatif_keuangan_pnp' || 
                             activeSection === 'bab2_fasilitatif_keuangan_gabungan' ? (
-                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="realisasi" />
+                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="realisasi" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_keuangan_pnbp' ? (
-                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="pnbp" />
+                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="pnbp" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_bezetting' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="detail" />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="detail" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_rekap' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="summary" />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="summary" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_cuti' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_pembinaan' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_persuratan' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_kendaraan' ? (
-                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="kendaraan" />
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="kendaraan" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_sarana' ? (
-                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="sarana" />
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="sarana" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_gedung' ? (
-                            <TemplateUmumEmbedded embedded defaultTab="gedung" />
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="gedung" defaultSubSection={activeSection} />
                         ) : (
                             <SectionEditor />
                         )

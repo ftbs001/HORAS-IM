@@ -403,7 +403,7 @@ const useMsg = () => {
     return [msg, show];
 };
 
-export default function TemplateUmum({ embedded = false, defaultTab = 'kendaraan' }) {
+export default function TemplateUmum({ embedded = false, defaultTab = 'kendaraan', defaultSubSection = null }) {
     const { user } = useAuth();
     const d = new Date();
     const [bulan, setBulan] = useState(d.getMonth() + 1);
@@ -454,6 +454,24 @@ export default function TemplateUmum({ embedded = false, defaultTab = 'kendaraan
     useEffect(() => {
         loadData(bulan, tahun);
     }, [bulan, tahun, loadData]);
+
+    // Deep link scroll
+    useEffect(() => {
+        if (!defaultSubSection) return;
+        const sectionMap = {
+            'bab2_fasilitatif_umum_kendaraan': 'sec_kendaraan',
+            'bab2_fasilitatif_umum_sarana': 'sec_sarana',
+            'bab2_fasilitatif_umum_gedung': 'sec_gedung',
+        };
+        const anchorId = sectionMap[defaultSubSection];
+        if (!anchorId) return;
+        const t = setTimeout(() => {
+            const el = document.getElementById(anchorId);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+        return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultSubSection]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -603,7 +621,7 @@ export default function TemplateUmum({ embedded = false, defaultTab = 'kendaraan
 
                 {/* Kendaraan */}
                 {(activeTab === 'kendaraan' || isPreview) && (
-                    <div style={{ marginBottom: isPreview ? '20px' : '0' }}>
+                    <div id="sec_kendaraan" style={{ marginBottom: isPreview ? '20px' : '0', scrollMarginTop: '16px' }}>
                         <TabKendaraan
                             data={uData}
                             onChange={updateData}
@@ -614,7 +632,7 @@ export default function TemplateUmum({ embedded = false, defaultTab = 'kendaraan
 
                 {/* Sarana */}
                 {(activeTab === 'sarana' || isPreview) && (
-                    <div style={{ marginTop: isPreview ? '20px' : '0', marginBottom: isPreview ? '20px' : '0' }}>
+                    <div id="sec_sarana" style={{ marginTop: isPreview ? '20px' : '0', marginBottom: isPreview ? '20px' : '0', scrollMarginTop: '16px' }}>
                         <TabSarana
                             data={uData}
                             onChange={updateData}
@@ -625,7 +643,7 @@ export default function TemplateUmum({ embedded = false, defaultTab = 'kendaraan
 
                 {/* Gedung */}
                 {(activeTab === 'gedung' || isPreview) && (
-                    <div style={{ marginTop: isPreview ? '20px' : '0' }}>
+                    <div id="sec_gedung" style={{ marginTop: isPreview ? '20px' : '0', scrollMarginTop: '16px' }}>
                         <TabGedung
                             data={uData}
                             onChange={updateData}

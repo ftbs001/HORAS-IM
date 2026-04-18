@@ -687,7 +687,7 @@ export function getInfokimDocxElements(part, templateData, bulanName, tahun) {
    RAW DOCX ELEMENTS BUILDER
    For integration into the main Gabung Laporan export pipeline.
 ══════════════════════════════════════════════════════════════════════════════ */
-export function getLalintalkimDocxElements(templateData) {
+export function getLalintalkimDocxElements(part, templateData) {
     const {
         tabel_a = {}, tabel_b = {}, tabel_c = {}, tabel_d = {},
         tabel_e = {}, tabel_f = {}, tabel_g = {}, tabel_h = {},
@@ -695,57 +695,93 @@ export function getLalintalkimDocxElements(templateData) {
         tabel_udara = {}, tabel_laut = {}, tabel_darat = {}
     } = templateData || {};
 
-    return [
-        subHeading('1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA'),
-        spacer(),
-        subHeading('a. Data Penerbitan Paspor pada Kantor Imigrasi Kelas II TPI Pematang Siantar'),
-        buildTabelA(tabel_a),
-        spacer(),
-        subHeading('b. Paspor pada Unit Layanan Paspor (ULP) Tebing Tinggi'),
-        buildTabelB(tabel_b),
-        spacer(),
-        subHeading('c. Paspor pada Unit Kerja Kantor (UKK) Dolok Sanggul'),
-        buildTabelC(tabel_c),
-        spacer(),
-        subHeading('d. Paspor pada UKK Tarutung — Paspor 48H'),
-        buildTabelMultiHeader('d', tabel_d, TABEL_D_ROWS),
-        spacer(),
-        subHeading('e. Paspor pada ULP Tebing Tinggi — Paspor 24H'),
-        buildTabelMultiHeader('e', tabel_e, TABEL_E_ROWS),
-        spacer(),
-        subHeading('f. Paspor pada UKK Tarutung — Paspor 24H'),
-        buildTabelMultiHeader('f', tabel_f, TABEL_F_ROWS),
-        spacer(),
-        subHeading('g. Pas Lintas Batas (PLB)'),
-        buildTabelSimple('g', tabel_g, TABEL_G_ROWS),
-        spacer(),
-        subHeading('h. Surat Perjalanan Laksana Paspor (SPLP)'),
-        buildTabelSimple('h', tabel_h, TABEL_H_ROWS),
-        spacer(),
+    if (!part) return [];
 
-        subHeading('2. PENERBITAN IZIN TINGGAL'),
-        spacer(),
-        subHeading('a. Izin Tinggal Kunjungan (ITK)'),
-        buildTabelSimple('itk', tabel_itk, TABEL_ITK_ROWS),
-        spacer(),
-        subHeading('b. Izin Tinggal Terbatas (ITAS)'),
-        buildTabelSimple('itas', tabel_itas, TABEL_ITAS_ROWS),
-        spacer(),
-        subHeading('c. Izin Tinggal Tetap (ITAP)'),
-        buildTabelSimple('itap', tabel_itap, TABEL_ITAP_ROWS),
-        spacer(),
-        subHeading('d. LAIN-LAIN'),
-        buildTabelSimple('lain', tabel_lain, TABEL_LAIN_ROWS),
-        spacer(),
-
-        heading('3. REKAPITULASI DATA PERLINTASAN'),
-        buildTabelPerlintasan('udara', tabel_udara, TABEL_PERLINTASAN_ROWS, 'TPI UDARA SILANGIT'),
-        spacer(),
-        buildTabelPerlintasan('laut', tabel_laut, TABEL_PERLINTASAN_ROWS, 'TPI LAUT'),
-        spacer(),
-        buildTabelPerlintasan('darat', tabel_darat, TABEL_PERLINTASAN_ROWS, 'TPI DARAT / POS LINTAS BATAS'),
-        spacer(),
-    ];
+    switch (part) {
+        case 'bab2_substantif_dokumen_paspor':
+            return [
+                subHeading('a. Data Penerbitan Paspor pada Kantor Imigrasi Kelas II TPI Pematang Siantar'),
+                buildTabelA(tabel_a),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_b':
+            return [
+                subHeading('b. Paspor pada Unit Layanan Paspor (ULP) Tebing Tinggi'),
+                buildTabelB(tabel_b),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_c':
+            return [
+                subHeading('c. Paspor pada Unit Kerja Kantor (UKK) Dolok Sanggul'),
+                buildTabelC(tabel_c),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_d':
+            return [
+                subHeading('d. Paspor pada UKK Tarutung — Paspor 48H'),
+                buildTabelMultiHeader('d', tabel_d, TABEL_D_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_e':
+            return [
+                subHeading('e. Paspor pada ULP Tebing Tinggi — Paspor 24H'),
+                buildTabelMultiHeader('e', tabel_e, TABEL_E_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_f':
+            return [
+                subHeading('f. Paspor pada UKK Tarutung — Paspor 24H'),
+                buildTabelMultiHeader('f', tabel_f, TABEL_F_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_g':
+            return [
+                subHeading('g. Pas Lintas Batas (PLB)'),
+                buildTabelSimple('g', tabel_g, TABEL_G_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_paspor_h':
+             return [
+                subHeading('h. Surat Perjalanan Laksana Paspor (SPLP)'),
+                buildTabelSimple('h', tabel_h, TABEL_H_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_izintinggal_itk':
+            return [
+                subHeading('a. Izin Tinggal Kunjungan (ITK)'),
+                buildTabelSimple('itk', tabel_itk, TABEL_ITK_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_izintinggal_itas':
+            return [
+                subHeading('b. Izin Tinggal Terbatas (ITAS)'),
+                buildTabelSimple('itas', tabel_itas, TABEL_ITAS_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_izintinggal_itap':
+            return [
+                subHeading('c. Izin Tinggal Tetap (ITAP)'),
+                buildTabelSimple('itap', tabel_itap, TABEL_ITAP_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_dokumen_izintinggal_lain':
+            return [
+                subHeading('d. LAIN-LAIN'),
+                buildTabelSimple('lain', tabel_lain, TABEL_LAIN_ROWS),
+                spacer()
+            ];
+        case 'bab2_substantif_rekapitulasi':
+            return [
+                buildTabelPerlintasan('udara', tabel_udara, TABEL_PERLINTASAN_ROWS, 'TPI UDARA SILANGIT'),
+                spacer(),
+                buildTabelPerlintasan('laut', tabel_laut, TABEL_PERLINTASAN_ROWS, 'TPI LAUT'),
+                spacer(),
+                buildTabelPerlintasan('darat', tabel_darat, TABEL_PERLINTASAN_ROWS, 'TPI DARAT / POS LINTAS BATAS'),
+                spacer()
+            ];
+        default:
+            return [];
+    }
 }
 
 

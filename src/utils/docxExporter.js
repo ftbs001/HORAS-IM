@@ -773,7 +773,7 @@ const buildChapter = async (title, sections, isFirst = false) => {
             if (section.templateData) {
                 // Import the template builder and generate native DOCX tables
                 const { getLalintalkimDocxElements } = await import('./templateDocxExporter.js');
-                const templateElems = getLalintalkimDocxElements(section.templateData);
+                const templateElems = getLalintalkimDocxElements(section.lalintalkimPart || null, section.templateData);
                 if (templateElems.length > 0) elems.push(...templateElems);
             } else {
                 elems.push(para('[Data Template belum terisi pada bulan ini]', { alignment: AlignmentType.CENTER, italics: true }));

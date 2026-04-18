@@ -182,7 +182,7 @@ function TableBendahara({ data, onChange, isPreview, loading }) {
 
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-export default function TemplateKeuangan({ defaultTab = 'realisasi', embedded = false }) {
+export default function TemplateKeuangan({ defaultTab = 'realisasi', embedded = false, defaultSubSection = null }) {
     const [msg, showMsg] = useMsg();
 
     const [bulan, setBulan] = useState(new Date().getMonth() + 1);
@@ -232,6 +232,25 @@ export default function TemplateKeuangan({ defaultTab = 'realisasi', embedded = 
     }, [showMsg]);
 
     useEffect(() => { loadData(bulan, tahun); }, [bulan, tahun, loadData]);
+
+    // Deep link scroll
+    useEffect(() => {
+        if (!defaultSubSection) return;
+        const sectionMap = {
+            'bab2_fasilitatif_keuangan_rm': 'sec_rm',
+            'bab2_fasilitatif_keuangan_pnp': 'sec_pnp',
+            'bab2_fasilitatif_keuangan_gabungan': 'sec_gabungan',
+            'bab2_fasilitatif_keuangan_pnbp': 'sec_bendahara',
+        };
+        const anchorId = sectionMap[defaultSubSection];
+        if (!anchorId) return;
+        const t = setTimeout(() => {
+            const el = document.getElementById(anchorId);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+        return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultSubSection]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -351,15 +370,21 @@ LAPORAN BENDAHARA PENERIMA`
             {/* Content Area */}
             {(activeTab === 'realisasi' || isPreview) && (
                 <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '24px' }}>
-                    <TableRealisasi title="a. Rupiah Murni (RM)" data={rmData} onChange={handleRmChange} isPreview={isPreview} loading={loading} />
-                    <TableRealisasi title="b. Penerimaan Non Pajak (PNBP)" data={pnpData} onChange={handlePnpChange} isPreview={isPreview} loading={loading} />
+                    <div id="sec_rm" style={{ scrollMarginTop: '16px' }}>
+                        <TableRealisasi title="a. Rupiah Murni (RM)" data={rmData} onChange={handleRmChange} isPreview={isPreview} loading={loading} />
+                    </div>
+                    <div id="sec_pnp" style={{ scrollMarginTop: '16px' }}>
+                        <TableRealisasi title="b. Penerimaan Non Pajak (PNBP)" data={pnpData} onChange={handlePnpChange} isPreview={isPreview} loading={loading} />
+                    </div>
                     {/* Gabungan is always readonly */}
-                    <TableRealisasi title="c. Rupiah Murni + PNBP" data={gabunganDataComputed} onChange={()=>{}} isPreview={isPreview} readOnly={true} loading={loading} />
+                    <div id="sec_gabungan" style={{ scrollMarginTop: '16px' }}>
+                        <TableRealisasi title="c. Rupiah Murni + PNBP" data={gabunganDataComputed} onChange={()=>{}} isPreview={isPreview} readOnly={true} loading={loading} />
+                    </div>
                 </div>
             )}
 
             {(activeTab === 'pnbp' || isPreview) && (
-                <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div id="sec_bendahara" style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', scrollMarginTop: '16px' }}>
                     <TableBendahara data={bendaharaData} onChange={handleBendaharaChange} isPreview={isPreview} loading={loading} />
                 </div>
             )}
