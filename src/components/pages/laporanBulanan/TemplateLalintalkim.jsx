@@ -798,10 +798,6 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
                     style={{ ...toolBtn('primary'), opacity: (saving || loading) ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
                     {saving ? '💾 Menyimpan...' : '💾 Simpan'}
                 </button>
-                <button onClick={handleExportWord}
-                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: '12px', fontWeight: 'bold', background: '#2563eb', color: '#fff' }}>
-                    📄 Ekspor Word
-                </button>
             </div>
 
             {/* ── TABS ────────────────────────────────────────────────────────── */}

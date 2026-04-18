@@ -1444,3 +1444,10 @@ export async function exportTemplateToDOCX(bulan, tahun, templateData) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
+
+/**
+ * Alias with correct casing so TemplateLalintalkim.jsx can import it.
+ * Exact same function as getLalintalkimDocxElements, just exported under the name
+ * used in the dynamic import.
+ */
+export const getLalintalKimDocxElements = getLalintalkimDocxElements;
