@@ -1751,42 +1751,41 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             <TemplateLalintalkim key={activeSection} embedded
                                 defaultTab="paspor"
                                 defaultSubSection={activeSection}
-                                propBulan={selectedMonth} propTahun={selectedYear}
                             />
                         ) : activeSection === 'bab2_substantif_rekapitulasi' ? (
-                            <TemplateLalintalkim key={activeSection} embedded defaultTab="perlintasan" propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateLalintalkim key={activeSection} embedded defaultTab="perlintasan" />
                         ) : activeSection === 'bab2_substantif_intel_yustisia' ? (
-                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_intel_admin' ? (
-                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_intel_timpora' ? (
-                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateInteldakimEmbedded key={activeSection} embedded seksiAlias="inteldakim" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_infokim' ? (
-                            <TemplateInfokimEmbedded key={activeSection} embedded defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateInfokimEmbedded key={activeSection} embedded defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_substantif_pengaduan' ? (
-                            <TemplateInfokimEmbedded key={activeSection} embedded defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateInfokimEmbedded key={activeSection} embedded defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_keuangan_rm' || 
                             activeSection === 'bab2_fasilitatif_keuangan_pnp' || 
                             activeSection === 'bab2_fasilitatif_keuangan_gabungan' ? (
-                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="realisasi" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="realisasi" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_keuangan_pnbp' ? (
-                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="pnbp" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKeuanganEmbedded key={activeSection} embedded defaultTab="pnbp" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_bezetting' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="detail" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="detail" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_rekap' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="summary" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="summary" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_cuti' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_pembinaan' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_kepegawaian_persuratan' ? (
-                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateKepegawaianEmbedded key={activeSection} embedded defaultTab="lainnya" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_kendaraan' ? (
-                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="kendaraan" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="kendaraan" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_sarana' ? (
-                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="sarana" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="sarana" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_gedung' ? (
-                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="gedung" defaultSubSection={activeSection} propBulan={selectedMonth} propTahun={selectedYear} />
+                            <TemplateUmumEmbedded key={activeSection} embedded defaultTab="gedung" defaultSubSection={activeSection} />
                         ) : (
                             <SectionEditor />
                         )
