@@ -431,22 +431,37 @@ const buildCoverLetter = async (data, logoPath) => {
     const letterheadElems = await generateLetterhead(logoPath, data);
     elems.push(...letterheadElems);
 
-    elems.push(new Paragraph({
-        style: STYLE_ID.NORMAL,
-        children: [tr(data.tanggal || '')],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 200, line: SPACING.LINE_1_5 },
-    }));
-
-    [['Nomor', data.nomor], ['Sifat', data.sifat], ['Lampiran', data.lampiran], ['Hal', data.hal]]
-        .forEach(([label, value]) => {
-            elems.push(new Paragraph({
-                style: STYLE_ID.NORMAL,
-                children: [tr(label), tr('\t: ' + (value || '-'))],
-                tabStops: [{ type: TabStopType.LEFT, position: 2 * CM }],
-                spacing: { after: 40, line: SPACING.LINE_1_5 },
-            }));
-        });
+    // ── Nomor/Sifat/Lampiran/Hal table + Tanggal inline on Nomor row ──
+    const nilBorder = { style: BorderStyle.NIL };
+    const headerAttrTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder, insideH: nilBorder, insideV: nilBorder },
+        rows: [
+            new TableRow({ children: [
+                new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Nomor')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ width: { size: 3, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ width: { size: 49, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.nomor || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, alignment: AlignmentType.RIGHT, children: [tr(data.tanggal || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+            ]}),
+            new TableRow({ children: [
+                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Sifat')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ columnSpan: 2, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.sifat || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+            ]}),
+            new TableRow({ children: [
+                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Lampiran')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ columnSpan: 2, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.lampiran || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+            ]}),
+            new TableRow({ children: [
+                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Hal')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+                new TableCell({ columnSpan: 2, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.hal || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
+            ]}),
+        ]
+    });
+    elems.push(headerAttrTable);
 
     elems.push(emptyLine());
 
@@ -467,7 +482,6 @@ const buildCoverLetter = async (data, logoPath) => {
         if (p.trim()) elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
     });
 
-    elems.push(emptyLine());
     elems.push(emptyLine());
 
     // --- BSrE Electronic Signature Layout ---
@@ -755,9 +769,9 @@ const buildAutoTOC = () => {
                 { styleName: 'GovernmentSubSubBAB', level: 3 },
             ],
             hyperlink: true,
-            headingStyleRange: '1-3',
             preserveTabInEntries: true,
             preserveNewLineInEntries: false,
+            updateFields: true,
         })
     );
 

@@ -409,6 +409,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [history, setHistory] = useState({});
+    const contentAreaRef = useRef(null); // ref to the scrollable main content container
     // 'document' = HTML viewer (tables work), 'text' = Quill editor
     const [editorTab, setEditorTab] = useState('document');
     const [paperSettings, setPaperSettings] = useState({});
@@ -1646,17 +1647,18 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     // Force scroll to top when preview opens
     useEffect(() => {
         if (viewMode === 'preview') {
-            // Immediately reset the scrollable container
             const resetScroll = () => {
-                const mainArea = document.getElementById('content-main-area');
-                if (mainArea) mainArea.scrollTop = 0;
+                if (contentAreaRef.current) {
+                    contentAreaRef.current.scrollTop = 0;
+                }
             };
+            // Immediate attempt
             resetScroll();
-            // Use rAF to ensure DOM is fully repainted before scrolling
+            // Post paint attempt (after DOM reflow)
             requestAnimationFrame(() => {
                 resetScroll();
-                // One extra attempt after images/fonts finish loading
-                setTimeout(resetScroll, 300);
+                // Final attempt after images/fonts
+                setTimeout(resetScroll, 400);
             });
         }
     }, [viewMode]);
@@ -1722,10 +1724,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 <div
                     id="content-main-area"
                     className="flex-1 overflow-y-auto"
-                    ref={el => {
-                        // Auto-scroll to top whenever activeSection changes
-                        if (el) el._scrollRef = el;
-                    }}
+                    ref={contentAreaRef}
                 >
                     {viewMode === 'dashboard' ? (
                         <DashboardView />
