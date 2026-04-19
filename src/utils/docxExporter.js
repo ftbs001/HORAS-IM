@@ -265,7 +265,7 @@ export const htmlTableToDocxTable = (tableEl) => {
                 columnSpan: colspan > 1 ? colspan : undefined,
                 rowSpan: rowspan > 1 ? rowspan : undefined,
                 shading: isHeader ? { fill: 'F5F5F5' } : undefined,
-                width: { size: Math.round(cellWidthPct), type: WidthType.PERCENTAGE },
+                width: { size: Math.max(1, Math.round(cellWidthPct)), type: WidthType.AUTO }, // Changed from PERCENTAGE to AUTO for autofitting
                 borders: CELL_BORDER,
             }));
 
@@ -281,7 +281,8 @@ export const htmlTableToDocxTable = (tableEl) => {
     });
 
     return new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: 100, type: WidthType.AUTO }, // Changed to AUTO
+        layout: TableLayoutType.AUTOFIT, // Changed to AUTOFIT
         borders: {
             top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
             bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },

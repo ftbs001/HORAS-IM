@@ -1000,7 +1000,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         docxCells.push(new TableCell({
                             columnSpan: colSpan > 1 ? colSpan : undefined,
                             rowSpan: rowSpan > 1 ? rowSpan : undefined,
-                            width: { size: Math.max(1, Math.round(colPct * colSpan)), type: WidthType.PERCENTAGE },
+                            width: { size: Math.max(1, Math.round(colPct * colSpan)), type: WidthType.AUTO }, // Changed from PERCENTAGE to AUTO for autofitting
                             shading: isHeader ? { fill: 'F5F5F5' } : undefined,
                             borders: {
                                 top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
@@ -1030,8 +1030,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
                 if (docxRows.length === 0) return null;
                 const tbl = new Table({
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    layout: TableLayoutType.FIXED,
+                    width: { size: 100, type: WidthType.AUTO },
+                    layout: TableLayoutType.AUTOFIT, // Changed to AUTOFIT for slimmer tables
                     borders: {
                         top: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
                         bottom: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
@@ -1471,15 +1471,18 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             const pageElems = await buildStructuredPageElements(page);
                             if (pageElems.length === 0) continue;
 
-                            // ── Auto-detect landscape ──────────────────────────────────────────
-                            // Rule: any page that contains at least one table → landscape.
-                            // Pages without tables → portrait (respect declared orientation).
-                            // This prevents tables from overflowing the page width.
+                            // Auto-detect landscape rules:
+                            // BAB I, III, IV are EXPLICITLY portrait, regardless of tables, to ensure no sudden landscape breaks.
+                            const strictPortraitSections = ['BAB I', 'BAB III', 'BAB IV'];
+                            const isStrictPortrait = strictPortraitSections.some(s => secName.includes(s));
+
                             const pageHasTable = (page.content || []).some(b => b.type === 'table');
-                            let orient = pageHasTable ? 'landscape'
+                            
+                            let orient = isStrictPortrait ? 'portrait' 
+                                : pageHasTable ? 'landscape'
                                 : page.orientation === 'landscape' ? 'landscape'
-                                    : globalOrient === 'landscape' ? 'landscape'
-                                        : 'portrait';
+                                : globalOrient === 'landscape' ? 'landscape'
+                                : 'portrait';
 
                             if (orient === 'landscape') {
                                 // Flush any accumulated portrait content first
@@ -1503,7 +1506,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             // Auto-detect landscape: any Table element → landscape.
                             const globalHtmlOrient = r.laporan?.docx_meta?.orientation || 'portrait';
                             const hasAnyTable = htmlElements.some(el => el instanceof Table);
-                            const isLandscape = hasAnyTable || globalHtmlOrient === 'landscape';
+                            
+                            const strictPortraitSections = ['BAB I', 'BAB III', 'BAB IV'];
+                            const isStrictPortrait = strictPortraitSections.some(s => secName.includes(s));
+
+                            const isLandscape = !isStrictPortrait && (hasAnyTable || globalHtmlOrient === 'landscape');
+                            
                             if (isLandscape) {
                                 flushPortrait(portraitBuf);
                                 allChunks.push({ orientation: 'landscape', elements: [...htmlElements, EMPTY(120)] });
