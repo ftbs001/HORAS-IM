@@ -107,9 +107,8 @@ const KopSurat = ({ data = {}, editable = false, onChange }) => {
                 </div>
             </div>
 
-            {/* Garis ganda (tebal-tipis) standar surat resmi */}
-            <div style={{ borderTop: '3px solid #000', margin: '4px 0 1px 0', padding: 0, height: 0, lineHeight: 0 }} />
-            <div style={{ borderTop: '1px solid #000', margin: '0', padding: 0, height: 0, lineHeight: 0 }} />
+            {/* Garis tunggal tipis rapat — persis seperti gambar referensi pengguna */}
+            <div style={{ borderTop: '0.5px solid #000', margin: '1px 0 0 0', padding: 0, height: 0, lineHeight: 0 }} />
         </div>
     );
 };

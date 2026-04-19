@@ -1876,6 +1876,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 creator: user?.nama || 'HORAS-IM',
                 title: `Laporan Bulanan ${bNama} ${tahun}`,
                 description: `Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar — ${bNama} ${tahun}`,
+                features: {
+                    updateFields: true,
+                },
                 styles: {
                     default: {
                         document: {

@@ -173,8 +173,8 @@ export const generateLetterhead = async (logoPath, data = {}) => {
         borders: {
             top: { style: BorderStyle.NIL },
             bottom: { 
-                style: BorderStyle.DOUBLE, 
-                size: 12, // Double line border (typically 1.5pt equivalent)
+                style: BorderStyle.SINGLE, 
+                size: 2, // Ultra thin line identical to user reference
                 color: LETTERHEAD_BORDER.COLOR 
             },
             left: { style: BorderStyle.NIL },
