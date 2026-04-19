@@ -301,7 +301,7 @@ export const htmlTableToDocxTable = (tableEl) => {
  * @param {string} htmlStr — HTML from mammoth.convertToHtml or Quill editor
  * @returns {Array} Array of docx Paragraph / Table objects
  */
-export const htmlToDocxElements = (htmlStr) => {
+export const htmlToDocxElements = async (htmlStr) => {
     if (!htmlStr || typeof htmlStr !== 'string') return [];
     const elements = [];
 
@@ -310,7 +310,7 @@ export const htmlToDocxElements = (htmlStr) => {
     const doc = parser.parseFromString(`<body>${htmlStr}</body>`, 'text/html');
     const body = doc.body;
 
-    const processNode = (node) => {
+    const processNode = async (node) => {
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const tag = node.tagName?.toLowerCase();
 
@@ -338,6 +338,34 @@ export const htmlToDocxElements = (htmlStr) => {
         if (tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
             const txt = node.textContent?.trim() || '';
             if (txt) elements.push(buildSubSubBabHeader(txt));
+            return;
+        }
+
+        // ── Images ───────────────────────────────────────────────
+        if (tag === 'img') {
+            const src = node.getAttribute('src');
+            if (src) {
+                try {
+                    const resp = await fetch(src);
+                    const arrBuf = await resp.arrayBuffer();
+                    
+                    // Native dimensions from DOM or fallback to A4 safe bounds
+                    let w = parseInt(node.getAttribute('width'));
+                    let h = parseInt(node.getAttribute('height'));
+                    if (!w || !h) { w = 500; h = 350; }
+                    
+                    elements.push(new Paragraph({
+                        children: [
+                            new ImageRun({
+                                data: arrBuf,
+                                transformation: { width: w, height: h }
+                            })
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { before: 120, after: 120 }
+                    }));
+                } catch(e) { console.warn('[docxExporter] htmlToDocxElements image fetch failed:', src, e); }
+            }
             return;
         }
 
@@ -381,7 +409,9 @@ export const htmlToDocxElements = (htmlStr) => {
 
         // ── Wrapper divs — just recurse into children ─────────────
         if (tag === 'div' || tag === 'section' || tag === 'article') {
-            node.childNodes.forEach(processNode);
+            for (const childNode of Array.from(node.childNodes)) {
+                await processNode(childNode);
+            }
             return;
         }
 
@@ -392,10 +422,14 @@ export const htmlToDocxElements = (htmlStr) => {
         }
 
         // ── Fallback: recurse ─────────────────────────────────────
-        node.childNodes.forEach(processNode);
+        for (const childNode of Array.from(node.childNodes)) {
+            await processNode(childNode);
+        }
     };
 
-    body.childNodes.forEach(processNode);
+    for (const childNode of Array.from(body.childNodes)) {
+        await processNode(childNode);
+    }
     return elements;
 };
 
@@ -951,9 +985,9 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
         // Priority 2: HTML content → convert tables and formatting to DOCX elements
         else if (section.content && section.content.trim() && !section.content.includes('[Belum ada konten]')) {
             const hasTable = /<table/i.test(section.content);
-            if (hasTable) {
-                // Use full HTML-to-DOCX converter that preserves tables
-                const htmlElems = htmlToDocxElements(section.content);
+            if (hasTable || /<img/i.test(section.content)) {
+                // Use full HTML-to-DOCX converter that preserves tables and images
+                const htmlElems = await htmlToDocxElements(section.content);
                 if (htmlElems.length > 0) {
                     elems.push(...htmlElems);
                 } else {

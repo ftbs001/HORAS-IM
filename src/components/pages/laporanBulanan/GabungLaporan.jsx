@@ -1048,7 +1048,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ── Helper: convert HTML string (from docx_html / mammoth output) → docx elements[]
             // FIX: nodeToRuns now uses context-based traversal — no TextRun instance spreading
-            const htmlToDocxElements = (htmlStr) => {
+            const htmlToDocxElements = async (htmlStr) => {
                 if (!htmlStr || htmlStr.trim().length < 5) return [];
                 try {
                     const parser = new DOMParser();
@@ -1056,7 +1056,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     const root = doc.querySelector('.docx-page') || doc.body;
                     const elements = [];
 
-                    const processNode = (node) => {
+                    const processNode = async (node) => {
                         if (node.nodeType === Node.TEXT_NODE) {
                             const txt = decodeHtmlEntities(node.textContent || '').trim();
                             if (txt) elements.push(PARA(txt));
@@ -1114,16 +1114,54 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             return;
                         }
 
+                        if (tag === 'img') {
+                            const src = node.getAttribute('src');
+                            if (src) {
+                                try {
+                                    const resp = await fetch(src);
+                                    const arrBuf = await resp.arrayBuffer();
+                                    
+                                    // Parse dimensions natively if they exist, otherwise fallback or scale down.
+                                    let w = parseInt(node.getAttribute('width'));
+                                    let h = parseInt(node.getAttribute('height'));
+                                    
+                                    if (!w || !h) {
+                                        // Default fallback that fits A4 width
+                                        w = 500;
+                                        h = 350;
+                                    }
+                                    
+                                    elements.push(new Paragraph({
+                                        children: [
+                                            new ImageRun({
+                                                data: arrBuf,
+                                                transformation: { width: w, height: h }
+                                            })
+                                        ],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 120, after: 120 }
+                                    }));
+                                } catch(e) { console.warn('[GabungLaporan] Failed to embed image:', src, e); }
+                            }
+                            return;
+                        }
+
                         if (['div', 'section', 'article', 'main', 'body'].includes(tag)) {
-                            Array.from(node.childNodes).forEach(processNode);
+                            for (const childNode of Array.from(node.childNodes)) {
+                                await processNode(childNode);
+                            }
                             return;
                         }
                         if (node.children?.length > 0) {
-                            Array.from(node.childNodes).forEach(processNode);
+                            for (const childNode of Array.from(node.childNodes)) {
+                                await processNode(childNode);
+                            }
                         }
                     };
 
-                    Array.from(root.childNodes).forEach(processNode);
+                    for (const childNode of Array.from(root.childNodes)) {
+                        await processNode(childNode);
+                    }
                     return elements;
                 } catch (err) {
                     console.warn('[GabungLaporan] htmlToDocxElements error:', err);
@@ -1460,7 +1498,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     // ── Priority 1: docx_html ──
                     const docxHtml = r.laporan?.docx_html;
                     if (docxHtml && docxHtml.trim().length > 10) {
-                        const htmlElements = htmlToDocxElements(docxHtml);
+                        const htmlElements = await htmlToDocxElements(docxHtml);
                         if (htmlElements.length > 0) {
                             // Auto-detect landscape: any Table element → landscape.
                             const globalHtmlOrient = r.laporan?.docx_meta?.orientation || 'portrait';
