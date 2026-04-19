@@ -65,9 +65,10 @@ const createLetterheadParagraph = (text, options = {}) => {
  * Generate letterhead table with logo and text
  * 
  * @param {string} logoPath - Path or URL to the logo image
+ * @param {object} data - Optional coverLetterData containing letterhead1-6 overrides
  * @returns {Promise<Array>} Array of docx elements (Table and border Paragraph)
  */
-export const generateLetterhead = async (logoPath) => {
+export const generateLetterhead = async (logoPath, data = {}) => {
     const elements = [];
 
     // Use default logo URL if no path provided
@@ -96,11 +97,11 @@ export const generateLetterhead = async (logoPath) => {
     const logoCell = new TableCell({
         width: { size: 15, type: WidthType.PERCENTAGE },
         verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NONE },
-            bottom: { style: BorderStyle.NONE },
-            left: { style: BorderStyle.NONE },
-            right: { style: BorderStyle.NONE },
+            top: { style: BorderStyle.NIL },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
         },
         children: logoRun ? [
             new Paragraph({
@@ -121,51 +122,64 @@ export const generateLetterhead = async (logoPath) => {
     const textCell = new TableCell({
         width: { size: 85, type: WidthType.PERCENTAGE },
         verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NONE },
-            bottom: { style: BorderStyle.NONE },
-            left: { style: BorderStyle.NONE },
-            right: { style: BorderStyle.NONE },
+            top: { style: BorderStyle.NIL },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
         },
         children: [
             // Line 1: KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA
-            createLetterheadParagraph(LETTERHEAD_STYLES.LINE_1.text, {
+            createLetterheadParagraph(data?.letterhead1 || LETTERHEAD_STYLES.LINE_1.text, {
                 size: LETTERHEAD_STYLES.LINE_1.fontSizeHalfPoints,
                 bold: LETTERHEAD_STYLES.LINE_1.bold,
             }),
             // Line 2: DIREKTORAT JENDERAL IMIGRASI
-            createLetterheadParagraph(LETTERHEAD_STYLES.LINE_2.text, {
+            createLetterheadParagraph(data?.letterhead2 || LETTERHEAD_STYLES.LINE_2.text, {
                 size: LETTERHEAD_STYLES.LINE_2.fontSizeHalfPoints,
                 bold: LETTERHEAD_STYLES.LINE_2.bold,
             }),
             // Line 3: KANTOR WILAYAH SUMATERA UTARA
-            createLetterheadParagraph(LETTERHEAD_STYLES.LINE_3.text, {
+            createLetterheadParagraph(data?.letterhead3 || LETTERHEAD_STYLES.LINE_3.text, {
                 size: LETTERHEAD_STYLES.LINE_3.fontSizeHalfPoints,
                 bold: LETTERHEAD_STYLES.LINE_3.bold,
             }),
             // Line 4: KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR (Bold)
-            createLetterheadParagraph(LETTERHEAD_STYLES.LINE_4.text, {
+            createLetterheadParagraph(data?.letterhead4 || LETTERHEAD_STYLES.LINE_4.text, {
                 size: LETTERHEAD_STYLES.LINE_4.fontSizeHalfPoints,
                 bold: LETTERHEAD_STYLES.LINE_4.bold,
                 spaceAfter: 40,
             }),
             // Line 5: Address
-            createLetterheadParagraph(LETTERHEAD_STYLES.LINE_5.text, {
+            createLetterheadParagraph(data?.letterhead5 || LETTERHEAD_STYLES.LINE_5.text, {
                 size: LETTERHEAD_STYLES.LINE_5.fontSizeHalfPoints,
                 bold: LETTERHEAD_STYLES.LINE_5.bold,
             }),
             // Line 6: Website and Email
-            createLetterheadParagraph(LETTERHEAD_STYLES.LINE_6.text, {
+            createLetterheadParagraph(data?.letterhead6 || LETTERHEAD_STYLES.LINE_6.text, {
                 size: LETTERHEAD_STYLES.LINE_6.fontSizeHalfPoints,
                 bold: LETTERHEAD_STYLES.LINE_6.bold,
             }),
         ],
     });
 
-    // Create letterhead table
+    // Create letterhead table with bottom border
     const letterheadTable = new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         layout: TableLayoutType.FIXED,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        borders: {
+            top: { style: BorderStyle.NIL },
+            bottom: { 
+                style: BorderStyle.SINGLE, 
+                size: 2, // Ultra thin line identical to GabungLaporan.jsx
+                color: LETTERHEAD_BORDER.COLOR 
+            },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
+            insideH: { style: BorderStyle.NIL },
+            insideV: { style: BorderStyle.NIL },
+        },
         rows: [
             new TableRow({
                 children: [logoCell, textCell],
@@ -174,24 +188,6 @@ export const generateLetterhead = async (logoPath) => {
     });
 
     elements.push(letterheadTable);
-
-    // Border line (0.5pt single line)
-    const borderLine = new Paragraph({
-        children: [],
-        border: {
-            bottom: {
-                style: BorderStyle.SINGLE,
-                size: LETTERHEAD_BORDER.THICKNESS_EIGHTH, // 0.5pt = 4 eighths
-                color: LETTERHEAD_BORDER.COLOR,
-            },
-        },
-        spacing: {
-            before: 100,
-            after: 200,
-        },
-    });
-
-    elements.push(borderLine);
 
     return elements;
 };

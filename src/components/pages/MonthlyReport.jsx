@@ -9,6 +9,7 @@ import '../../styles/quill-custom.css';
 import CoverLetter from './CoverLetter';
 import CoverPage from './CoverPage';
 import Foreword from './Foreword';
+import KopSurat from '../common/KopSurat';
 import TableOfContents from './TableOfContents';
 import { supabase } from '../../lib/supabaseClient';
 import html2pdf from 'html2pdf.js';
@@ -172,70 +173,83 @@ const toc = [
 
 // Cover Letter Preview Component (for preview mode)
 const CoverLetterPreview = () => {
-    const { coverLetterData } = useReport();
+    const { coverLetterData, form } = useReport();
 
-    if (!coverLetterData || Object.keys(coverLetterData).length === 0) return null;
+    // Default template identical to CoverLetter.jsx
+    const defaultData = {
+        letterhead1: 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA',
+        letterhead2: 'DIREKTORAT JENDERAL IMIGRASI',
+        letterhead3: 'KANTOR WILAYAH SUMATERA UTARA',
+        letterhead4: 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR',
+        letterhead5: 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun',
+        letterhead6: 'Laman: pematangsiantar.imigrasi.go.id, Pos-el: kanim_pematangsiantar@imigrasi.go.id',
+        nomor: 'WIM.2.IMI.4-PR.04.01-3291',
+        tanggal: '19 Agustus 2025',
+        sifat: 'Penting',
+        lampiran: '1 (satu) berkas',
+        hal: 'Laporan Kegiatan Bulan Juli 2025\npada Kantor Imigrasi Kelas II TPI Pematang Siantar',
+        tujuan: 'Yth. Kepala Kantor Wilayah Sumatera Utara\nDirektorat Jenderal Imigrasi\ndi tempat',
+        isi: 'Menindaklanjuti surat Sekretaris Direktorat Jenderal Imigrasi No.IMI.1-TI.03-3178 tanggal 27 Agustus 2018 tentang Penggunaan Aplikasi Laporan Bulanan Online, bersama ini dengan hormat kami kirimkan Laporan Kegiatan Bulan Maret 2026 pada Kantor Imigrasi Kelas II TPI Pematang Siantar.\n\nDemikian kami sampaikan, atas perkenan dan petunjuk lebih lanjut kami ucapkan terima kasih.',
+        penandatangan: 'Benyamin Kali Patembal Harahap',
+        tembusan: '1  Sekretaris Direktorat Jenderal Imigrasi\n   Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia.'
+    };
+
+    // Use current data or fallback to defaults
+    const data = { ...defaultData, ...(coverLetterData || {}) };
 
     return (
         <div className="mb-16 pb-16 border-b-4 border-black page-break-after" style={{ fontFamily: 'Arial, sans-serif' }}>
-            {/* Kop Surat */}
-            <div className="flex items-start gap-4 border-b-2 border-black pb-4 mb-6">
-                {/* Logo Kementerian Imigrasi dan Pemasyarakatan */}
-                <div className="flex-shrink-0">
-                    <img
-                        src={logoKementerian}
-                        alt="Logo Kementerian Imigrasi dan Pemasyarakatan"
-                        width="70"
-                        height="70"
-                        className="object-contain"
-                    />
-                </div>
+            {/* Kop Surat — komponen bersama (identik dengan edit view) */}
+            <KopSurat data={data} editable={false} />
 
-                {/* Header Text */}
-                <div className="flex-1 text-center" style={{ lineHeight: '1.3' }}>
-                    <div style={{ fontSize: '9pt', fontWeight: 'bold', letterSpacing: '0.3px' }}>
-                        KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA<br />
-                        <span style={{ fontSize: '8.5pt' }}>DIREKTORAT JENDERAL IMIGRASI</span><br />
-                        <span style={{ fontSize: '8.5pt' }}>KANTOR WILAYAH SUMATERA UTARA</span><br />
-                        <span style={{ fontSize: '11pt', marginTop: '2px', display: 'inline-block' }}>
-                            KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR
-                        </span>
-                    </div>
-                    <div style={{ fontSize: '7.5pt', marginTop: '4px', fontWeight: 'normal' }}>
-                        Jalan Raya Medan Km. 11,5, Purbasetan, Tanjung Dolok, Simalungun<br />
-                        <span>Laman: imigrasiSiantar.id, Surel: kanim.siantar@gmail.id Faks: kanim@kemenkumham.go.id</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tanggal (di kanan atas, setelah kop surat, sebelum nomor) */}
-            <div className="text-right text-sm mb-6">{coverLetterData.tanggal || ''}</div>
+            {/* Spacer setelah kop */}
+            <div style={{ height: '16px' }} />
 
             {/* Content */}
-            <div className="grid grid-cols-[100px,1fr] gap-x-2 gap-y-1 mb-4 text-sm">
+            <div className="grid grid-cols-[100px,1fr,auto] gap-x-2 gap-y-1 mb-4 text-sm" style={{ fontFamily: 'Times New Roman, serif' }}>
                 <div>Nomor</div>
-                <div>: {coverLetterData.nomor || ''}</div>
+                <div>: {data.nomor}</div>
+                <div className="text-right whitespace-nowrap pl-8">{data.tanggal}</div>
                 <div>Sifat</div>
-                <div>: {coverLetterData.sifat || ''}</div>
+                <div className="col-span-2">: {data.sifat}</div>
                 <div>Lampiran</div>
-                <div>: {coverLetterData.lampiran || ''}</div>
+                <div className="col-span-2">: {data.lampiran}</div>
                 <div>Hal</div>
-                <div className="whitespace-pre-line">: {coverLetterData.hal || ''}</div>
+                <div className="whitespace-pre-line col-span-2">: {data.hal}</div>
             </div>
 
-            <div className="text-sm whitespace-pre-line mb-6">{coverLetterData.tujuan || ''}</div>
-            <div className="text-sm text-justify leading-relaxed whitespace-pre-line mb-12">{coverLetterData.isi || ''}</div>
+            <div className="text-sm whitespace-pre-line mb-6" style={{ fontFamily: 'Times New Roman, serif' }}>{data.tujuan}</div>
+            <div className="text-sm text-justify leading-relaxed whitespace-pre-line mb-12" style={{ fontFamily: 'Times New Roman, serif' }}>{data.isi}</div>
 
-            <div className="text-center text-sm">
-                <div className="mb-16">Kepala Kantor,</div>
-                <div className="font-bold">{coverLetterData.penandatangan || ''}</div>
+
+            {/* Tanda Tangan */}
+            <div className="flex justify-between text-sm mt-8" style={{ fontFamily: 'Times New Roman, serif' }}>
+                {/* Empty left spacer */}
+                <div className="flex-1" />
+
+                {/* Signer section right */}
+                <div className="text-center w-[350px]">
+                    <div className="mb-2">Kepala Kantor,</div>
+                    
+                    {/* BSrE Badge Mimic */}
+                    <div className="flex items-center justify-center gap-3 my-2 px-3 py-2 w-max mx-auto translate-x-[-12px]">
+                        <img src="/logo_kemenimipas.png" alt="Kemenimipas" className="w-[38px] h-[38px] object-contain" />
+                        <div className="text-left leading-tight">
+                            <div className="font-bold text-[15px] tracking-wide text-gray-900 mb-[2px]" style={{ fontFamily: 'Arial, sans-serif' }}>KEMENIMIPAS</div>
+                            <div className="text-[10px] text-gray-400 font-medium" style={{ fontFamily: 'Arial, sans-serif' }}>Ditandatangani secara elektronik oleh:</div>
+                        </div>
+                    </div>
+
+                    <div className="font-bold pt-2 underline">
+                        {data.penandatangan}
+                    </div>
+                </div>
             </div>
 
-            <div className="mt-12 text-xs">
-                <div className="font-bold mb-1">Tembusan :</div>
-                <div className="pl-4">
-                    1. Sekretaris Direktorat Jenderal Imigrasi<br />
-                    Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia.
+            <div className="mt-12 text-xs" style={{ fontFamily: 'Times New Roman, serif' }}>
+                <div className="mb-1">Tembusan:</div>
+                <div className="whitespace-pre-line">
+                    {data.tembusan}
                 </div>
             </div>
         </div>
@@ -390,6 +404,9 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     const [activeSection, setActiveSection] = useState('cover_letter');
     const [expandedNodes, setExpandedNodes] = useState(['bab1', 'bab1_pengantar', 'bab2', 'bab2_substantif']);
     const [viewMode, setViewMode] = useState(sectionFilter ? 'edit' : 'dashboard'); // Default to dashboard if no section filter
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [templateToDelete, setTemplateToDelete] = useState(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [history, setHistory] = useState({});
     // 'document' = HTML viewer (tables work), 'text' = Quill editor
@@ -1625,6 +1642,24 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         );
     };
     // ── End SectionEditor ──────────────────────────────────────────────────────
+
+    // Force scroll to top when preview opens
+    useEffect(() => {
+        if (viewMode === 'preview') {
+            // Immediately reset the scrollable container
+            const resetScroll = () => {
+                const mainArea = document.getElementById('content-main-area');
+                if (mainArea) mainArea.scrollTop = 0;
+            };
+            resetScroll();
+            // Use rAF to ensure DOM is fully repainted before scrolling
+            requestAnimationFrame(() => {
+                resetScroll();
+                // One extra attempt after images/fonts finish loading
+                setTimeout(resetScroll, 300);
+            });
+        }
+    }, [viewMode]);
 
     return (
         <div className="flex flex-1 flex-col min-h-0 bg-gray-100 animate-fade-in">

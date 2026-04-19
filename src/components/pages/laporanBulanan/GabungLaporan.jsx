@@ -484,80 +484,67 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 ? new ImageRun({ data: buf, transformation: { width: w, height: h }, type: type === 'jpg' ? 'jpeg' : type })
                 : new TextRun({ text: '', font: FONT, size: F_SMALL });
 
-            // KOP: 3-column borderless table — [logo-kemen | teks | logo-imigrasi]
-            const NOB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }; // no border
+            // KOP: 2-column borderless table — [logo-kemen | teks-center]
+            // Persis seperti gambar: 1 logo kiri saja, teks di tengah, garis ganda di bawah
+            const NOB = { style: BorderStyle.NONE }; // explicitly NONE to disable vertical line artifact in DOCX
             const kopTableRow = new TableRow({
                 children: [
-                    // Col 1: Logo Kementerian
+                    // Col 1: Logo Kementerian (kiri)
                     new TableCell({
-                        width: { size: 12, type: WidthType.PERCENTAGE },
+                        width: { size: 14, type: WidthType.PERCENTAGE },
                         borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
                         verticalAlign: VerticalAlign.CENTER,
                         children: [new Paragraph({
-                            children: [mkLogo(logoKemenBuf, 'png', 72, 72)],
+                            children: [mkLogo(logoKemenBuf, 'png', 80, 80)],
                             alignment: AlignmentType.CENTER,
                             spacing: { after: 0 },
                         })],
                     }),
-                    // Col 2: Teks kop — centered
+                    // Col 2: Teks kop — centered. Uses coverLetterData or exact defaults from CoverLetter.jsx
                     new TableCell({
-                        width: { size: 76, type: WidthType.PERCENTAGE },
+                        width: { size: 86, type: WidthType.PERCENTAGE },
                         borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
                         verticalAlign: VerticalAlign.CENTER,
                         children: [
-                            new Paragraph({ children: [new TextRun({ text: 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', font: 'Arial', size: 20, bold: false })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: 'DIREKTORAT JENDERAL IMIGRASI', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: 'KANTOR WILAYAH SUMATERA UTARA', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR', font: 'Arial', size: 22, bold: true })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun', font: 'Arial', size: 16 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: 'Laman: pematangsiantar.imigrasi.go.id | Pos-el: kanim_pematangsiantar@imigrasi.go.id', font: 'Arial', size: 16 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead1 || 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', font: 'Arial', size: 20, bold: false })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead2 || 'DIREKTORAT JENDERAL IMIGRASI', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead3 || 'KANTOR WILAYAH SUMATERA UTARA', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead4 || 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR', font: 'Arial', size: 24, bold: true })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead5 || 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun', font: 'Arial', size: 18 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead6 || 'Laman: pematangsiantar.imigrasi.go.id, Pos-el: kanim_pematangsiantar@imigrasi.go.id', font: 'Arial', size: 16 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
                         ],
-                    }),
-                    // Col 3: Logo Imigrasi
-                    new TableCell({
-                        width: { size: 12, type: WidthType.PERCENTAGE },
-                        borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
-                        verticalAlign: VerticalAlign.CENTER,
-                        children: [new Paragraph({
-                            children: [mkLogo(logoImigrBuf, 'jpg', 72, 72)],
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 0 },
-                        })],
                     }),
                 ],
             });
 
             const kopTable = new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
-                borders: { top: NOB, bottom: NOB, left: NOB, right: NOB, insideH: NOB, insideV: NOB },
+                borders: { 
+                    top: NOB, 
+                    bottom: { style: BorderStyle.SINGLE, size: 2, color: '000000' }, 
+                    left: NOB, 
+                    right: NOB, 
+                    insideH: NOB, 
+                    insideV: NOB 
+                },
                 rows: [kopTableRow],
             });
 
-            // Thick double border line immediately below the kop table
-            // Double-border below kop: use a table row with bottom border instead of
-            // paragraph border (paragraph border is less reliable across Word versions)
-            const kopBorderLine = new Paragraph({
-                children: [new TextRun({ text: '', font: FONT, size: F_SMALL })],
-                border: {
-                    bottom: { style: BorderStyle.DOUBLE, size: 6, color: '000000', space: 1 },
-                },
-                spacing: { before: 60, after: 120 },
-            });
-
-            const kopElements = [kopTable, kopBorderLine];
+            // Hanya tabel kop (garis bawah sudah termasuk dalam properti border bottom tabel di atas)
+            const kopElements = [kopTable];
 
             // ══════════════════════════════════════════════════════════════════
             // SECTION 1: SURAT PENGANTAR
             // Menggunakan data dari coverLetterData (Semua Laporan) jika ada
             // ══════════════════════════════════════════════════════════════════
-            // Helper: ambil nilai dari coverLetterData, fallback ke default
-            const clDate     = cleanXml(coverLetterData?.tanggal   || `Pematang Siantar, ${tgl}`);
-            const clNomor    = cleanXml(coverLetterData?.nomor      || `W5.IMI.02-IM.01.10-${String(now.getMonth() + 1).padStart(3, '0')}/${tahun}`);
-            const clSifat    = cleanXml(coverLetterData?.sifat      || 'Biasa');
-            const clLampiran = cleanXml(coverLetterData?.lampiran   || '1 (satu) Eksemplar');
-            const clHal      = cleanXml(coverLetterData?.hal        || `Laporan Kegiatan Bulan ${bNama} ${tahun}`);
-            const clIsi      = cleanXml(coverLetterData?.isi         || `Dengan hormat, disampaikan bahwa dalam rangka pelaksanaan tugas dan fungsi Kantor Imigrasi Kelas II TPI Pematang Siantar, bersama ini kami sampaikan Laporan Bulanan bulan ${bNama} ${tahun} yang memuat kegiatan operasional di bidang substantif maupun fasilitatif.\n\nLaporan ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas dan fungsi kantor serta sebagai bahan evaluasi kinerja dalam rangka peningkatan pelayanan keimigrasian kepada masyarakat.\n\nDemikian laporan ini kami sampaikan. Atas perhatian dan arahan Bapak/Ibu, kami mengucapkan terima kasih.`);
-            const clPenandatangan = cleanXml(coverLetterData?.penandatangan || '');
+            // Helper: ambil nilai dari coverLetterData, fallback ke default yang persis sama dengan CoverLetter.jsx
+            const clDate     = cleanXml(coverLetterData?.tanggal   || `19 Agustus 2025`); // Or dynamic if needed, but UI uses static in the form, let's keep it clean
+            const clNomor    = cleanXml(coverLetterData?.nomor      || `WIM.2.IMI.4-PR.04.01-3291`);
+            const clSifat    = cleanXml(coverLetterData?.sifat      || 'Penting');
+            const clLampiran = cleanXml(coverLetterData?.lampiran   || '1 (satu) berkas');
+            const clHal      = cleanXml(coverLetterData?.hal        || `Laporan Kegiatan Bulan Juli 2025\npada Kantor Imigrasi Kelas II TPI Pematang Siantar`);
+            const clIsi      = cleanXml(coverLetterData?.isi         || `Menindaklanjuti surat Sekretaris Direktorat Jenderal Imigrasi No.IMI.1-TI.03-3178 tanggal 27 Agustus 2018 tentang Penggunaan Aplikasi Laporan Bulanan Online, bersama ini dengan hormat kami kirimkan Laporan Kegiatan Bulan Maret 2026 pada Kantor Imigrasi Kelas II TPI Pematang Siantar.\n\nDemikian kami sampaikan, atas perkenan dan petunjuk lebih lanjut kami ucapkan terima kasih.`);
+            const clPenandatangan = cleanXml(coverLetterData?.penandatangan || 'Benyamin Kali Patembal Harahap');
 
             // Build Hal as possibly multi-line
             const halLines = clHal.split('\n').filter(Boolean);
@@ -565,16 +552,17 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const suratChildren = [
                 ...kopElements,
 
-                // Tanggal (kanan)
+                // Nomor / Sifat / Lampiran / Hal with Tanggal right-aligned on the first row
                 new Paragraph({
-                    children: [TR(clDate)],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 240, line: 240, lineRule: 'auto' },
+                    children: [
+                        TR('Nomor    '), TR(': '), TR(clNomor),
+                        TR(`\t${clDate}`)
+                    ],
+                    tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W }],
+                    spacing: { after: 60, line: 240, lineRule: 'auto' },
+                    indent: { left: 0 },
                 }),
-
-                // Nomor / Sifat / Lampiran / Hal
                 ...[
-                    { label: 'Nomor    ', val: clNomor },
                     { label: 'Sifat    ', val: clSifat },
                     { label: 'Lampiran ', val: clLampiran },
                     { label: 'Hal      ', val: halLines[0] || clHal },
@@ -597,11 +585,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     ? coverLetterData.tujuan.split('\n').filter(Boolean).map(line =>
                         PARA([TR(cleanXml(line))], { noIndent: true }))
                     : [
-                        PARA([TR('Yth.')], { noIndent: true }),
-                        PARA([TR('Kepala Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan', { bold: true })], { noIndent: true }),
-                        PARA([TR('Sumatera Utara')], { noIndent: true }),
-                        PARA([TR('di —')], { noIndent: true }),
-                        PARA([TR('Medan')], { noIndent: true }),
+                        PARA([TR('Yth. Kepala Kantor Wilayah Sumatera Utara')], { noIndent: true }),
+                        PARA([TR('Direktorat Jenderal Imigrasi')], { noIndent: true }),
+                        PARA([TR('di tempat')], { noIndent: true }),
                     ]),
 
                 EMPTY(200),
@@ -617,43 +603,44 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     alignment: AlignmentType.RIGHT,
                     spacing: { after: 60, line: 240, lineRule: 'auto' },
                 }),
-                EMPTY(1200),
-                ...(clPenandatangan
-                    ? [
-                        new Paragraph({
-                            children: [TR(clPenandatangan, { bold: true, underline: { type: 'single' } })],
-                            alignment: AlignmentType.RIGHT,
-                            spacing: { after: 60, line: 240, lineRule: 'auto' },
-                        }),
-                    ]
-                    : [
-                        new Paragraph({
-                            children: [TR('_________________________', { bold: true, underline: { type: 'single' } })],
-                            alignment: AlignmentType.RIGHT,
-                            spacing: { after: 60, line: 240, lineRule: 'auto' },
-                        }),
-                        new Paragraph({
-                            children: [TR('NIP. _____________________')],
-                            alignment: AlignmentType.RIGHT,
-                            spacing: { after: 400, line: 240, lineRule: 'auto' },
-                        }),
-                    ]),
-
-                // Tembusan
+                EMPTY(1400),
                 new Paragraph({
-                    children: [TR('Tembusan:', { bold: true, size: F_SMALL })],
+                    children: [TR(clPenandatangan || '_________________________', { bold: true, underline: { type: 'single' } })],
+                    alignment: AlignmentType.RIGHT,
                     spacing: { after: 60, line: 240, lineRule: 'auto' },
                 }),
                 new Paragraph({
-                    children: [TR('1. Sekretaris Direktorat Jenderal Imigrasi;', { size: F_SMALL })],
-                    indent: { left: cm(0.5) },
-                    spacing: { after: 40, line: 240, lineRule: 'auto' },
+                    children: [TR(coverLetterData?.nip ? `NIP. ${cleanXml(coverLetterData.nip)}` : '')],
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { after: 400, line: 240, lineRule: 'auto' },
                 }),
+
+                // Tembusan
                 new Paragraph({
-                    children: [TR('2. Arsip.', { size: F_SMALL })],
-                    indent: { left: cm(0.5) },
-                    spacing: { after: 0, line: 240, lineRule: 'auto' },
+                    children: [TR('Tembusan:', { bold: false, size: F_SMALL })],
+                    spacing: { after: 60, line: 240, lineRule: 'auto', before: 300 },
                 }),
+                ...(coverLetterData?.tembusan
+                    ? coverLetterData.tembusan.split('\n').filter(Boolean).map(line =>
+                        new Paragraph({
+                            children: [TR(line, { size: F_SMALL })],
+                            indent: { left: 0 },
+                            spacing: { after: 40, line: 240, lineRule: 'auto' },
+                        })
+                    )
+                    : [
+                        new Paragraph({
+                            children: [TR('1  Sekretaris Direktorat Jenderal Imigrasi', { size: F_SMALL })],
+                            indent: { left: 0 },
+                            spacing: { after: 40, line: 240, lineRule: 'auto' },
+                        }),
+                        new Paragraph({
+                            children: [TR('   Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia.', { size: F_SMALL })],
+                            indent: { left: 0 },
+                            spacing: { after: 0, line: 240, lineRule: 'auto' },
+                        }),
+                    ]
+                ),
             ];
 
             // ══════════════════════════════════════════════════════════════════

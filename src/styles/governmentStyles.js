@@ -24,12 +24,12 @@ import { AlignmentType } from 'docx';
 export const CM = 567;  // 1 cm in twips (1 inch = 1440 twips, 1 inch = 2.54 cm)
 export const MM = 56.7; // 1 mm in twips
 
-// ==================== MARGINS (LOCKED: 2cm all sides) ====================
+// ==================== MARGINS ====================
 export const MARGINS = {
-    LEFT: 2 * CM,  // 2 cm
+    LEFT: 3 * CM,   // 3 cm  (Professional standard for binded reports)
     RIGHT: 2 * CM,  // 2 cm
-    TOP: 2 * CM,  // 2 cm
-    BOTTOM: 2 * CM,  // 2 cm
+    TOP: 2 * CM,    // 2 cm
+    BOTTOM: 2 * CM, // 2 cm
 };
 
 // ==================== FONTS (LOCKED: Arial) ====================

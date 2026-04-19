@@ -44,6 +44,7 @@ import {
     LevelFormat,
     convertInchesToTwip,
     VerticalAlign,
+    TableLayoutType,
 } from 'docx';
 
 import { saveAs } from 'file-saver';
@@ -448,33 +449,154 @@ const buildCoverLetter = async (data, logoPath) => {
         });
 
     elems.push(emptyLine());
-    if (data.tujuan) elems.push(para(data.tujuan, { spaceAfter: 300 }));
 
-    (data.isi || '').split('\n\n').forEach(p => {
+    // Tujuan
+    const tujuanArr = (data.tujuan || 'Yth. Kepala Kantor Wilayah Sumatera Utara\nDirektorat Jenderal Imigrasi\ndi tempat').split('\n').filter(Boolean);
+    tujuanArr.forEach(line => {
+        elems.push(new Paragraph({
+            style: STYLE_ID.NORMAL,
+            children: [tr(line.trim())],
+            spacing: { after: 0, line: SPACING.LINE_1_5 },
+        }));
+    });
+    elems.push(emptyLine());
+
+    // Isi
+    const rawIsi = data.isi || 'Menindaklanjuti surat Sekretaris Direktorat Jenderal Imigrasi No.IMI.1-TI.03-3178 tanggal 27 Agustus 2018 tentang Penggunaan Aplikasi Laporan Bulanan Online, bersama ini dengan hormat kami kirimkan Laporan Kegiatan Bulan Maret 2026 pada Kantor Imigrasi Kelas II TPI Pematang Siantar.\n\nDemikian kami sampaikan, atas perkenan dan petunjuk lebih lanjut kami ucapkan terima kasih.';
+    rawIsi.split('\n\n').forEach(p => {
         if (p.trim()) elems.push(para(p.replace(/\n/g, ' '), { indent: true }));
     });
 
     elems.push(emptyLine());
     elems.push(emptyLine());
-    elems.push(new Paragraph({
-        style: STYLE_ID.NORMAL,
-        children: [tr('Kepala Kantor,')],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 0, line: SPACING.LINE_1_5 },
-    }));
-    for (let i = 0; i < 4; i++) elems.push(emptyLine());
-    elems.push(new Paragraph({
-        style: STYLE_ID.NORMAL,
-        children: [tr(data.penandatangan || '', { bold: true, underline: { type: UnderlineType.SINGLE } })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 0, line: SPACING.LINE_1_5 },
-    }));
-    elems.push(emptyLine());
-    elems.push(emptyLine());
-    elems.push(new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Tembusan:', { bold: true, size: FONT.SIZE.XSMALL })], spacing: { after: 0, line: SPACING.LINE_1_5 } }));
-    elems.push(new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('1. Sekretaris Direktorat Jenderal Imigrasi Kemenkumham RI', { size: FONT.SIZE.XSMALL })], indent: { left: INDENT.SUB_BAB }, spacing: { after: 0, line: SPACING.LINE_1_5 } }));
 
-    elems.push(pageBreak());
+    // --- BSrE Electronic Signature Layout ---
+    let bsreLogoData = null;
+    try {
+        bsreLogoData = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
+    } catch (err) {
+        console.warn('Docx electronic signature badge image failed to load:', err);
+    }
+
+    const badgeLogoCell = bsreLogoData ? [new Paragraph({
+        children: [new ImageRun({
+            data: bsreLogoData,
+            transformation: { width: 38, height: 38 },
+        })],
+        alignment: AlignmentType.CENTER,
+    })] : [new Paragraph({ text: '[LOGO]', alignment: AlignmentType.CENTER })];
+
+    const ttdLayoutTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        borders: {
+            top: { style: BorderStyle.NIL },
+            bottom: { style: BorderStyle.NIL },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
+            insideH: { style: BorderStyle.NIL },
+            insideV: { style: BorderStyle.NIL },
+        },
+        rows: [
+            new TableRow({
+                children: [
+                    // Left: Placeholder ttd_pengirim
+                    new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.BOTTOM,
+                        borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                        children: [
+                            new Paragraph({
+                                style: STYLE_ID.NORMAL,
+                                children: [tr('')], // Empty block to preserve structure
+                            })
+                        ]
+                    }),
+                    // Right: BSrE Signer Layout
+                    new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.TOP,
+                        borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                        children: [
+                            new Paragraph({
+                                style: STYLE_ID.NORMAL,
+                                children: [tr('Kepala Kantor,')],
+                                alignment: AlignmentType.CENTER,
+                                spacing: { after: 100 },
+                            }),
+                            // BSrE Badge Table (nested)
+                            new Table({
+                                width: { size: 70, type: WidthType.PERCENTAGE },
+                                alignment: AlignmentType.CENTER,
+                                borders: {
+                                    top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL },
+                                    insideV: { style: BorderStyle.NIL }, insideH: { style: BorderStyle.NIL }
+                                },
+                                rows: [
+                                    new TableRow({
+                                        children: [
+                                            new TableCell({
+                                                width: { size: 30, type: WidthType.PERCENTAGE },
+                                                verticalAlign: VerticalAlign.CENTER,
+                                                borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                                                children: badgeLogoCell,
+                                            }),
+                                            new TableCell({
+                                                width: { size: 70, type: WidthType.PERCENTAGE },
+                                                verticalAlign: VerticalAlign.CENTER,
+                                                borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                                                children: [
+                                                    new Paragraph({
+                                                        style: STYLE_ID.NORMAL,
+                                                        children: [tr('KEMENIMIPAS', { bold: true, size: 20 /*10pt*/ })],
+                                                        spacing: { after: 0, line: 240 },
+                                                    }),
+                                                    new Paragraph({
+                                                        style: STYLE_ID.NORMAL,
+                                                        children: [tr('Ditandatangani secara elektronik oleh:', { size: 16 /*8pt*/, color: '666666' })],
+                                                        spacing: { after: 0, line: 240 },
+                                                    })
+                                                ]
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            new Paragraph({
+                                spacing: { before: 100, after: 0 },
+                                style: STYLE_ID.NORMAL,
+                                children: [tr(data.penandatangan || 'Benyamin Kali Patembal Harahap', { bold: true, underline: { type: UnderlineType.SINGLE } })],
+                                alignment: AlignmentType.CENTER,
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    });
+    elems.push(ttdLayoutTable);
+
+    elems.push(emptyLine());
+    elems.push(emptyLine());
+
+    // Tembusan
+    elems.push(new Paragraph({ 
+        style: STYLE_ID.NORMAL, 
+        children: [tr('Tembusan:', { bold: false, size: FONT.SIZE.XSMALL })], 
+        spacing: { after: 0, line: SPACING.LINE_1_5 } 
+    }));
+    
+    const tembusanArr = (data.tembusan || '1  Sekretaris Direktorat Jenderal Imigrasi\n   Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia.').split('\n').filter(Boolean);
+    tembusanArr.forEach(line => {
+        elems.push(new Paragraph({ 
+            style: STYLE_ID.NORMAL, 
+            children: [tr(line, { size: FONT.SIZE.XSMALL })], 
+            indent: { left: 0 }, 
+            spacing: { after: 0, line: SPACING.LINE_1_5 } 
+        }));
+    });
+
     return elems;
 };
 
@@ -498,12 +620,10 @@ const buildCoverPage = async (data, logoPath) => {
     if (!data) return [];
     const elems = [];
 
-    // ── Spasi atas ─────────────────────────────────────────────
-    for (let i = 0; i < 5; i++) elems.push(emptyLine());
-
     // ── Judul Kantor: Bold + Underline + Center ─────────────────
-    const titleStyle = (text) => new Paragraph({
+    const titleStyle = (text, isFirst = false) => new Paragraph({
         style: STYLE_ID.NORMAL,
+        pageBreakBefore: isFirst, // <--- Force page break correctly
         children: [new TextRun({
             text,
             font: FONT.NAME,
@@ -516,8 +636,9 @@ const buildCoverPage = async (data, logoPath) => {
         spacing: { before: 0, after: 0, line: SPACING.LINE_1 },
     });
 
-    elems.push(titleStyle('KANTOR IMIGRASI KELAS II TPI'));
-    elems.push(titleStyle('PEMATANG SIANTAR'));
+    // We add 5 empty lines if page is already fresh, but with pageBreakBefore we want the empty lines AFTER the break.
+    elems.push(titleStyle('KANTOR IMIGRASI KELAS II TPI', true));
+    elems.push(titleStyle('PEMATANG SIANTAR', false));
 
     // ── Spasi setelah judul ─────────────────────────────────────
     for (let i = 0; i < 4; i++) elems.push(emptyLine());

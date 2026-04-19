@@ -15,7 +15,7 @@ const CoverLetter = () => {
         letterhead3: 'KANTOR WILAYAH SUMATERA UTARA',
         letterhead4: 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR',
         letterhead5: 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun',
-        letterhead6: 'Laman: imigrasipematangsiantar.kemenkumham.go.id, Pos-el: knm.pematangsiantar@kemenkumham.go.id',
+        letterhead6: 'Laman: pematangsiantar.imigrasi.go.id, Pos-el: kanim_pematangsiantar@imigrasi.go.id',
         // Cover letter fields
         nomor: 'WIM.2.IMI.4-PR.04.01-3291',
         tanggal: '19 Agustus 2025',
@@ -23,8 +23,9 @@ const CoverLetter = () => {
         lampiran: '1 (satu) berkas',
         hal: 'Laporan Kegiatan Bulan Juli 2025\npada Kantor Imigrasi Kelas II TPI Pematang Siantar',
         tujuan: 'Yth. Kepala Kantor Wilayah Sumatera Utara\nDirektorat Jenderal Imigrasi\ndi tempat',
-        isi: 'Menindaklanjuti surat Sekretaris Direktorat Jenderal Imigrasi No.IMI-1.T1.03-3178 tanggal 27 Agustus 2018 tentang Penggunaan Aplikasi Laporan Bulanan Online, bersama ini dengan hormat kami kirimkan Laporan Kegiatan Bulan Juli 2025 pada Kantor Imigrasi Kelas II TPI Pematang Siantar.\n\nDemikian kami sampaikan, atas perhatian dan petunjuk lebih lanjut  kami ucapkan terima kasih.',
-        penandatangan: 'Benyamin Kali Patembai Harahap'
+        isi: 'Menindaklanjuti surat Sekretaris Direktorat Jenderal Imigrasi No.IMI.1-TI.03-3178 tanggal 27 Agustus 2018 tentang Penggunaan Aplikasi Laporan Bulanan Online, bersama ini dengan hormat kami kirimkan Laporan Kegiatan Bulan Maret 2026 pada Kantor Imigrasi Kelas II TPI Pematang Siantar.\n\nDemikian kami sampaikan, atas perkenan dan petunjuk lebih lanjut kami ucapkan terima kasih.',
+        penandatangan: 'Benyamin Kali Patembal Harahap',
+        tembusan: '1  Sekretaris Direktorat Jenderal Imigrasi\n   Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia.'
     });
 
     const [isSaving, setIsSaving] = useState(false);
@@ -83,27 +84,26 @@ const CoverLetter = () => {
                     {/* Spacer setelah kop surat */}
                     <div style={{ marginBottom: '16px' }}></div>
 
-                    {/* Tanggal (di kanan atas, setelah kop surat) */}
-                    <div className="text-right mb-6 text-sm">
-                        <input
-                            type="text"
-                            value={formData.tanggal}
-                            onChange={(e) => handleChange('tanggal', e.target.value)}
-                            className="px-3 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none text-right"
-                            style={{ width: '200px' }}
-                        />
-                    </div>
-
-                    {/* Nomor, Sifat, Lampiran, Hal */}
+                    {/* Nomor, Sifat, Lampiran, Hal (and Tanggal inline) */}
                     <div className="grid grid-cols-[120px,1fr] gap-x-4 gap-y-2 mb-6 text-sm">
                         <div>Nomor</div>
-                        <div className="flex items-center gap-2">
-                            <span>:</span>
+                        <div className="flex justify-between items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1">
+                                <span>:</span>
+                                <input
+                                    type="text"
+                                    value={formData.nomor}
+                                    onChange={(e) => handleChange('nomor', e.target.value)}
+                                    className="w-[250px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
+                                />
+                            </div>
+                            {/* Date Field right aligned on the same row! */}
                             <input
                                 type="text"
-                                value={formData.nomor}
-                                onChange={(e) => handleChange('nomor', e.target.value)}
-                                className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
+                                value={formData.tanggal}
+                                onChange={(e) => handleChange('tanggal', e.target.value)}
+                                className="px-2 py-1 border border-transparent hover:border-gray-300 rounded focus:border-gray-300 focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none text-right font-medium"
+                                style={{ width: '150px' }}
                             />
                         </div>
 
@@ -162,26 +162,46 @@ const CoverLetter = () => {
                     </div>
 
                     {/* Tanda Tangan */}
-                    <div className="text-center text-sm">
-                        <div className="mb-16">Kepala Kantor,</div>
-                        <div className="font-bold mb-1">
-                            <input
-                                type="text"
-                                value={formData.penandatangan}
-                                onChange={(e) => handleChange('penandatangan', e.target.value)}
-                                className="text-center px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
-                                style={{ width: '300px' }}
-                            />
+                    <div className="flex justify-between text-sm mt-8">
+                        {/* Placeholder section left */}
+                        <div className="flex items-end pb-[42px]">
+                            <div className="font-bold text-gray-800 ml-12 px-2 py-1 bg-gray-100/50 rounded">${'{'}ttd_pengirim{'}'}</div>
+                        </div>
+
+                        {/* Signer section right */}
+                        <div className="text-center w-[350px]">
+                            <div className="mb-2">Kepala Kantor,</div>
+                            
+                            {/* BSrE Badge Mimic */}
+                            <div className="flex items-center justify-center gap-3 my-2 px-3 py-2 w-max mx-auto translate-x-[-12px]">
+                                <img src="/logo_kemenimipas.png" alt="Kemenimipas" className="w-[38px] h-[38px] object-contain" />
+                                <div className="text-left leading-tight">
+                                    <div className="font-bold text-[15px] tracking-wide text-gray-900 mb-[2px]">KEMENIMIPAS</div>
+                                    <div className="text-[10px] text-gray-400 font-medium">Ditandatangani secara elektronik oleh:</div>
+                                </div>
+                            </div>
+
+                            <div className="font-bold pt-2">
+                                <input
+                                    type="text"
+                                    value={formData.penandatangan}
+                                    onChange={(e) => handleChange('penandatangan', e.target.value)}
+                                    className="text-center px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
                         </div>
                     </div>
 
                     {/* Tembusan */}
-                    <div className="mt-12 text-xs">
+                    <div className="mt-8 text-sm">
                         <div className="font-bold mb-1">Tembusan :</div>
-                        <div className="pl-4">
-                            1. Sekretaris Direktorat Jenderal Imigrasi<br />
-                            Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia.
-                        </div>
+                        <textarea
+                            value={formData.tembusan}
+                            onChange={(e) => handleChange('tembusan', e.target.value)}
+                            rows={3}
+                            className="w-full pl-0 pr-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none resize-none whitespace-pre-wrap"
+                        />
                     </div>
                 </div>
 
