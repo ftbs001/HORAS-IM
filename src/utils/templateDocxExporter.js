@@ -641,11 +641,18 @@ function buildInfokimDocx(infokimData, bulanName, tahun) {
     return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [titleRow, subTitleRow, headerRow, ...dataRows] });
 }
 
-function buildPengaduanDocx(pgRows) {
+function buildPengaduanDocx(pgRows, bulanName, tahun) {
     const rows = pgRows || [];
     // Landscape page width is ~14400 DXA. Fixed No(4%) + 13cols even split
     const noCW  = Math.round(PAGE_W * 0.04);
     const colCW = Math.round((PAGE_W - noCW) / PENGADUAN_COLS.length);
+
+    const titleRow = new TableRow({ children: [
+        cell(`6. PENGADUAN MASYARAKAT`, { bold: true, center: true, bg: HEADER_BG, colSpan: PENGADUAN_COLS.length + 1, sz: FONT_SIZE }),
+    ]});
+    const subTitleRow = new TableRow({ children: [
+        cell(`${(bulanName || '').toUpperCase()} ${tahun || ''}`, { center: true, bg: HEADER_BG, colSpan: PENGADUAN_COLS.length + 1, sz: FONT_SM }),
+    ]});
 
     const headerRow = new TableRow({ tableHeader: true, children: [
         cell('No', { bold: true, center: true, bg: HEADER_BG, sz: FONT_XS, w: noCW }),
@@ -659,7 +666,7 @@ function buildPengaduanDocx(pgRows) {
             ...PENGADUAN_COLS.map(col => cell(row[col.key] || '-', { sz: FONT_XS, w: colCW })),
         ]}));
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...dataRows] });
+    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [titleRow, subTitleRow, headerRow, ...dataRows] });
 }
 
 /**
@@ -674,7 +681,7 @@ export function getInfokimDocxElements(part, templateData, bulanName, tahun) {
         return [buildInfokimDocx(templateData?.infokim || {}, bulanName, tahun), spacer()];
     }
     if (part === 'pengaduan') {
-        return [buildPengaduanDocx(templateData?.pengaduan || []), spacer()];
+        return [buildPengaduanDocx(templateData?.pengaduan || [], bulanName, tahun), spacer()];
     }
     return [];
 }
