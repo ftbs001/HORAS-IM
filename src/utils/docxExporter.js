@@ -432,7 +432,7 @@ const buildCoverLetter = async (data, logoPath) => {
     elems.push(...letterheadElems);
 
     // ── Nomor/Sifat/Lampiran/Hal table + Tanggal inline on Nomor row ──
-    const nilBorder = { style: BorderStyle.NIL };
+    const nilBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
     const headerAttrTable = new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         layout: TableLayoutType.FIXED,
@@ -505,12 +505,12 @@ const buildCoverLetter = async (data, logoPath) => {
         layout: TableLayoutType.FIXED,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NIL },
-            bottom: { style: BorderStyle.NIL },
-            left: { style: BorderStyle.NIL },
-            right: { style: BorderStyle.NIL },
-            insideH: { style: BorderStyle.NIL },
-            insideV: { style: BorderStyle.NIL },
+            top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            insideH: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            insideV: { style: BorderStyle.NONE, size: 0, color: 'auto' },
         },
         rows: [
             new TableRow({
@@ -519,7 +519,7 @@ const buildCoverLetter = async (data, logoPath) => {
                     new TableCell({
                         width: { size: 50, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.BOTTOM,
-                        borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
                         children: [
                             new Paragraph({
                                 style: STYLE_ID.NORMAL,
@@ -531,7 +531,7 @@ const buildCoverLetter = async (data, logoPath) => {
                     new TableCell({
                         width: { size: 50, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.TOP,
-                        borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
                         children: [
                             new Paragraph({
                                 style: STYLE_ID.NORMAL,
@@ -544,8 +544,8 @@ const buildCoverLetter = async (data, logoPath) => {
                                 width: { size: 70, type: WidthType.PERCENTAGE },
                                 alignment: AlignmentType.CENTER,
                                 borders: {
-                                    top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL },
-                                    insideV: { style: BorderStyle.NIL }, insideH: { style: BorderStyle.NIL }
+                                    top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+                                    insideV: { style: BorderStyle.NONE, size: 0, color: 'auto' }, insideH: { style: BorderStyle.NONE, size: 0, color: 'auto' }
                                 },
                                 rows: [
                                     new TableRow({
@@ -553,13 +553,13 @@ const buildCoverLetter = async (data, logoPath) => {
                                             new TableCell({
                                                 width: { size: 30, type: WidthType.PERCENTAGE },
                                                 verticalAlign: VerticalAlign.CENTER,
-                                                borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                                                borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
                                                 children: badgeLogoCell,
                                             }),
                                             new TableCell({
                                                 width: { size: 70, type: WidthType.PERCENTAGE },
                                                 verticalAlign: VerticalAlign.CENTER,
-                                                borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
+                                                borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
                                                 children: [
                                                     new Paragraph({
                                                         style: STYLE_ID.NORMAL,
