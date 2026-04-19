@@ -431,37 +431,31 @@ const buildCoverLetter = async (data, logoPath) => {
     const letterheadElems = await generateLetterhead(logoPath, data);
     elems.push(...letterheadElems);
 
-    // ── Nomor/Sifat/Lampiran/Hal table + Tanggal inline on Nomor row ──
-    const nilBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-    const headerAttrTable = new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        layout: TableLayoutType.FIXED,
-        borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder, insideH: nilBorder, insideV: nilBorder },
-        rows: [
-            new TableRow({ children: [
-                new TableCell({ width: { size: 18, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Nomor')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ width: { size: 3, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ width: { size: 49, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.nomor || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, alignment: AlignmentType.RIGHT, children: [tr(data.tanggal || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-            ]}),
-            new TableRow({ children: [
-                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Sifat')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ columnSpan: 2, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.sifat || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-            ]}),
-            new TableRow({ children: [
-                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Lampiran')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ columnSpan: 2, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.lampiran || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-            ]}),
-            new TableRow({ children: [
-                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr('Hal')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(':')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-                new TableCell({ columnSpan: 2, borders: { top: nilBorder, bottom: nilBorder, left: nilBorder, right: nilBorder }, children: [new Paragraph({ style: STYLE_ID.NORMAL, children: [tr(data.hal || '')], spacing: { after: 40, line: SPACING.LINE_1_5 } })] }),
-            ]}),
-        ]
+    // ── Nomor/Sifat/Lampiran/Hal using TabStops (No Table to avoid border bugs) ──
+    const attrPairs = [
+        ['Nomor', data.nomor, data.tanggal], // Tanggal is injected on the right of Nomor
+        ['Sifat', data.sifat, null],
+        ['Lampiran', data.lampiran, null],
+        ['Hal', data.hal, null]
+    ];
+
+    attrPairs.forEach(([label, value, rightText]) => {
+        const pChildren = [tr(label), tr('\t: ' + (value || '-'))];
+        if (rightText) {
+            // Add a tab stop to push the text to the far right margin
+            pChildren.push(tr('\t' + rightText));
+        }
+
+        elems.push(new Paragraph({
+            style: STYLE_ID.NORMAL,
+            children: pChildren,
+            tabStops: [
+                { type: TabStopType.LEFT, position: 2 * CM }, // Align the colon
+                { type: TabStopType.RIGHT, position: 16 * CM } // Align the right text (e.g., date)
+            ],
+            spacing: { after: 40, line: SPACING.LINE_1_5 },
+        }));
     });
-    elems.push(headerAttrTable);
 
     elems.push(emptyLine());
 
@@ -505,12 +499,12 @@ const buildCoverLetter = async (data, logoPath) => {
         layout: TableLayoutType.FIXED,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            insideH: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            insideV: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            top: { style: BorderStyle.NIL },
+            bottom: { style: BorderStyle.NIL },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
+            insideH: { style: BorderStyle.NIL },
+            insideV: { style: BorderStyle.NIL },
         },
         rows: [
             new TableRow({
@@ -519,7 +513,7 @@ const buildCoverLetter = async (data, logoPath) => {
                     new TableCell({
                         width: { size: 50, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.BOTTOM,
-                        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
+                        borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
                         children: [
                             new Paragraph({
                                 style: STYLE_ID.NORMAL,
@@ -531,7 +525,7 @@ const buildCoverLetter = async (data, logoPath) => {
                     new TableCell({
                         width: { size: 50, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.TOP,
-                        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
+                        borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
                         children: [
                             new Paragraph({
                                 style: STYLE_ID.NORMAL,
@@ -544,8 +538,8 @@ const buildCoverLetter = async (data, logoPath) => {
                                 width: { size: 70, type: WidthType.PERCENTAGE },
                                 alignment: AlignmentType.CENTER,
                                 borders: {
-                                    top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-                                    insideV: { style: BorderStyle.NONE, size: 0, color: 'auto' }, insideH: { style: BorderStyle.NONE, size: 0, color: 'auto' }
+                                    top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL },
+                                    insideV: { style: BorderStyle.NIL }, insideH: { style: BorderStyle.NIL }
                                 },
                                 rows: [
                                     new TableRow({
@@ -553,13 +547,13 @@ const buildCoverLetter = async (data, logoPath) => {
                                             new TableCell({
                                                 width: { size: 30, type: WidthType.PERCENTAGE },
                                                 verticalAlign: VerticalAlign.CENTER,
-                                                borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
+                                                borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
                                                 children: badgeLogoCell,
                                             }),
                                             new TableCell({
                                                 width: { size: 70, type: WidthType.PERCENTAGE },
                                                 verticalAlign: VerticalAlign.CENTER,
-                                                borders: { top: { style: BorderStyle.NONE, size: 0, color: 'auto' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' }, left: { style: BorderStyle.NONE, size: 0, color: 'auto' }, right: { style: BorderStyle.NONE, size: 0, color: 'auto' } },
+                                                borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } },
                                                 children: [
                                                     new Paragraph({
                                                         style: STYLE_ID.NORMAL,

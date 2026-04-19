@@ -99,10 +99,10 @@ export const generateLetterhead = async (logoPath, data = {}) => {
         verticalAlign: VerticalAlign.CENTER,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            top: { style: BorderStyle.NIL },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
+            bottom: { style: BorderStyle.NIL },
         },
         children: logoRun ? [
             new Paragraph({
@@ -125,10 +125,10 @@ export const generateLetterhead = async (logoPath, data = {}) => {
         verticalAlign: VerticalAlign.CENTER,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            top: { style: BorderStyle.NIL },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
+            bottom: { style: BorderStyle.NIL },
         },
         children: [
             // Line 1: KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA
@@ -171,16 +171,16 @@ export const generateLetterhead = async (logoPath, data = {}) => {
         layout: TableLayoutType.FIXED,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
-            top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            top: { style: BorderStyle.NIL },
             bottom: { 
                 style: BorderStyle.SINGLE, 
                 size: 2, // Ultra thin line identical to GabungLaporan.jsx
                 color: LETTERHEAD_BORDER.COLOR 
             },
-            left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            insideH: { style: BorderStyle.NONE, size: 0, color: 'auto' },
-            insideV: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            left: { style: BorderStyle.NIL },
+            right: { style: BorderStyle.NIL },
+            insideH: { style: BorderStyle.NIL },
+            insideV: { style: BorderStyle.NIL },
         },
         rows: [
             new TableRow({
