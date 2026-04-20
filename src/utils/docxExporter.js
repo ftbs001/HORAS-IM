@@ -45,6 +45,7 @@ import {
     convertInchesToTwip,
     VerticalAlign,
     TableLayoutType,
+    PageOrientation,
 } from 'docx';
 
 import { saveAs } from 'file-saver';
