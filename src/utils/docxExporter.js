@@ -1341,7 +1341,7 @@ export const generateDocx = async ({
     let arabicPageStart = 1; // reset arabic counter at first chapter
 
     for (const [idx, chapter] of (chapters || []).entries()) {
-        const chapElems = await buildChapter(chapter.title, chapter.sections, idx === 0);
+        const chapElems = await buildChapter(chapter.title, chapter.sections, idx === 0, coverPageData);
         const landscape = isLandscapeChapter(chapter.title);
 
         sections.push({

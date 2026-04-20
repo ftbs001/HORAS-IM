@@ -1178,14 +1178,14 @@ const MonthlyReport = ({ sectionFilter = null }) => {
             return;
         }
 
-        // Find the A4 paper div inside the preview container
-        const paperDiv = previewContainer.querySelector('div > div');
+        // Retrieve the A4 paper div (the container itself)
+        const paperDiv = previewContainer;
         if (!paperDiv) {
             showNotification('Error: Paper container tidak ditemukan', 'error');
             return;
         }
 
-        // Clone only the paper content for cleaner export
+        // Clone the entire paper content for cleaner export
         const clone = paperDiv.cloneNode(true);
 
         // Remove any buttons or interactive elements from clone
