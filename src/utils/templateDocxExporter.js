@@ -1611,10 +1611,9 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
 
     // A. SARAN
     elements.push(new Paragraph({
-        children: [new TextRun({ text: 'A.', font: FONT_NAME, size: 24 }), new TextRun({ text: 'SARAN', font: FONT_NAME, size: 24 })],
+        children: [new TextRun({ text: 'A.', font: FONT_NAME, size: 24 }), new TextRun({ text: '\tSARAN', font: FONT_NAME, size: 24 })],
         spacing: { before: 240, after: 120 },
-        indent: { left: 400, hanging: 400 },
-        tabStops: [{ type: "left", position: 400 }]
+        indent: { left: 400, hanging: 400 }
     }));
 
     saran.forEach((s, idx) => {
@@ -1643,8 +1642,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
     elements.push(new Paragraph({
         children: [new TextRun({ text: 'B.', font: FONT_NAME, size: 24 }), new TextRun({ text: '\tKESIMPULAN', font: FONT_NAME, size: 24 })],
         spacing: { before: 240, after: 120 },
-        indent: { left: 400, hanging: 400 },
-        tabStops: [{ type: "left", position: 400 }]
+        indent: { left: 400, hanging: 400 }
     }));
 
     const kesLines = kesimpulanParsed.split('\n');
