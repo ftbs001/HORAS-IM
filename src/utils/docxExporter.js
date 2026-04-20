@@ -1209,8 +1209,8 @@ async function structuredBlockToDocx(block) {
 // ==================== MAIN EXPORT FUNCTION ====================
 
 // A4 portrait: 11906 × 16838 twips  |  A4 landscape: 16838 × 11906 twips
-const A4_P = { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT };
-const A4_L = { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE };
+const A4_P = { width: 11906, height: 16838, orientation: "portrait" };
+const A4_L = { width: 16838, height: 11906, orientation: "landscape" };
 
 // Chapters that should be rendered in LANDSCAPE orientation
 // STRICT: ONLY BAB II (Pelaksanaan Tugas) and BAB V (Lampiran) use Landscape.
@@ -1279,7 +1279,7 @@ export const generateDocx = async ({
             : (typeof bulan === 'string' && bulan.length > 0 ? bulan : 'Bulan');
 
         const { getPenutupDocxElements } = await import('./templateDocxExporter.js');
-        const penutupElems = getPenutupDocxElements(penutupData, bulanName, String(tahun || ''));
+        const penutupElems = getPenutupDocxElements(finalPenutupData, bulanName, String(tahun || ''));
 
         if (penutupElems.length > 0) {
             // If BAB IV exists in chapters already, replace its content with template
@@ -1290,14 +1290,14 @@ export const generateDocx = async ({
                     title: '',
                     level: 2,
                     isPenutupTemplate: true,
-                    templateData: { penutup: penutupData },
+                    templateData: { penutup: finalPenutupData },
                 }, ...chapters[bab4Idx].sections.filter(s => !s.isPenutupTemplate)];
             } else {
                 // BAB IV absent — create it and insert before BAB V
                 const bab5Idx = chapters.findIndex(c => c.title?.toUpperCase().startsWith('BAB V'));
                 const bab4Chapter = {
                     title: 'BAB IV PENUTUP',
-                    sections: [{ title: '', level: 2, isPenutupTemplate: true, templateData: { penutup: penutupData } }],
+                    sections: [{ title: '', level: 2, isPenutupTemplate: true, templateData: { penutup: finalPenutupData } }],
                 };
                 if (bab5Idx >= 0) chapters.splice(bab5Idx, 0, bab4Chapter);
                 else chapters.push(bab4Chapter);
@@ -1321,7 +1321,6 @@ export const generateDocx = async ({
         // Section 1: roman page numbers (i, ii, iii)
         {
             properties: {
-                type: SectionType.NEXT_PAGE,
                 page: {
                     size: A4_P,
                     margin: MARGINS,
