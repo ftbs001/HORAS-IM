@@ -1682,23 +1682,21 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Landscape sections use A4-landscape page size with same margins.
             // ── Section property builder ───────────────────────────────────────
             // IMPORTANT: Always explicitly set page size to avoid inheritance from previous landscape sections
-            // type: SectionType.NEXT_PAGE is strictly required in DOCX to cleanly sever MS Word formatting inheritance
+            // IMPORTANT: type: SectionType.NEXT_PAGE is strictly required in DOCX to cleanly sever MS Word formatting inheritance
             const mkSecProps = (landscape = false) => ({
-                properties: {
-                    type: SectionType.NEXT_PAGE,
-                    page: {
-                        margin: MARGIN,
-                        size: landscape ? {
-                            width: cm(29.7),
-                            height: cm(21.0),
-                            orientation: PageOrientation.LANDSCAPE,
-                        } : {
-                            width: cm(21.0),
-                            height: cm(29.7),
-                            orientation: PageOrientation.PORTRAIT,
-                        },
+                type: SectionType.NEXT_PAGE,
+                page: {
+                    margin: MARGIN,
+                    size: landscape ? {
+                        width: cm(29.7),
+                        height: cm(21.0),
+                        orientation: PageOrientation.LANDSCAPE,
+                    } : {
+                        width: cm(21.0),
+                        height: cm(29.7),
+                        orientation: PageOrientation.PORTRAIT,
                     },
-                }
+                },
             });
 
             // ── Merge consecutive same-orientation chunks → DOCX sections ─────
@@ -1917,7 +1915,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     },
                     // 4. BAB I PENDAHULUAN → PORTRAIT
                     {
-                        ...mkSecProps(false),
+                        properties: mkSecProps(false),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab1,
@@ -1926,21 +1924,21 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     ...bab2Sections,
                     // 6. BAB III PERMASALAHAN → PORTRAIT (wajib)
                     {
-                        ...mkSecProps(false),
+                        properties: mkSecProps(false),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab3,
                     },
                     // 7. BAB IV PENUTUP → PORTRAIT (wajib)
                     {
-                        ...mkSecProps(false),
+                        properties: mkSecProps(false),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab4,
                     },
                     // 8. BAB V LAMPIRAN → LANDSCAPE (wajib)
                     {
-                        ...mkSecProps(true),
+                        properties: mkSecProps(true),
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab5,
