@@ -355,11 +355,23 @@ export default function TemplatePenutup({
     useEffect(() => {
         setIsPreview(forcePreview);
     }, [forcePreview]);
+    useEffect(() => {
+        const uStr = JSON.stringify(uData);
+        if (originalData && uStr !== originalData && !loading && !saving && !isPreview) {
+            setHasChanges(true);
+            const timer = setTimeout(() => {
+                handleSave(true); // auto-save silent
+            }, 2000);
+            return () => clearTimeout(timer);
+        } else if (originalData && uStr === originalData) {
+            setHasChanges(false);
+        }
+    }, [uData, originalData, loading, saving, isPreview]);
 
-    const handleSave = async () => {
-        if (loading || saving) return;
-        setSaving(true);
-        setMsg(null);
+    const handleSave = async (isAutoSave = false) => {
+        if (loading || (saving && !isAutoSave)) return;
+        if (!isAutoSave) setSaving(true);
+        if (!isAutoSave) setMsg(null);
         try {
             // Fetch existing TU row to preserve other keys (keuangan, kepegawaian, umum)
             const { data: existing } = await supabase
@@ -381,12 +393,13 @@ export default function TemplatePenutup({
                 );
             if (error) throw error;
             setOriginalData(JSON.stringify(uData));
-            showMsg('success', 'Data penutup berhasil disimpan!');
+            setHasChanges(false);
+            if (!isAutoSave) showMsg('success', 'Data penutup berhasil disimpan!');
         } catch (err) {
             console.error('handleSave err:', err);
-            showMsg('error', 'Gagal menyimpan data.');
+            if (!isAutoSave) showMsg('error', 'Gagal menyimpan data.');
         } finally {
-            setSaving(false);
+            if (!isAutoSave) setSaving(false);
         }
     };
 

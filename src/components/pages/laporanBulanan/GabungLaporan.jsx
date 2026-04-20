@@ -1681,19 +1681,19 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Portrait sections use the standard MARGIN (2cm all sides).
             // Landscape sections use A4-landscape page size with same margins.
             // ── Section property builder ───────────────────────────────────────
-            // IMPORTANT: Always explicitly set page size to avoid inheritance from previous landscape sections
+            // IMPORTANT: Using sections array directly triggers page breaks automatically. 
+            // Avoid SectionType.NEXT_PAGE as it triggers a Word bug that inherits landscape.
             const mkSecProps = (landscape = false) => ({
-                type: SectionType.NEXT_PAGE,
                 page: {
                     margin: MARGIN,
                     size: landscape ? {
                         width: cm(29.7),
                         height: cm(21.0),
-                        orientation: PageOrientation?.LANDSCAPE || 'landscape',
+                        orientation: PageOrientation.LANDSCAPE,
                     } : {
                         width: cm(21.0),
                         height: cm(29.7),
-                        orientation: PageOrientation?.PORTRAIT || 'portrait',
+                        orientation: PageOrientation.PORTRAIT,
                     },
                 },
             });
