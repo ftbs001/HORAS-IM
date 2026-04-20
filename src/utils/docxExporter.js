@@ -980,8 +980,18 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
         if (section.isPenutupTemplate) {
             const { getPenutupDocxElements } = await import('./templateDocxExporter.js');
             const penutupData = section.templateData?.penutup || null;
-            const templateElems = penutupData ? getPenutupDocxElements(penutupData, coverPageData?.month || '', coverPageData?.year || '') : [];
-            if (templateElems.length > 0) elems.push(...templateElems);
+            if (penutupData) {
+                // Resolve month to name string (getPenutupDocxElements needs a name like 'April' not '4')
+                const BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                const rawMonth = coverPageData?.month || '';
+                const mInt = parseInt(rawMonth);
+                const bulanName = (mInt > 0 && mInt <= 12)
+                    ? BULAN[mInt]
+                    : (typeof rawMonth === 'string' && rawMonth.length > 0 ? rawMonth : 'Bulan');
+                const templateElems = getPenutupDocxElements(penutupData, bulanName, coverPageData?.year || '');
+                if (templateElems.length > 0) elems.push(...templateElems);
+            }
             continue;
         }
 
@@ -1203,10 +1213,14 @@ const A4_P = { width: 11906, height: 16838, orientation: PageOrientation.PORTRAI
 const A4_L = { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE };
 
 // Chapters that should be rendered in LANDSCAPE orientation
+// STRICT: ONLY BAB II (Pelaksanaan Tugas) and BAB V (Lampiran) use Landscape.
+// BAB I, BAB III, BAB IV and everything else must be Portrait.
 const LANDSCAPE_CHAPTERS = ['BAB II', 'BAB V'];
 
-const isLandscapeChapter = (title = '') =>
-    LANDSCAPE_CHAPTERS.some(prefix => title.toUpperCase().startsWith(prefix));
+const isLandscapeChapter = (title = '') => {
+    const upper = title.toUpperCase();
+    return LANDSCAPE_CHAPTERS.some(prefix => upper.startsWith(prefix));
+};
 
 const buildSectionProps = (landscape, pageStart = null, includePageNumbers = true) => {
     const pageSize = landscape ? A4_L : A4_P;
