@@ -9,7 +9,7 @@
  *  - Tabel perlintasan disederhanakan agar tidak overflow di landscape A4
  */
 import { Document, Packer, Paragraph, Table, TableRow, TableCell,
-    TextRun, WidthType, AlignmentType, VerticalAlign,
+    TextRun, ImageRun, WidthType, AlignmentType, VerticalAlign,
     ShadingType, HeightRule, BorderStyle } from 'docx';
 import {
     BULAN_NAMES,

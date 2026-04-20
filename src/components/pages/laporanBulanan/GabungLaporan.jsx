@@ -1629,6 +1629,17 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     if (r.template_data) allTemplateData[r.seksi_id] = r.template_data;
                 });
             }
+            
+            // Fetch bab4_penutup separately (stored by template_name, not seksi_id)
+            const { data: penutupRow } = await supabase
+                .from('laporan_template')
+                .select('template_data')
+                .eq('template_name', 'penutup')
+                .eq('bulan', bulan)
+                .eq('tahun', tahun)
+                .maybeSingle();
+            const penutupTemplateData = penutupRow?.template_data || null;
+
             const tmplLalin = allTemplateData[2] || null;
             const tmplIntel = allTemplateData[1] || null;
             const tmplTikim = allTemplateData[3] || null;
@@ -1678,18 +1689,20 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Portrait sections use the standard MARGIN (2cm all sides).
             // Landscape sections use A4-landscape page size with same margins.
             // ── Section property builder ───────────────────────────────────────
-            // IMPORTANT: Use PageOrientation enum (not string) to avoid DOCX corruption
+            // IMPORTANT: Always explicitly set page size to avoid inheritance from previous landscape sections
             const mkSecProps = (landscape = false) => ({
                 type: SectionType.NEXT_PAGE,
                 page: {
                     margin: MARGIN,
-                    ...(landscape ? {
-                        size: {
-                            width: cm(29.7),
-                            height: cm(21.0),
-                            orientation: PageOrientation?.LANDSCAPE || 'landscape',
-                        },
-                    } : {}),
+                    size: landscape ? {
+                        width: cm(29.7),
+                        height: cm(21.0),
+                        orientation: PageOrientation?.LANDSCAPE || 'landscape',
+                    } : {
+                        width: cm(21.0),
+                        height: cm(29.7),
+                        orientation: PageOrientation?.PORTRAIT || 'portrait',
+                    },
                 },
             });
 
@@ -1806,7 +1819,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             const bab4 = [
                 ...babTitle('IV', 'PENUTUP'),
-                ...(allTemplateData['bab4_penutup'] ? getPenutupDocxElements(allTemplateData['bab4_penutup'], bNama, tahun, logoKemenBuf) : [
+                ...(penutupTemplateData ? getPenutupDocxElements(penutupTemplateData, bNama, tahun, logoKemenBuf) : [
                     ...subBab('A.  SARAN', ''),
                     ...([
                         '1.  Urusan Kepegawaian : Diperlukan penambahan personel pada seksi-seksi yang kekurangan SDM guna meningkatkan kualitas pelayanan dan distribusi beban kerja yang lebih merata.',
