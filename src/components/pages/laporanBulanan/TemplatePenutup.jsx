@@ -317,15 +317,17 @@ export default function TemplatePenutup({
         try {
             const { data, error } = await supabase
                 .from('laporan_template')
-                .select('*')
-                .eq('seksi_id', 99)
+                .select('template_data')
+                .eq('seksi_id', 4)  // TU row (same as Kepegawaian/Keuangan/Umum)
                 .eq('bulan', b)
                 .eq('tahun', t)
                 .maybeSingle();
 
             if (error) throw error;
-            if (data?.template_data) {
-                const parsed = JSON.parse(JSON.stringify({ ...getDefaultPenutupData(), ...data.template_data }));
+            // penutup data is nested inside template_data.penutup
+            const raw = data?.template_data?.penutup;
+            if (raw) {
+                const parsed = { ...getDefaultPenutupData(), ...raw };
                 setUData(parsed);
                 setOriginalData(JSON.stringify(parsed));
             } else {
@@ -359,11 +361,22 @@ export default function TemplatePenutup({
         setSaving(true);
         setMsg(null);
         try {
-            // Use reserved seksi_id=99 for penutup (no specific seksi)
+            // Fetch existing TU row to preserve other keys (keuangan, kepegawaian, umum)
+            const { data: existing } = await supabase
+                .from('laporan_template')
+                .select('template_data')
+                .eq('seksi_id', 4)
+                .eq('bulan', bulan)
+                .eq('tahun', tahun)
+                .maybeSingle();
+
+            const existingData = existing?.template_data || {};
+            const newTemplateData = { ...existingData, penutup: uData };
+
             const { error } = await supabase
                 .from('laporan_template')
                 .upsert(
-                    { seksi_id: 99, bulan, tahun, template_data: uData, updated_by: user?.id },
+                    { seksi_id: 4, bulan, tahun, template_data: newTemplateData, updated_at: new Date().toISOString() },
                     { onConflict: 'seksi_id,bulan,tahun' }
                 );
             if (error) throw error;
@@ -429,13 +442,13 @@ export default function TemplatePenutup({
                                     const { data, error } = await supabase
                                         .from('laporan_template')
                                         .select('template_data')
-                                        .eq('seksi_id', 99)
+                                        .eq('seksi_id', 4)
                                         .eq('bulan', bulan)
                                         .eq('tahun', tahun)
                                         .maybeSingle();
                                     
                                     if (error) throw error;
-                                    const td = data?.template_data || uData;
+                                    const td = data?.template_data?.penutup || uData;
                                     
                                     const bName = BULAN_NAMES[bulan] || '';
                                     const { exportStandaloneTemplateDocx, getPenutupDocxElements } = await import('../../../utils/templateDocxExporter.js');

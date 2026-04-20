@@ -1630,20 +1630,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 });
             }
             
-            // Fetch bab4_penutup (stored under reserved seksi_id=99)
-            const { data: penutupRow } = await supabase
-                .from('laporan_template')
-                .select('template_data')
-                .eq('seksi_id', 99)
-                .eq('bulan', bulan)
-                .eq('tahun', tahun)
-                .maybeSingle();
-            const penutupTemplateData = penutupRow?.template_data || null;
-
             const tmplLalin = allTemplateData[2] || null;
             const tmplIntel = allTemplateData[1] || null;
             const tmplTikim = allTemplateData[3] || null;
             const tmplTU    = allTemplateData[4] || null;
+            // Penutup data is stored nested inside the TU row (seksi_id=4) as template_data.penutup
+            const penutupTemplateData = allTemplateData[4]?.penutup || null;
 
             // Collect Substantif Templates (Landscape)
             const substantifTemplateElems = [];
