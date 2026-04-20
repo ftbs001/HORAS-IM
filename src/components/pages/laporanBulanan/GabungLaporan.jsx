@@ -1630,11 +1630,11 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 });
             }
             
-            // Fetch bab4_penutup separately (stored by template_name, not seksi_id)
+            // Fetch bab4_penutup (stored under reserved seksi_id=99)
             const { data: penutupRow } = await supabase
                 .from('laporan_template')
                 .select('template_data')
-                .eq('template_name', 'penutup')
+                .eq('seksi_id', 99)
                 .eq('bulan', bulan)
                 .eq('tahun', tahun)
                 .maybeSingle();

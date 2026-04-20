@@ -318,7 +318,7 @@ export default function TemplatePenutup({
             const { data, error } = await supabase
                 .from('laporan_template')
                 .select('*')
-                .eq('template_name', 'penutup')
+                .eq('seksi_id', 99)
                 .eq('bulan', b)
                 .eq('tahun', t)
                 .maybeSingle();
@@ -359,14 +359,13 @@ export default function TemplatePenutup({
         setSaving(true);
         setMsg(null);
         try {
-            const { error } = await supabase.rpc('upsert_laporan_template', {
-                p_seksi_id: user?.seksiId || null,
-                p_template_name: 'penutup',
-                p_bulan: bulan,
-                p_tahun: tahun,
-                p_data: uData,
-                p_user_id: user?.id
-            });
+            // Use reserved seksi_id=99 for penutup (no specific seksi)
+            const { error } = await supabase
+                .from('laporan_template')
+                .upsert(
+                    { seksi_id: 99, bulan, tahun, template_data: uData, updated_by: user?.id },
+                    { onConflict: 'seksi_id,bulan,tahun' }
+                );
             if (error) throw error;
             setOriginalData(JSON.stringify(uData));
             showMsg('success', 'Data penutup berhasil disimpan!');
@@ -430,7 +429,7 @@ export default function TemplatePenutup({
                                     const { data, error } = await supabase
                                         .from('laporan_template')
                                         .select('template_data')
-                                        .eq('template_name', 'penutup')
+                                        .eq('seksi_id', 99)
                                         .eq('bulan', bulan)
                                         .eq('tahun', tahun)
                                         .maybeSingle();
