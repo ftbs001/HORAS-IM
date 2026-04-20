@@ -1234,8 +1234,8 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 letterRendering: true,
                 scrollX: 0,
                 scrollY: 0,
-                width: 794,
-                windowWidth: 794,
+                width: 1122,
+                windowWidth: 1122,
                 backgroundColor: '#ffffff',
             },
             jsPDF: {
