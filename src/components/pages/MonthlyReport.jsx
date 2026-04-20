@@ -933,15 +933,17 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
             // Prepare template data for ALL seksi (case-insensitive month match)
             let allTemplateData = {};
+            let finalBulan = new Date().getMonth() + 1;
+            let tahunInt = new Date().getFullYear();
             try {
                 const rawMonth = coverPageData?.month || '';
                 const rawYear  = coverPageData?.year  || new Date().getFullYear();
-                const tahunInt = parseInt(rawYear) || new Date().getFullYear();
+                tahunInt = parseInt(rawYear) || new Date().getFullYear();
 
                 // Case-insensitive lookup: 'APRIL' → 4, 'April' → 4
                 const monthUpper = String(rawMonth).toUpperCase();
                 const mIndex = BULAN_NAMES.findIndex((n, i) => i > 0 && n.toUpperCase() === monthUpper);
-                const finalBulan = mIndex > 0 ? mIndex : (parseInt(rawMonth) || new Date().getMonth() + 1);
+                finalBulan = mIndex > 0 ? mIndex : (parseInt(rawMonth) || new Date().getMonth() + 1);
 
                 const { data: tmplRows } = await supabase
                     .from('laporan_template')
@@ -1143,6 +1145,10 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 filename: `Laporan_Bulanan_${coverPageData?.month || 'Master'}_${new Date().toISOString().split('T')[0]}.docx`,
                 logoPath: logoKementerian,      // Logo for cover letter KOP
                 coverLogoPath: logosCombined,   // Logo for cover page
+                // Direct BAB IV Penutup injection params
+                penutupData: tuTemplateData?.penutup || null,
+                bulan: finalBulan,
+                tahun: tahunInt,
             });
 
             showNotification('Ekspor Word berhasil! File DOCX telah diunduh.', 'success');

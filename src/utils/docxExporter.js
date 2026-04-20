@@ -1261,7 +1261,49 @@ export const generateDocx = async ({
     filename,
     logoPath,
     coverLogoPath,
+    penutupData,        // Direct BAB IV data: template_data.penutup (seksi_id=4)
+    bulan,             // month integer (1-12)
+    tahun,             // year number
 }) => {
+    // ── INJECT BAB IV directly from penutupData ───────────────────────────────
+    // This bypasses the fragile filteredToc-to-chapter pipeline.
+    // Always build BAB IV from the top-level penutupData param or fallback to defaults.
+    const { getDefaultPenutupData } = await import('./penutupSchema.js');
+    const finalPenutupData = penutupData || getDefaultPenutupData();
+
+    if (finalPenutupData) {
+        const BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const mInt = parseInt(bulan);
+        const bulanName = (mInt > 0 && mInt <= 12) ? BULAN[mInt]
+            : (typeof bulan === 'string' && bulan.length > 0 ? bulan : 'Bulan');
+
+        const { getPenutupDocxElements } = await import('./templateDocxExporter.js');
+        const penutupElems = getPenutupDocxElements(penutupData, bulanName, String(tahun || ''));
+
+        if (penutupElems.length > 0) {
+            // If BAB IV exists in chapters already, replace its content with template
+            const bab4Idx = chapters.findIndex(c => c.title?.toUpperCase().startsWith('BAB IV'));
+            if (bab4Idx >= 0) {
+                // Prepend penutup elements as the first section to display
+                chapters[bab4Idx].sections = [{
+                    title: '',
+                    level: 2,
+                    isPenutupTemplate: true,
+                    templateData: { penutup: penutupData },
+                }, ...chapters[bab4Idx].sections.filter(s => !s.isPenutupTemplate)];
+            } else {
+                // BAB IV absent — create it and insert before BAB V
+                const bab5Idx = chapters.findIndex(c => c.title?.toUpperCase().startsWith('BAB V'));
+                const bab4Chapter = {
+                    title: 'BAB IV PENUTUP',
+                    sections: [{ title: '', level: 2, isPenutupTemplate: true, templateData: { penutup: penutupData } }],
+                };
+                if (bab5Idx >= 0) chapters.splice(bab5Idx, 0, bab4Chapter);
+                else chapters.push(bab4Chapter);
+            }
+        }
+    }
     // ── Section 1: Front matter (roman) ──────────────────────────────────────
     const sec1Children = [];
 
