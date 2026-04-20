@@ -33,6 +33,8 @@ import TemplateKeuanganEmbedded from '../pages/laporanBulanan/TemplateKeuangan';
 import TemplateKepegawaianEmbedded from '../pages/laporanBulanan/TemplateKepegawaian';
 // Template Urusan Umum (Kendaraan & Sarana - TU)
 import TemplateUmumEmbedded from '../pages/laporanBulanan/TemplateUmum';
+// Template BAB IV Penutup
+import TemplatePenutupEmbedded from '../pages/laporanBulanan/TemplatePenutup';
 
 
 // Register custom fonts
@@ -157,13 +159,7 @@ const toc = [
     },
     {
         id: 'bab4', label: 'BAB IV PENUTUP', type: 'folder', children: [
-            {
-                id: 'bab4_saran', label: 'A. SARAN', type: 'folder', children: [
-                    { id: 'bab4_saran_kepegawaian', label: '1. Urusan Kepegawaian', type: 'file' },
-                    { id: 'bab4_saran_keuangan', label: '2. Urusan Keuangan', type: 'file' },
-                ]
-            },
-            { id: 'bab4_kesimpulan', label: 'B. KESIMPULAN', type: 'file' },
+            { id: 'bab4_penutup', label: 'Laporan Penutup', type: 'file' }
         ]
     },
     {
@@ -1306,6 +1302,9 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         if (nodeId === 'bab2_fasilitatif_umum_gedung') {
             return <TemplateUmumEmbedded key={nodeId} embedded defaultTab="gedung" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
         }
+        if (nodeId === 'bab4_penutup') {
+            return <TemplatePenutupEmbedded key={nodeId} embedded propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
         return null;
     };
 
@@ -1786,6 +1785,8 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             <TemplateUmumEmbedded key={activeSection} embedded defaultTab="sarana" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab2_fasilitatif_umum_gedung' ? (
                             <TemplateUmumEmbedded key={activeSection} embedded defaultTab="gedung" defaultSubSection={activeSection} />
+                        ) : activeSection === 'bab4_penutup' ? (
+                            <TemplatePenutupEmbedded key={activeSection} embedded />
                         ) : (
                             <SectionEditor />
                         )

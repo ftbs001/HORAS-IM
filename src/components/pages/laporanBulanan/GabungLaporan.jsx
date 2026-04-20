@@ -6,7 +6,7 @@ import { exportToPdf } from '../../../utils/pdfExporter';
 import { validateMergeDocuments } from '../../../utils/structuredDocValidator';
 import {
     getLalintalkimDocxElements, getInteldakimDocxElements, getInfokimDocxElements,
-    getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements,
+    getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements, getPenutupDocxElements,
 } from '../../../utils/templateDocxExporter.js';
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
@@ -1806,46 +1806,19 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             const bab4 = [
                 ...babTitle('IV', 'PENUTUP'),
+                ...(allTemplateData['bab4_penutup'] ? getPenutupDocxElements(allTemplateData['bab4_penutup'], bNama, tahun, logoKemenBuf) : [
+                    ...subBab('A.  SARAN', ''),
+                    ...([
+                        '1.  Urusan Kepegawaian : Diperlukan penambahan personel pada seksi-seksi yang kekurangan SDM guna meningkatkan kualitas pelayanan dan distribusi beban kerja yang lebih merata.',
+                        '2.  Urusan Keuangan    : Diharapkan adanya peningkatan alokasi anggaran operasional agar seluruh program kerja dapat terlaksana sesuai target yang ditetapkan.',
+                        '3.  Urusan Umum        : Perlu dilakukan pemeliharaan dan pembaruan sarana prasarana secara berkala untuk mendukung kelancaran operasional layanan keimigrasian.',
+                        '4.  Substantif         : Peningkatan koordinasi lintas instansi dalam pengawasan WNA dan penegakan hukum keimigrasian perlu terus ditingkatkan.',
+                    ].map(t => PARA(t))),
 
-                ...subBab('A.  SARAN', ''),
-                ...([
-                    '1.  Urusan Kepegawaian : Diperlukan penambahan personel pada seksi-seksi yang kekurangan SDM guna meningkatkan kualitas pelayanan dan distribusi beban kerja yang lebih merata.',
-                    '2.  Urusan Keuangan    : Diharapkan adanya peningkatan alokasi anggaran operasional agar seluruh program kerja dapat terlaksana sesuai target yang ditetapkan.',
-                    '3.  Urusan Umum        : Perlu dilakukan pemeliharaan dan pembaruan sarana prasarana secara berkala untuk mendukung kelancaran operasional layanan keimigrasian.',
-                    '4.  Substantif         : Peningkatan koordinasi lintas instansi dalam pengawasan WNA dan penegakan hukum keimigrasian perlu terus ditingkatkan.',
-                ].map(t => PARA(t))),
-
-                ...subBab('B.  KESIMPULAN', ''),
-                PARA(`Demikian Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar untuk bulan ${bNama} tahun ${tahun} ini disusun. Secara umum, seluruh kegiatan pelayanan keimigrasian di bidang substantif dan fasilitatif telah berjalan dengan baik dan tertib sesuai ketentuan peraturan perundang-undangan yang berlaku.`),
-                PARA('Segala permasalahan yang ditemukan dalam periode pelaporan ini akan dijadikan bahan evaluasi dan dasar perbaikan pelaksanaan tugas di masa yang akan datang, dengan tetap mengutamakan kepentingan masyarakat dan keamanan Negara.'),
-
-                EMPTY(600),
-
-                new Paragraph({
-                    children: [TR(`Pematang Siantar, ${tgl}`)],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 60, line: 240, lineRule: 'auto' },
-                }),
-                new Paragraph({
-                    children: [TR('Kepala Kantor Imigrasi Kelas II TPI', { bold: true })],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 60, line: 240, lineRule: 'auto' },
-                }),
-                new Paragraph({
-                    children: [TR('Pematang Siantar,', { italics: true })],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 1200 },
-                }),
-                new Paragraph({
-                    children: [TR('_________________________', { bold: true })],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 60, line: 240, lineRule: 'auto' },
-                }),
-                new Paragraph({
-                    children: [TR('NIP. _____________________')],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 0, line: 240, lineRule: 'auto' },
-                }),
+                    ...subBab('B.  KESIMPULAN', ''),
+                    PARA(`Demikian Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar untuk bulan ${bNama} tahun ${tahun} ini disusun. Secara umum, seluruh kegiatan pelayanan keimigrasian di bidang substantif dan fasilitatif telah berjalan dengan baik dan tertib sesuai ketentuan peraturan perundang-undangan yang berlaku.`),
+                    PARA('Segala permasalahan yang ditemukan dalam periode pelaporan ini akan dijadikan bahan evaluasi dan dasar perbaikan pelaksanaan tugas di masa yang akan datang, dengan tetap mengutamakan kepentingan masyarakat dan keamanan Negara.'),
+                ]),
             ];
 
             // ══════════════════════════════════════════════════════════════════

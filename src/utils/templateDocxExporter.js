@@ -1598,3 +1598,151 @@ export async function exportStandaloneTemplateDocx({ title, filename, bulanName,
  * Exact same function as getLalintalkimDocxElements
  */
 export const getLalintalKimDocxElements = getLalintalkimDocxElements;
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PENUTUP BUILDER
+══════════════════════════════════════════════════════════════════════════════ */
+export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = null) {
+    const { saran = [], kesimpulan = '' } = data || {};
+    const kesimpulanParsed = kesimpulan.replace(/{Bulan}/g, bulanName).replace(/{Tahun}/g, tahun);
+
+    const elements = [];
+
+    // A. SARAN
+    elements.push(new Paragraph({
+        children: [new TextRun({ text: 'A.', font: FONT_NAME, size: 24 }), new TextRun({ text: 'SARAN', font: FONT_NAME, size: 24 })],
+        spacing: { before: 240, after: 120 },
+        indent: { left: 400, hanging: 400 },
+        tabStops: [{ type: "left", position: 400 }]
+    }));
+
+    saran.forEach((s, idx) => {
+        elements.push(new Paragraph({
+            children: [
+                new TextRun({ text: `${idx + 1}.`, font: FONT_NAME, size: 24 }),
+                new TextRun({ text: `\t${s.judul}`, font: FONT_NAME, size: 24 })
+            ],
+            spacing: { before: 120, after: 80 },
+            indent: { left: 400, hanging: 400 },
+        }));
+        
+        // Multi-line isi 
+        const isiLines = (s.isi || '').split('\n');
+        isiLines.forEach((line, lIdx) => {
+            elements.push(new Paragraph({
+                children: [new TextRun({ text: line, font: FONT_NAME, size: 24 })],
+                alignment: AlignmentType.JUSTIFIED,
+                spacing: { before: lIdx === 0 ? 0 : 80, after: 0 },
+                indent: { left: 800, firstLine: 400 } 
+            }));
+        });
+    });
+
+    // B. KESIMPULAN
+    elements.push(new Paragraph({
+        children: [new TextRun({ text: 'B.', font: FONT_NAME, size: 24 }), new TextRun({ text: '\tKESIMPULAN', font: FONT_NAME, size: 24 })],
+        spacing: { before: 240, after: 120 },
+        indent: { left: 400, hanging: 400 },
+        tabStops: [{ type: "left", position: 400 }]
+    }));
+
+    const kesLines = kesimpulanParsed.split('\n');
+    kesLines.forEach(line => {
+        elements.push(new Paragraph({
+            children: [new TextRun({ text: line, font: FONT_NAME, size: 24 })],
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { before: 80, after: 0 },
+            indent: { left: 400, firstLine: 400 } 
+        }));
+    });
+
+    // TANDA TANGAN
+    const jabatan = data?.ttd?.jabatan || 'Kepala Kantor,';
+    const nama = data?.ttd?.nama || 'Benyamin Kali Patembal Harahap';
+    const kiriTxt = data?.ttd?.kiri || '${ttd_pengirim}';
+    const showEsign = data?.ttd?.showEsign !== false;
+
+    const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+    const tdBorders = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER };
+
+    const rightCellChildren = [
+        new Paragraph({ children: [new TextRun({ text: jabatan, font: FONT_NAME, size: 24 })], spacing: { after: 120 } })
+    ];
+
+    if (showEsign && logoKemenBuf) {
+        const eSignTable = new Table({
+             width: { size: 100, type: WidthType.PERCENTAGE },
+             borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideV: NO_BORDER, insideH: NO_BORDER },
+             rows: [
+                 new TableRow({ children: [
+                    new TableCell({
+                        width: { size: 15, type: WidthType.PERCENTAGE },
+                        borders: tdBorders,
+                        children: [new Paragraph({ children: [new ImageRun({ data: logoKemenBuf, transformation: { width: 40, height: 40 }, type: 'png' })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 85, type: WidthType.PERCENTAGE },
+                        borders: tdBorders,
+                        verticalAlign: VerticalAlign.CENTER,
+                        children: [
+                            new Paragraph({ children: [new TextRun({ text: 'KEMENIMIPAS', font: 'Arial', size: 24, bold: true })], spacing: { after: 0 } }),
+                            new Paragraph({ children: [new TextRun({ text: 'Ditandatangani secara elektronik oleh:', font: 'Arial', size: 16, color: '555555' })], spacing: { after: 0 } })
+                        ]
+                    })
+                 ]})
+             ]
+        });
+        rightCellChildren.push(eSignTable);
+        rightCellChildren.push(new Paragraph({ spacing: { before: 120 } }));
+    } else {
+        rightCellChildren.push(new Paragraph({ spacing: { before: 1200 } })); // 1200 twips ~ 4 lines
+    }
+
+    rightCellChildren.push(new Paragraph({ children: [new TextRun({ text: nama, font: FONT_NAME, size: 24 })] }));
+
+    const kiriLines = kiriTxt.split('\n');
+    const leftCellChildren = kiriLines.map((l, i) => new Paragraph({
+        children: [new TextRun({ text: l, font: FONT_NAME, size: 24 })],
+        spacing: { before: i === 0 ? 600 : 0 }
+    }));
+
+    const signTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideV: NO_BORDER, insideH: NO_BORDER },
+        rows: [
+            new TableRow({ children: [
+                new TableCell({ children: leftCellChildren, width: { size: 50, type: WidthType.PERCENTAGE }, borders: tdBorders }),
+                new TableCell({ children: rightCellChildren, width: { size: 50, type: WidthType.PERCENTAGE }, borders: tdBorders })
+            ]})
+        ]
+    });
+
+    elements.push(new Paragraph({ spacing: { before: 600, after: 0 } }));
+    elements.push(signTable);
+    
+    // TEMBUSAN
+    const tembusan = data?.tembusan || [];
+    if (tembusan.length > 0) {
+        elements.push(new Paragraph({ spacing: { before: 800, after: 120 } }));
+        elements.push(new Paragraph({
+            children: [new TextRun({ text: 'Tembusan :', font: FONT_NAME, size: 24 })],
+            spacing: { after: 120 }
+        }));
+        tembusan.forEach((t, i) => {
+            const lines = (t.isi || '').split('\n');
+            lines.forEach((line, lIdx) => {
+                elements.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: lIdx === 0 ? `${i + 1}. ` : '    ', font: FONT_NAME, size: 24 }),
+                        new TextRun({ text: line, font: FONT_NAME, size: 24 })
+                    ],
+                    spacing: { after: 0 },
+                    indent: { left: 400, hanging: 400 }
+                }));
+            });
+        });
+    }
+
+    return elements;
+}
