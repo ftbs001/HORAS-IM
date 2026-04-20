@@ -305,17 +305,17 @@ function TabelMultiHeader({ data, onChange, isPreview, loading, tableName, schem
         const bg = grand ? '#c6efce' : '#e8f5e9';
         if (isPreview) {
             return (
-                <>
+                <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
                     <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontFamily: FONT, fontSize: '9pt', background: bg, fontWeight: 'bold' }}>{lv === 0 ? '-' : lv}</td>
                     <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontFamily: FONT, fontSize: '9pt', background: bg, fontWeight: 'bold' }}>{pv === 0 ? '-' : pv}</td>
-                </>
+                </React.Fragment>
             );
         }
         return (
-            <>
+            <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
                 <td style={{ border: '1px solid #aaa', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', background: bg }}>{lv}</td>
                 <td style={{ border: '1px solid #aaa', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', background: bg }}>{pv}</td>
-            </>
+            </React.Fragment>
         );
     };
 
@@ -399,17 +399,17 @@ function TabelSimple({ data, onChange, isPreview, loading, tableName, schemaRows
         const bg = grand ? '#c6efce' : '#e8f5e9';
         if (isPreview) {
             return (
-                <>
+                <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
                     <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontFamily: FONT, fontSize: '10pt', background: bg, fontWeight: 'bold' }}>{lv === 0 ? '-' : lv}</td>
                     <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontFamily: FONT, fontSize: '10pt', background: bg, fontWeight: 'bold' }}>{pv === 0 ? '-' : pv}</td>
-                </>
+                </React.Fragment>
             );
         }
         return (
-            <>
+            <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
                 <td style={{ border: '1px solid #aaa', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: bg }}>{lv === 0 ? '0' : lv}</td>
                 <td style={{ border: '1px solid #aaa', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: bg }}>{pv === 0 ? '0' : pv}</td>
-            </>
+            </React.Fragment>
         );
     };
 
