@@ -358,13 +358,10 @@ export default function TemplatePenutup({
     useEffect(() => {
         const uStr = JSON.stringify(uData);
         if (originalData && uStr !== originalData && !loading && !saving && !isPreview) {
-            setHasChanges(true);
             const timer = setTimeout(() => {
                 handleSave(true); // auto-save silent
             }, 2000);
             return () => clearTimeout(timer);
-        } else if (originalData && uStr === originalData) {
-            setHasChanges(false);
         }
     }, [uData, originalData, loading, saving, isPreview]);
 
@@ -393,7 +390,6 @@ export default function TemplatePenutup({
                 );
             if (error) throw error;
             setOriginalData(JSON.stringify(uData));
-            setHasChanges(false);
             if (!isAutoSave) showMsg('success', 'Data penutup berhasil disimpan!');
         } catch (err) {
             console.error('handleSave err:', err);
