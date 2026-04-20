@@ -1101,6 +1101,38 @@ const MonthlyReport = ({ sectionFilter = null }) => {
             };
             buildChapters(filteredToc);
 
+            // ── DIRECT INJECT: BAB IV Penutup ────────────────────────────────────────
+            // Do NOT rely on filteredToc for BAB IV — filteredToc may exclude bab4_penutup
+            // when a role-based sectionFilter is active. Instead, always inject BAB IV
+            // directly from the fetched database data (tuTemplateData).
+            const existingBab4Idx = chapters.findIndex(c => c.title && c.title.toUpperCase().startsWith('BAB IV'));
+            const penutupSectionPayload = {
+                title: 'Laporan Penutup',
+                level: 2,
+                isPenutupTemplate: true,
+                templateData: tuTemplateData,
+            };
+            if (existingBab4Idx >= 0) {
+                // BAB IV exists in chapters (from filteredToc) — ensure penutup section is there
+                const hasPernutup = chapters[existingBab4Idx].sections.some(s => s.isPenutupTemplate);
+                if (!hasPernutup) {
+                    chapters[existingBab4Idx].sections.unshift(penutupSectionPayload);
+                }
+            } else {
+                // BAB IV not present at all — inject it as a dedicated chapter
+                // Insert before BAB V (if exists), else just push
+                const bab5Idx = chapters.findIndex(c => c.title && c.title.toUpperCase().startsWith('BAB V'));
+                const babIVChapter = {
+                    title: 'BAB IV PENUTUP',
+                    sections: [penutupSectionPayload],
+                };
+                if (bab5Idx >= 0) {
+                    chapters.splice(bab5Idx, 0, babIVChapter);
+                } else {
+                    chapters.push(babIVChapter);
+                }
+            }
+
             // Generate DOCX with hierarchical structure and logos
             await generateDocx({
                 coverLetterData: coverLetterData,
