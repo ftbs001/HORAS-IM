@@ -976,6 +976,14 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
             continue;
         }
 
+        if (section.isPenutupTemplate) {
+            const { getPenutupDocxElements } = await import('./templateDocxExporter.js');
+            const penutupData = section.templateData?.penutup || null;
+            const templateElems = penutupData ? getPenutupDocxElements(penutupData, coverPageData?.month || '', coverPageData?.year || '') : [];
+            if (templateElems.length > 0) elems.push(...templateElems);
+            continue;
+        }
+
         // Priority 1: content_json blocks (rich content with images)
         if (section.blocks && section.blocks.length > 0) {
             for (const block of section.blocks) {
@@ -1190,8 +1198,8 @@ async function structuredBlockToDocx(block) {
 // ==================== MAIN EXPORT FUNCTION ====================
 
 // A4 portrait: 11906 × 16838 twips  |  A4 landscape: 16838 × 11906 twips
-const A4_P = { width: 11906, height: 16838 };
-const A4_L = { width: 16838, height: 11906 };
+const A4_P = { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT };
+const A4_L = { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE };
 
 // Chapters that should be rendered in LANDSCAPE orientation
 const LANDSCAPE_CHAPTERS = ['BAB II', 'BAB V'];

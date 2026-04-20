@@ -1080,6 +1080,9 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                         chapter.sections.push({ title: child.label, level: sectionLevel, isUmumTemplate: true, umumPart: 'sarana', templateData: tuTemplateData });
                                     } else if (child.id === 'bab2_fasilitatif_umum_gedung') {
                                         chapter.sections.push({ title: child.label, level: sectionLevel, isUmumTemplate: true, umumPart: 'gedung', templateData: tuTemplateData });
+                                    } else if (child.id === 'bab4_penutup') {
+                                        // Inject Penutup Data, which is stored in TU row
+                                        chapter.sections.push({ title: child.label, level: sectionLevel, isPenutupTemplate: true, templateData: tuTemplateData });
                                     } else if (htmlContent && htmlContent.trim() && !htmlContent.includes('[Belum ada konten]')) {
                                         chapter.sections.push({
                                             title: child.label,
