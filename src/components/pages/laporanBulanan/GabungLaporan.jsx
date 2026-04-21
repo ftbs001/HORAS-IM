@@ -1638,12 +1638,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Penutup data is stored nested inside the TU row (seksi_id=4) as template_data.penutup
             const penutupTemplateData = allTemplateData[4]?.penutup || null;
 
-            let logoKemenBuf = null;
-            try {
-                logoKemenBuf = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
-            } catch (e) {
-                console.warn('[GabungLaporan] Failed to load signature logo:', e);
-            }
+
 
             // Collect Substantif Templates (Landscape)
             const substantifTemplateElems = [];
