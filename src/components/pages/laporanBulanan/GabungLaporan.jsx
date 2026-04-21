@@ -8,6 +8,7 @@ import {
     getLalintalkimDocxElements, getInteldakimDocxElements, getInfokimDocxElements,
     getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements, getPenutupDocxElements,
 } from '../../../utils/templateDocxExporter.js';
+import { fetchImageAsArrayBuffer } from '../../../utils/imageHandler';
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
 // Dynamic import('docx') conflicts with static imports in other files and breaks
@@ -1636,6 +1637,13 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const tmplTU    = allTemplateData[4] || null;
             // Penutup data is stored nested inside the TU row (seksi_id=4) as template_data.penutup
             const penutupTemplateData = allTemplateData[4]?.penutup || null;
+
+            let logoKemenBuf = null;
+            try {
+                logoKemenBuf = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
+            } catch (e) {
+                console.warn('[GabungLaporan] Failed to load signature logo:', e);
+            }
 
             // Collect Substantif Templates (Landscape)
             const substantifTemplateElems = [];

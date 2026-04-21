@@ -1209,8 +1209,8 @@ async function structuredBlockToDocx(block) {
 // ==================== MAIN EXPORT FUNCTION ====================
 
 // A4 portrait: 11906 × 16838 twips  |  A4 landscape: 16838 × 11906 twips
-const A4_P = { width: 11906, height: 16838, orientation: "portrait" };
-const A4_L = { width: 16838, height: 11906, orientation: "landscape" };
+const A4_P = { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT };
+const A4_L = { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE };
 
 // Chapters that should be rendered in LANDSCAPE orientation
 // STRICT: ONLY BAB II (Pelaksanaan Tugas) and BAB V (Lampiran) use Landscape.
@@ -1279,7 +1279,15 @@ export const generateDocx = async ({
             : (typeof bulan === 'string' && bulan.length > 0 ? bulan : 'Bulan');
 
         const { getPenutupDocxElements } = await import('./templateDocxExporter.js');
-        const penutupElems = getPenutupDocxElements(finalPenutupData, bulanName, String(tahun || ''));
+        
+        let logoKemenBuf = null;
+        try {
+            logoKemenBuf = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
+        } catch (e) {
+            console.warn('Docx electronic signature badge image failed to load:', e);
+        }
+
+        const penutupElems = getPenutupDocxElements(finalPenutupData, bulanName, String(tahun || ''), logoKemenBuf);
 
         if (penutupElems.length > 0) {
             // If BAB IV exists in chapters already, replace its content with template
