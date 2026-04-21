@@ -9,6 +9,7 @@ import {
     getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements, getPenutupDocxElements,
 } from '../../../utils/templateDocxExporter.js';
 import { fetchImageAsArrayBuffer } from '../../../utils/imageHandler';
+import { getDefaultPenutupData } from '../../../utils/penutupSchema.js';
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
 // Dynamic import('docx') conflicts with static imports in other files and breaks
@@ -39,11 +40,12 @@ const F_HEAD = pt(14);    // 28 hp — BAB heading (14pt)
 const F_SUBBAB = pt(12);  // 24 hp — Sub-BAB heading (12pt)
 const F_SMALL = pt(10);   // 20 hp — small text
 const F_TABLE = pt(10);   // 20 hp — table cell text (10pt, compact)
-const MARGIN = { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) };  // LOCKED: 2cm all sides
+const MARGIN = { top: cm(2), bottom: cm(2), left: cm(2.5), right: cm(2) };  // LOCKED: portrait margins
+const MARGIN_LANDSCAPE = { top: cm(2), bottom: cm(2), left: cm(2), right: cm(2) }; // landscape: same
 const LS_15 = { line: 360, lineRule: 'auto' };  // 1.5 line spacing — LOCKED
 const INDENT_1 = cm(1.25); // first-line indent for body paragraphs
-// Content area width: 21cm - 2cm - 2cm = 17cm
-const CONTENT_W = cm(17);
+// Content area width portrait: 21cm - 2.5cm - 2cm = 16.5cm
+const CONTENT_W = cm(16.5);
 
 
 // ─── Page order constants (for TOC page-number estimation) ────────────────────
@@ -822,7 +824,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // SECTION 4: BAB I PENDAHULUAN
             // ══════════════════════════════════════════════════════════════════
             const bab1 = [
-                ...babTitle('I', 'PENDAHULUAN'),
+                ...babTitleNoPB('I', 'PENDAHULUAN'),
 
                 ...subBab('A.  PENGANTAR', ''),
                 ...subSubBab('1.  Gambaran Umum Kantor Imigrasi Kelas II TPI Pematang Siantar',
@@ -1689,18 +1691,36 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const mkSecProps = (landscape = false) => ({
                 type: SectionType.NEXT_PAGE,
                 page: {
-                    margin: MARGIN,
+                    margin: landscape ? MARGIN_LANDSCAPE : MARGIN,
                     size: landscape ? {
+                        // A4 landscape: swap width/height and set orientation
                         width: cm(29.7),
                         height: cm(21.0),
                         orientation: PageOrientation.LANDSCAPE,
                     } : {
+                        // A4 portrait
                         width: cm(21.0),
                         height: cm(29.7),
                         orientation: PageOrientation.PORTRAIT,
                     },
                 },
             });
+
+            // ── babTitle without leading PageBreak ────────────────────────────
+            // Use this variant when generating children for a section that already
+            // starts on a new page via SectionType.NEXT_PAGE (no PB() needed).
+            const babTitleNoPB = (roman, judul) => [
+                new Paragraph({
+                    children: [TR(`BAB ${roman}`, { bold: true, size: F_HEAD })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { ...LS_15, before: 0, after: 0 },
+                }),
+                new Paragraph({
+                    children: [TR(judul.toUpperCase(), { bold: true, size: F_HEAD })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { ...LS_15, before: 0, after: 480 },
+                }),
+            ];
 
             // ── Merge consecutive same-orientation chunks → DOCX sections ─────
             // Guards: (1) empty chunks are filtered, (2) each section gets ≥1 child
@@ -1735,8 +1755,11 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             // BAB II: PELAKSANAAN TUGAS
             // WAJIB LANDSCAPE: BAB II selalu menggunakan kertas Landscape
+            // PENTING: Gunakan babTitleNoPB karena SectionType.NEXT_PAGE sudah
+            //          memulai halaman baru — PB() di dalam children menyebabkan
+            //          MS Word menyisipkan halaman kosong portrait di awal!
             // ══════════════════════════════════════════════════════════════════
-            const bab2HeaderElems = babTitle('II', 'PELAKSANAAN TUGAS');
+            const bab2HeaderElems = babTitleNoPB('II', 'PELAKSANAAN TUGAS');
             const subBabAElems = subBab('A.  BIDANG SUBSTANTIF', '');
             const subBabBElems = subBab('B.  BIDANG FASILITATIF', '');
 
@@ -1752,7 +1775,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // Semua konten BAB II digabung dalam satu section LANDSCAPE
             const bab2AllElems = [
-                ...bab2HeaderElems,
+                ...bab2HeaderElems,   // NO PB() — section break sudah handle ini
                 ...subBabAElems,
                 ...(substantifBodyElems.length > 0
                     ? substantifBodyElems
@@ -1788,7 +1811,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // SECTION 6: BAB III PERMASALAHAN
             // ══════════════════════════════════════════════════════════════════
             const bab3 = [
-                ...babTitle('III', 'PERMASALAHAN'),
+                ...babTitleNoPB('III', 'PERMASALAHAN'),
                 PARA(`Dalam pelaksanaan tugas dan fungsi pada ${BULAN_NAMES[bulan]} ${tahun}, terdapat beberapa permasalahan yang dihadapi oleh Kantor Imigrasi Kelas II TPI Pematang Siantar, sebagai berikut:`),
 
                 ...subBab('1.  Urusan Kepegawaian', ''),
@@ -1814,31 +1837,22 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // ══════════════════════════════════════════════════════════════════
             // SECTION 7: BAB IV PENUTUP
+            // Selalu gunakan getPenutupDocxElements agar konsisten dengan preview.
+            // Jika tidak ada data tersimpan di DB, gunakan data default dari penutupSchema.
             // ══════════════════════════════════════════════════════════════════
+            const resolvedPenutupData = penutupTemplateData || getDefaultPenutupData();
             const bab4 = [
-                ...babTitle('IV', 'PENUTUP'),
-                ...(penutupTemplateData ? getPenutupDocxElements(penutupTemplateData, bNama, tahun, logoKemenBuf) : [
-                    ...subBab('A.  SARAN', ''),
-                    ...([
-                        '1.  Urusan Kepegawaian : Diperlukan penambahan personel pada seksi-seksi yang kekurangan SDM guna meningkatkan kualitas pelayanan dan distribusi beban kerja yang lebih merata.',
-                        '2.  Urusan Keuangan    : Diharapkan adanya peningkatan alokasi anggaran operasional agar seluruh program kerja dapat terlaksana sesuai target yang ditetapkan.',
-                        '3.  Urusan Umum        : Perlu dilakukan pemeliharaan dan pembaruan sarana prasarana secara berkala untuk mendukung kelancaran operasional layanan keimigrasian.',
-                        '4.  Substantif         : Peningkatan koordinasi lintas instansi dalam pengawasan WNA dan penegakan hukum keimigrasian perlu terus ditingkatkan.',
-                    ].map(t => PARA(t))),
-
-                    ...subBab('B.  KESIMPULAN', ''),
-                    PARA(`Demikian Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar untuk bulan ${bNama} tahun ${tahun} ini disusun. Secara umum, seluruh kegiatan pelayanan keimigrasian di bidang substantif dan fasilitatif telah berjalan dengan baik dan tertib sesuai ketentuan peraturan perundang-undangan yang berlaku.`),
-                    PARA('Segala permasalahan yang ditemukan dalam periode pelaporan ini akan dijadikan bahan evaluasi dan dasar perbaikan pelaksanaan tugas di masa yang akan datang, dengan tetap mengutamakan kepentingan masyarakat dan keamanan Negara.'),
-                ]),
+                ...babTitleNoPB('IV', 'PENUTUP'),
+                ...getPenutupDocxElements(resolvedPenutupData, bNama, tahun, logoKemenBuf),
                 // MS WORD BUG FIX: docx section MUST NOT end with a Table.
                 EMPTY(10)
             ];
 
             // ══════════════════════════════════════════════════════════════════
-            // SECTION 8: BAB V LAMPIRAN
+            // SECTION 8: BAB V LAMPIRAN — LANDSCAPE (Struktur Organisasi)
             // ══════════════════════════════════════════════════════════════════
             const bab5 = [
-                ...babTitle('V', 'LAMPIRAN'),
+                ...babTitleNoPB('V', 'LAMPIRAN'),
                 PARA(`Lampiran Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar bulan ${bNama} ${tahun}, terdiri dari:`),
                 ...([
                     '1.  Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar;',

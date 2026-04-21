@@ -24,9 +24,10 @@ const MARGIN_MM = 10;  // safety margin per page
  * @param {string} elementId   - DOM id of ContentBlockRenderer (default: 'content-block-renderer')
  * @param {string} filename    - Output PDF filename (e.g., 'Laporan_Maret_2026.pdf')
  * @param {Function} onProgress - Optional callback(percent) for progress UI
+ * @param {boolean} isLandscape  - Export in landscape mode
  * @returns {Promise<boolean>} - true on success, false on error
  */
-export const exportToPdf = async (elementId = 'content-block-renderer', filename = 'Laporan.pdf', onProgress) => {
+export const exportToPdf = async (elementId = 'content-block-renderer', filename = 'Laporan.pdf', onProgress, isLandscape = false) => {
     try {
         onProgress?.(5);
 
@@ -55,7 +56,7 @@ export const exportToPdf = async (elementId = 'content-block-renderer', filename
 
         // 2. Create PDF
         const pdf = new jsPDF({
-            orientation: 'portrait',
+            orientation: isLandscape ? 'landscape' : 'portrait',
             unit: 'mm',
             format: 'a4',
             compress: false,        // Do NOT compress — preserves image quality
@@ -65,8 +66,11 @@ export const exportToPdf = async (elementId = 'content-block-renderer', filename
         const canvasHeight = canvas.height;
 
         // 3. Calculate usable width in PDF pixels
-        const pdfWidthMM = A4_WIDTH_MM - MARGIN_MM * 2;
-        const pdfHeightMM = A4_HEIGHT_MM - MARGIN_MM * 2;
+        const effectivePdfWidthMM = isLandscape ? A4_HEIGHT_MM : A4_WIDTH_MM;
+        const effectivePdfHeightMM = isLandscape ? A4_WIDTH_MM : A4_HEIGHT_MM;
+        
+        const pdfWidthMM = effectivePdfWidthMM - MARGIN_MM * 2;
+        const pdfHeightMM = effectivePdfHeightMM - MARGIN_MM * 2;
 
         // px per mm on canvas
         const canvasMmWidth = canvasWidth;

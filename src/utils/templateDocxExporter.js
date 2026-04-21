@@ -10,7 +10,7 @@
  */
 import { Document, Packer, Paragraph, Table, TableRow, TableCell,
     TextRun, ImageRun, WidthType, AlignmentType, VerticalAlign,
-    ShadingType, HeightRule, BorderStyle } from 'docx';
+    ShadingType, HeightRule, BorderStyle, PageOrientation } from 'docx';
 import {
     BULAN_NAMES,
     TABEL_A_ROWS, TABEL_B_ROWS, TABEL_C_ROWS,
@@ -1554,7 +1554,9 @@ function buildGedungDocx(data) {
    STANDALONE TEMPLATE EXPORTER (PER SEKSI)
 ══════════════════════════════════════════════════════════════════════════════ */
 export async function exportStandaloneTemplateDocx({ title, filename, bulanName, tahun, elements, isLandscape = true }) {
-    const docSize = isLandscape ? { width: 16838, height: 11906 } : { width: 11906, height: 16838 };
+    const docSize = isLandscape 
+        ? { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE } 
+        : { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT };
     const docMargin = isLandscape 
         ? { top: 1134, bottom: 1134, left: 1701, right: 1134 } 
         : { top: 1701, bottom: 1134, left: 1134, right: 1134 };
