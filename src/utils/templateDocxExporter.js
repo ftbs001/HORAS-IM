@@ -10,7 +10,7 @@
  */
 import { Document, Packer, Paragraph, Table, TableRow, TableCell,
     TextRun, ImageRun, WidthType, AlignmentType, VerticalAlign,
-    ShadingType, HeightRule, BorderStyle, PageOrientation } from 'docx';
+    ShadingType, HeightRule, BorderStyle, PageOrientation, TableLayoutType } from 'docx';
 import {
     BULAN_NAMES,
     TABEL_A_ROWS, TABEL_B_ROWS, TABEL_C_ROWS,
@@ -1673,6 +1673,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
     if (showEsign && logoKemenBuf) {
         const eSignTable = new Table({
              width: { size: 100, type: WidthType.PERCENTAGE },
+             layout: TableLayoutType.FIXED,
              borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideV: NO_BORDER, insideH: NO_BORDER },
              rows: [
                  new TableRow({ children: [
@@ -1709,6 +1710,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
 
     const signTable = new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
         borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideV: NO_BORDER, insideH: NO_BORDER },
         rows: [
             new TableRow({ children: [

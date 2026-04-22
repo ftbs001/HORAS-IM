@@ -1686,22 +1686,18 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Portrait sections use the standard MARGIN (2cm all sides).
             // Landscape sections use A4-landscape page size with same margins.
             // ── Section property builder ───────────────────────────────────────
-            // IMPORTANT: Always explicitly set page size to avoid inheritance from previous landscape sections
-            // IMPORTANT: type: SectionType.NEXT_PAGE is strictly required in DOCX to cleanly sever MS Word formatting inheritance
             const mkSecProps = (landscape = false) => ({
                 type: SectionType.NEXT_PAGE,
                 page: {
                     margin: landscape ? MARGIN_LANDSCAPE : MARGIN,
-                    size: landscape ? {
-                        // A4 landscape: swap width/height and set orientation
-                        width: cm(29.7),
-                        height: cm(21.0),
-                        orientation: PageOrientation.LANDSCAPE,
-                    } : {
-                        // A4 portrait
+                    size: {
+                        // FIX: docx library v9.5+ will AUTOMATICALLY swap width & height internally
+                        // if PageOrientation.LANDSCAPE is provided. If we provide pre-swapped
+                        // dimensions, the engine reverts them to portrait. Always provide A4 
+                        // portrait base dimensions!
                         width: cm(21.0),
                         height: cm(29.7),
-                        orientation: PageOrientation.PORTRAIT,
+                        orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT,
                     },
                 },
             });
