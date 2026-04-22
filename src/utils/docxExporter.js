@@ -989,9 +989,18 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
                 const bulanName = (mInt > 0 && mInt <= 12)
                     ? BULAN[mInt]
                     : (typeof rawMonth === 'string' && rawMonth.length > 0 ? rawMonth : 'Bulan');
-                const templateElems = getPenutupDocxElements(penutupData, bulanName, coverPageData?.year || '');
+                // Fetch logo for BSrE e-signature
+                let logoKemenBufLocal = null;
+                try {
+                    logoKemenBufLocal = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
+                } catch (e) {
+                    console.warn('[docxExporter] BAB IV logo fetch failed:', e);
+                }
+                const templateElems = getPenutupDocxElements(penutupData, bulanName, String(coverPageData?.year || ''), logoKemenBufLocal);
                 if (templateElems.length > 0) elems.push(...templateElems);
             }
+            // Always ensure last element is a paragraph (not a Table) to avoid Word OOXML errors
+            elems.push(new Paragraph({ children: [] }));
             continue;
         }
 
@@ -1027,6 +1036,9 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
         }
     }
 
+    // Always end the chapter with an explicit empty paragraph (ensures Word
+    // can attach the sectPr to it and won't bleed orientation to next section)
+    elems.push(new Paragraph({ children: [] }));
     return elems;
 };
 
