@@ -1847,9 +1847,34 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             // SECTION 8: BAB V LAMPIRAN — LANDSCAPE (Struktur Organisasi)
             // ══════════════════════════════════════════════════════════════════
+            let strukturOrgImageBuf = null;
+            try {
+                strukturOrgImageBuf = await fetchImageAsArrayBuffer('/struktur_organisasi.png');
+            } catch (err) {
+                console.warn('[GabungLaporan] Gagal memuat image struktur organisasi', err);
+            }
+
             const bab5 = [
                 ...babTitleNoPB('V', 'LAMPIRAN'),
                 PARA(`Lampiran Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar bulan ${bNama} ${tahun}, terdiri dari:`),
+                
+                ...(strukturOrgImageBuf ? [
+                    new Paragraph({
+                        children: [
+                            new ImageRun({
+                                data: strukturOrgImageBuf,
+                                type: 'png',
+                                transformation: { 
+                                    width: 900, 
+                                    height: 600 // Aspect ratio ~1.5 (A4 Landscape usable area)
+                                }
+                            })
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { before: 240, after: 360 }
+                    })
+                ] : []),
+
                 ...([
                     '1.  Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar;',
                     '2.  Grafik Rekapitulasi Data Perlintasan;',

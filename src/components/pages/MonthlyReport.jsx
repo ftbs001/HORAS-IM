@@ -390,6 +390,19 @@ const TableOfContentsPreview = () => {
     );
 };
 
+// Bab 5 Preview Component (for preview and edit modes)
+const Bab5OrgChartView = () => {
+    return (
+        <div className="w-full flex flex-col items-center justify-center bg-white p-4 h-full">
+            <img 
+                src="/struktur_organisasi.png" 
+                alt="Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar"
+                style={{ width: '100%', maxHeight: '180mm', objectFit: 'contain' }}
+            />
+        </div>
+    );
+};
+
 const MonthlyReport = ({ sectionFilter = null }) => {
     const { user } = useAuth();
     const { reportData, updateSection, clearSection, reportAttachments, addAttachment, removeAttachment, getAttachments, coverLetterData, coverPageData, forewordData } = useReport();
@@ -1346,6 +1359,9 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         if (nodeId === 'bab4_penutup') {
             return <TemplatePenutupEmbedded key={nodeId} embedded propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
         }
+        if (nodeId === 'bab5') {
+            return <Bab5OrgChartView key={nodeId} />;
+        }
         return null;
     };
 
@@ -1828,6 +1844,8 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             <TemplateUmumEmbedded key={activeSection} embedded defaultTab="gedung" defaultSubSection={activeSection} />
                         ) : activeSection === 'bab4_penutup' ? (
                             <TemplatePenutupEmbedded key={activeSection} embedded />
+                        ) : activeSection === 'bab5' ? (
+                            <Bab5OrgChartView />
                         ) : (
                             <SectionEditor />
                         )
@@ -1876,7 +1894,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                         💡 Mode Landscape untuk menampung resolusi tabel yang lebar
                                     </div>
                                     
-                                    {filteredToc.filter(c => ['bab2', 'bab5'].includes(c.id)).map(chapter => (
+                                    {filteredToc.filter(c => ['bab2'].includes(c.id)).map(chapter => (
                                         <div key={chapter.id} id={`preview-section-${chapter.id}`} className="mb-12">
                                             <h3 className="text-2xl font-bold uppercase text-center mb-8 bg-gray-100 py-2 border-y border-black">{chapter.label}</h3>
                                             <div className="space-y-6">
@@ -1884,6 +1902,13 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {/* ── BAB V LAMPIRAN — LANDSCAPE with Org Chart Image ── */}
+                            {filteredToc && filteredToc.some(c => c.id === 'bab5') && (
+                                <div id="preview-section-bab5" className="w-[297mm] shadow-2xl bg-white min-h-[210mm] font-serif print:p-0 print:shadow-none shrink-0 border border-gray-300">
+                                    <Bab5OrgChartView />
                                 </div>
                             )}
                         </div>
