@@ -1210,7 +1210,9 @@ async function structuredBlockToDocx(block) {
 
 // A4 portrait: 11906 × 16838 twips  |  A4 landscape: 16838 × 11906 twips
 const A4_P = { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT };
-const A4_L = { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE };
+// FIX: docx library v9+ swaps dimensions internally when orientation is LANDSCAPE.
+// Providing pre-swapped width/height will cause the library to flip them back to portrait.
+const A4_L = { width: 11906, height: 16838, orientation: PageOrientation.LANDSCAPE };
 
 // Chapters that should be rendered in LANDSCAPE orientation
 // STRICT: ONLY BAB II (Pelaksanaan Tugas) and BAB V (Lampiran) use Landscape.

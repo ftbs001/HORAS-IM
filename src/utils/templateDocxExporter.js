@@ -1554,9 +1554,11 @@ function buildGedungDocx(data) {
    STANDALONE TEMPLATE EXPORTER (PER SEKSI)
 ══════════════════════════════════════════════════════════════════════════════ */
 export async function exportStandaloneTemplateDocx({ title, filename, bulanName, tahun, elements, isLandscape = true }) {
-    const docSize = isLandscape 
-        ? { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE } 
-        : { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT };
+    const docSize = { 
+         width: 11906, 
+         height: 16838, 
+         orientation: isLandscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT 
+    };
     const docMargin = isLandscape 
         ? { top: 1134, bottom: 1134, left: 1701, right: 1134 } 
         : { top: 1701, bottom: 1134, left: 1134, right: 1134 };
