@@ -453,14 +453,25 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     }
                 } else if (rawUrl.startsWith('data:image')) {
                     const b64Data = rawUrl.split(',')[1];
+                    const matchType = rawUrl.match(/^data:image\/([a-zA-Z+]+);base64,/);
+                    const mime = matchType ? `image/${matchType[1]}` : 'image/png';
                     const binary = atob(b64Data);
                     const bytes = new Uint8Array(binary.length);
                     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                    blob = new Blob([bytes.buffer], { type: 'image/png' });
+                    blob = new Blob([bytes.buffer], { type: mime });
                 }
 
                 if (!blob) throw new Error('Bad image data');
 
+                // Bypass Canvas entirely for native MS Word supported formats!
+                // This prevents silent corporate Canvas-fingerprinting blockers from killing the export,
+                // and avoids massive RAM spikes inside the browser.
+                if (blob.type === 'image/jpeg' || blob.type === 'image/jpg' || blob.type === 'image/png') {
+                    const buffer = await blob.arrayBuffer();
+                    return { buffer, width: maxWidth, height: maxHeight, type: blob.type === 'image/png' ? 'png' : 'jpeg' };
+                }
+
+                // Fallback to Canvas ONLY for unsupported formats (WEBP, HEIC masquerading as JPEG)
                 return new Promise((resolve, reject) => {
                     const img = new Image();
                     const blobUrl = URL.createObjectURL(blob);
@@ -493,7 +504,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
                         URL.revokeObjectURL(blobUrl);
-                        resolve({ buffer: bytes.buffer, width: newW, height: newH });
+                        resolve({ buffer: bytes.buffer, width: newW, height: newH, type: 'jpeg' });
                     };
                     
                     img.onerror = () => {
@@ -917,11 +928,11 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             if (src) {
                                 try {
                                     // Bounded Canvas Fetcher - Reuses safe pattern from BAB V
-                                    const { buffer, width, height } = await fetchImageToStandardJpegBuffer(src);
+                                    const { buffer, width, height, type } = await fetchImageToStandardJpegBuffer(src);
                                     paragraphs.push(new Paragraph({
                                         children: [
                                             new ImageRun({
-                                                data: buffer, type: 'jpeg',
+                                                data: buffer, type: type || 'jpeg',
                                                 transformation: { width: width, height: height }
                                             })
                                         ],
@@ -943,11 +954,11 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     } else if (node.nodeName === 'IMG') {
                         const src = node.getAttribute('src');
                         try {
-                            const { buffer, width, height } = await fetchImageToStandardJpegBuffer(src);
+                            const { buffer, width, height, type } = await fetchImageToStandardJpegBuffer(src);
                             paragraphs.push(new Paragraph({
                                 children: [
                                     new ImageRun({
-                                        data: buffer, type: 'jpeg',
+                                        data: buffer, type: type || 'jpeg',
                                         transformation: { width: width, height: height }
                                     })
                                 ],
@@ -1959,6 +1970,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             let strukturOrgImageBuf = null;
             let bab5ImgDim = { width: 940, height: 660 };
+            let bab5ImgType = 'jpeg';
 
             try {
                 const { data: b5Data, error: dbErr } = await supabase
@@ -1971,9 +1983,10 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 const bab5Raw = b5Data?.content;
                 
                 if (bab5Raw) {
-                    const { buffer, width, height } = await fetchImageToStandardJpegBuffer(bab5Raw, 940, 660);
+                    const { buffer, width, height, type } = await fetchImageToStandardJpegBuffer(bab5Raw, 940, 660);
                     strukturOrgImageBuf = buffer;
                     bab5ImgDim = { width, height };
+                    bab5ImgType = type || 'jpeg';
                 }
             } catch (err) {
                 console.warn('[GabungLaporan] Gagal merender image bab5:', err);
@@ -1992,7 +2005,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         children: [
                             new ImageRun({
                                 data: strukturOrgImageBuf,
-                                type: 'jpeg', // Guaranteed by Canvas normalization
+                                type: bab5ImgType,
                                 transformation: {
                                     width: bab5ImgDim.width,
                                     height: bab5ImgDim.height,
