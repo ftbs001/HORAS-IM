@@ -1857,6 +1857,19 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             let strukturOrgImageBuf = null;
             let bab5DebugInfo = 'Memulai fetch...';
             let bab5ImgType = 'png'; // Default
+            let bab5ImgDim = { width: 940, height: 660 }; // Default dimension fallback
+
+            // Helper to get image sizes
+            const getImageDimensions = (blobUrl) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        resolve({ w: img.naturalWidth, h: img.naturalHeight });
+                    };
+                    img.onerror = () => resolve({ w: 940, h: 660 });
+                    img.src = blobUrl;
+                });
+            };
 
             try {
                 // Fetch directly from DB to ensure we have the absolute latest URL
@@ -1886,7 +1899,29 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             
                             const blob = await res.blob();
                             strukturOrgImageBuf = await blob.arrayBuffer();
-                            bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes, Type: ${bab5ImgType})`;
+
+                            // Get image dimensions dynamically
+                            const blobUrl = URL.createObjectURL(blob);
+                            const dim = await getImageDimensions(blobUrl);
+                            URL.revokeObjectURL(blobUrl);
+
+                            // Proportional scaling for A4 landscape (Max W: ~940px, Max H: ~660px)
+                            const MAX_W = 940;
+                            const MAX_H = 660;
+                            let newW = dim.w;
+                            let newH = dim.h;
+
+                            if (newW > MAX_W) {
+                                newH = Math.round(newH * (MAX_W / newW));
+                                newW = MAX_W;
+                            }
+                            if (newH > MAX_H) {
+                                newW = Math.round(newW * (MAX_H / newH));
+                                newH = MAX_H;
+                            }
+                            bab5ImgDim = { width: newW, height: newH };
+
+                            bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes, Type: ${bab5ImgType}, Dim: ${newW}x${newH})`;
                         } catch (fetchErr) {
                             bab5DebugInfo = `GAGAL FETCH URL: ${fetchErr.message}. Mungkin masalah CORS atau jaringan.`;
                         }
@@ -1897,6 +1932,23 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         const m = bab5Raw.match(/^data:image\/([a-zA-Z+]+);base64,/);
                         if (m && (m[1] === 'jpeg' || m[1] === 'jpg')) bab5ImgType = 'jpeg';
                         else if (m && m[1] === 'png') bab5ImgType = 'png';
+
+                        // Get image dimensions dynamically from base64
+                        const dim = await getImageDimensions(bab5Raw);
+                        const MAX_W = 940;
+                        const MAX_H = 660;
+                        let newW = dim.w;
+                        let newH = dim.h;
+                        
+                        if (newW > MAX_W) {
+                            newH = Math.round(newH * (MAX_W / newW));
+                            newW = MAX_W;
+                        }
+                        if (newH > MAX_H) {
+                            newW = Math.round(newW * (MAX_H / newH));
+                            newH = MAX_H;
+                        }
+                        bab5ImgDim = { width: newW, height: newH };
 
                         const b64 = bab5Raw.split(',')[1];
                         const bin = atob(b64);
@@ -1926,12 +1978,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             new ImageRun({
                                 data: strukturOrgImageBuf,
                                 type: bab5ImgType,
-                                // A4 Landscape usable w≈25.7cm, h≈18cm at 96dpi
-                                // pxCm: 96/2.54 ≈ 37.8 px/cm → 25.7cm≈970px, 18cm≈680px
-                                // Reduce slightly for margins: 940 x 660
                                 transformation: {
-                                    width: 940,
-                                    height: 660,
+                                    width: bab5ImgDim.width,
+                                    height: bab5ImgDim.height,
                                 }
                             })
                         ],
