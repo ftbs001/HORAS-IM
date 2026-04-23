@@ -1855,30 +1855,46 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // SECTION 8: BAB V LAMPIRAN — LANDSCAPE (Struktur Organisasi)
             // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
+            let bab5DebugInfo = 'Memulai fetch...';
             try {
                 // Fetch directly from DB to ensure we have the absolute latest URL
-                const { data: b5Data } = await supabase
+                const { data: b5Data, error: dbErr } = await supabase
                     .from('monthly_reports')
                     .select('content')
                     .eq('section_key', 'bab5')
                     .single();
 
+                if (dbErr) throw dbErr;
                 const bab5Raw = b5Data?.content;
                 
-                if (bab5Raw) {
+                if (!bab5Raw) {
+                    bab5DebugInfo = 'Data BAB V kosong di database.';
+                } else {
                     if (bab5Raw.startsWith('http')) {
-                        // New approach: public URL from Supabase Storage
-                        strukturOrgImageBuf = await fetchImageAsArrayBuffer(bab5Raw);
+                        bab5DebugInfo = `URL ditemukan: ${bab5Raw.substring(0, 40)}... mencoba fetch...`;
+                        try {
+                            const res = await fetch(bab5Raw);
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            const blob = await res.blob();
+                            strukturOrgImageBuf = await blob.arrayBuffer();
+                            bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes)`;
+                        } catch (fetchErr) {
+                            bab5DebugInfo = `GAGAL FETCH URL: ${fetchErr.message}. Mungkin masalah CORS atau jaringan.`;
+                        }
                     } else if (bab5Raw.startsWith('data:image')) {
-                        // Legacy approach: base64 data URL
+                        bab5DebugInfo = 'Base64 ditemukan... decode...';
                         const b64 = bab5Raw.split(',')[1];
                         const bin = atob(b64);
                         strukturOrgImageBuf = new Uint8Array(bin.length);
                         for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
+                        bab5DebugInfo = `Success decode Base64 (Size: ${strukturOrgImageBuf.byteLength} bytes)`;
+                    } else {
+                        bab5DebugInfo = 'Format data BAB V tidak dikenali.';
                     }
                 }
             } catch (err) {
                 console.warn('[GabungLaporan] Gagal memuat image bab5:', err);
+                bab5DebugInfo = `ERROR DB/TRY: ${err.message}`;
             }
 
             const bab5 = [
@@ -1908,7 +1924,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         spacing: { before: 0, after: 0 }
                     }),
                 ] : [
-                    PARA('(Gambar Struktur Organisasi tidak dapat dimuat. Pastikan halaman preview sudah dibuka terlebih dahulu sebelum export.)', { noIndent: true })
+                    PARA('(Gambar Struktur Organisasi tidak dapat dimuat.)', { noIndent: true }),
+                    PARA(`[DEBUG INFO]: ${bab5DebugInfo}`, { noIndent: true })
                 ]),
                 EMPTY(10),
             ];
