@@ -348,25 +348,49 @@ export const htmlToDocxElements = async (htmlStr) => {
             const src = node.getAttribute('src');
             if (src) {
                 try {
-                    const resp = await fetch(src);
-                    const arrBuf = await resp.arrayBuffer();
-                    
-                    // Native dimensions from DOM or fallback to A4 safe bounds
-                    let w = parseInt(node.getAttribute('width'));
-                    let h = parseInt(node.getAttribute('height'));
-                    if (!w || !h) { w = 500; h = 350; }
-                    
-                    elements.push(new Paragraph({
-                        children: [
-                            new ImageRun({
-                                data: arrBuf,
-                                transformation: { width: w, height: h }
-                            })
-                        ],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { before: 120, after: 120 }
-                    }));
-                } catch(e) { console.warn('[docxExporter] htmlToDocxElements image fetch failed:', src, e); }
+                    // Use robust native handler which correctly cracks gigabytes of data:image base64 without memory bounds
+                    const arrBuf = await fetchImageAsArrayBuffer(src);
+                    if (arrBuf) {
+                        // Native dimensions from DOM or fallback to A4 safe bounds
+                        let w = parseInt(node.getAttribute('width'));
+                        let h = parseInt(node.getAttribute('height'));
+                        
+                        // Infer width/height from inline style if attributes are missing
+                        if (!w || !h) {
+                            const style = node.getAttribute('style') || '';
+                            const wMatch = style.match(/width:\s*(\d+)px/);
+                            if (wMatch) w = parseInt(wMatch[1], 10);
+                            const hMatch = style.match(/height:\s*(\d+)px/);
+                            if (hMatch) h = parseInt(hMatch[1], 10);
+                        }
+
+                        // Get image type for DOCX ImageRun MIME validation
+                        const type = getMimeFromBase64(src) || 'png';
+
+                        if (!w || !h) {
+                            // If still 0, cap at 500x350 to ensure Word compatibility
+                            w = 500; h = 350;
+                        }
+
+                        // Force DOCX page boundary safety (600px max width for A4 portrait)
+                        if (w > 600) {
+                            h = Math.round(h * (600 / w));
+                            w = 600;
+                        }
+
+                        elements.push(new Paragraph({
+                            children: [
+                                new ImageRun({
+                                    data: arrBuf,
+                                    type: type,
+                                    transformation: { width: w, height: h }
+                                })
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { before: 120, after: 120 }
+                        }));
+                    }
+                } catch(e) { console.warn('[docxExporter] htmlToDocxElements image fetch failed:', src.substring(0, 50), e); }
             }
             return;
         }
@@ -1236,13 +1260,13 @@ const isLandscapeChapter = (title = '') => {
     return LANDSCAPE_CHAPTERS.some(prefix => upper.startsWith(prefix));
 };
 
-const buildSectionProps = (landscape, pageStart = null, includePageNumbers = true) => {
+const buildSectionProps = (landscape, pageStart = null, includePageNumbers = true, customMargin = null) => {
     const pageSize = landscape ? A4_L : A4_P;
     return {
         type: SectionType.NEXT_PAGE,
         page: {
             size: pageSize,
-            margin: MARGINS,
+            margin: customMargin || MARGINS,
             ...(includePageNumbers && pageStart !== null
                 ? { pageNumbers: { start: pageStart, formatType: NumberFormat.DECIMAL } }
                 : includePageNumbers
@@ -1364,10 +1388,16 @@ export const generateDocx = async ({
     for (const [idx, chapter] of (chapters || []).entries()) {
         const chapElems = await buildChapter(chapter.title, chapter.sections, idx === 0, coverPageData);
         const landscape = isLandscapeChapter(chapter.title);
+        const isBab4 = chapter.title && chapter.title.toUpperCase().startsWith('BAB IV');
+
+        const { convertInchesToTwip } = await import('docx');
+        const cm = (val) => Math.round(val * 567); // 1cm = 567 twip
+        // BAB IV PENUTUP needs tighter margins to fit exactly on ONE page with the huge signature badge
+        const customMargin = isBab4 ? { top: cm(2), bottom: cm(2), left: cm(2.5), right: cm(2) } : null;
 
         sections.push({
             properties: {
-                ...buildSectionProps(landscape, idx === 0 ? arabicPageStart : null, true),
+                ...buildSectionProps(landscape, idx === 0 ? arabicPageStart : null, true, customMargin),
                 ...(idx === 0 ? {} : {}), // page numbering continues automatically
             },
             footers: {

@@ -1173,8 +1173,8 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         wrapper.appendChild(clone);
         document.body.appendChild(wrapper);
 
-        // Wait a bit more for any async content
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait a bit more for any async content (massive base64 images natively take 1000-1500ms to decode the bitmap block in cloned dom nodes!)
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // PDF options optimized for government report format
         // Margins: 4cm left, 3cm others (converted to mm)
