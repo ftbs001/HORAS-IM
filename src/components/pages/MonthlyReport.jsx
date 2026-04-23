@@ -633,64 +633,6 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         }));
     };
 
-    // Image Upload Handler
-    const imageHandler = () => {
-        const input = document.createElement('input');
-        input.setAttribute('type', 'file');
-        input.setAttribute('accept', 'image/*');
-        input.click();
-
-        input.onchange = async () => {
-            const file = input.files?.[0];
-            if (!file) return;
-
-            const quill = quillRef.current?.getEditor();
-            if (!quill) return;
-
-            // Extract reliable cursor position
-            const range = quill.getSelection(true) || { index: quill.getLength() };
-            // Use global notification instead of polluting editor text blocks which can shift during typing
-            showNotification('⏳ Mengupload gambar ke peladen...', 'info');
-
-            try {
-                // Sanitize file name completely to avoid URL decoding or RLS issues in Supabase
-                const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const fileName = `${Date.now()}_${safeName}`;
-                // Upload strictly to a flat folder to bypass complex dynamic section RLS masks if any
-                const filePath = `rich_text/${fileName}`;
-
-                const { data, error } = await supabase.storage
-                    .from('report-images')
-                    .upload(filePath, file, { cacheControl: '3600', upsert: false });
-
-                if (error) throw error;
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('report-images')
-                    .getPublicUrl(filePath);
-
-                const currentRange = quill.getSelection() || range;
-                quill.insertEmbed(currentRange.index, 'image', publicUrl);
-                quill.setSelection(currentRange.index + 1);
-
-                showNotification('✅ Gambar berhasil ditambahkan!', 'success');
-            } catch (error) {
-                console.error('Error uploading image:', error);
-                
-                // Ultimate Fallback: if server upload completely fails, embed directly as Base64. 
-                // It ensures the user never fails to submit their picture inside the report itself.
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const currentRange = quill.getSelection() || range;
-                    quill.insertEmbed(currentRange.index, 'image', e.target.result);
-                    quill.setSelection(currentRange.index + 1);
-                    showNotification('⚠️ Gambar gagal diupload, beralih ke mode offline (Base64).', 'warning');
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-    };
-
     const handleUndo = () => {
         const sectionStack = history[activeSection] || [];
         if (sectionStack.length <= 1) {
@@ -848,7 +790,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
 
 
-    // Quill Configuration - Enhanced with MS Word-like features
+    // Quill Configuration - Enhanced with MS Word-like features natively using Base64
     const modules = useMemo(() => ({
         toolbar: {
             container: [
@@ -876,14 +818,16 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 ['link', 'image', 'video'],
                 // Row 11: Clear formatting
                 ['clean']
-            ],
-            handlers: {
-                image: imageHandler
-            }
+            ]
         },
         clipboard: {
             matchVisual: false
-        }
+        },
+        imageResize: {
+            parchment: Quill.import('parchment'),
+            modules: ['Resize', 'DisplaySize', 'Toolbar']
+        },
+        imageDrop: true
     }), []);
 
     const formats = [
