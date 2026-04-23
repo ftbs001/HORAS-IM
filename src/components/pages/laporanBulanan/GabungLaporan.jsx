@@ -1856,6 +1856,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
             let bab5DebugInfo = 'Memulai fetch...';
+            let bab5ImgType = 'png'; // Default
+
             try {
                 // Fetch directly from DB to ensure we have the absolute latest URL
                 const { data: b5Data, error: dbErr } = await supabase
@@ -1875,14 +1877,27 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         try {
                             const res = await fetch(bab5Raw);
                             if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            
+                            // Extract type from Content-Type or URL extension
+                            const contentType = res.headers.get('content-type') || '';
+                            if (contentType.includes('jpeg') || contentType.includes('jpg')) bab5ImgType = 'jpeg';
+                            else if (contentType.includes('png')) bab5ImgType = 'png';
+                            else if (bab5Raw.toLowerCase().includes('.jpg') || bab5Raw.toLowerCase().includes('.jpeg')) bab5ImgType = 'jpeg';
+                            
                             const blob = await res.blob();
                             strukturOrgImageBuf = await blob.arrayBuffer();
-                            bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes)`;
+                            bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes, Type: ${bab5ImgType})`;
                         } catch (fetchErr) {
                             bab5DebugInfo = `GAGAL FETCH URL: ${fetchErr.message}. Mungkin masalah CORS atau jaringan.`;
                         }
                     } else if (bab5Raw.startsWith('data:image')) {
                         bab5DebugInfo = 'Base64 ditemukan... decode...';
+                        
+                        // Extract type from base64 header
+                        const m = bab5Raw.match(/^data:image\/([a-zA-Z+]+);base64,/);
+                        if (m && (m[1] === 'jpeg' || m[1] === 'jpg')) bab5ImgType = 'jpeg';
+                        else if (m && m[1] === 'png') bab5ImgType = 'png';
+
                         const b64 = bab5Raw.split(',')[1];
                         const bin = atob(b64);
                         strukturOrgImageBuf = new Uint8Array(bin.length);
@@ -1910,7 +1925,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         children: [
                             new ImageRun({
                                 data: strukturOrgImageBuf,
-                                type: 'png',
+                                type: bab5ImgType,
                                 // A4 Landscape usable w≈25.7cm, h≈18cm at 96dpi
                                 // pxCm: 96/2.54 ≈ 37.8 px/cm → 25.7cm≈970px, 18cm≈680px
                                 // Reduce slightly for margins: 940 x 660
