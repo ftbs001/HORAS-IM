@@ -1851,25 +1851,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 EMPTY(10)
             ];
 
-            // ══════════════════════════════════════════════════════════════════
-            // SECTION 8: BAB V LAMPIRAN — LANDSCAPE (Struktur Organisasi)
-            // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
-            let bab5DebugInfo = 'Memulai fetch...';
-            let bab5ImgType = 'png'; // Default
             let bab5ImgDim = { width: 940, height: 660 }; // Default dimension fallback
-
-            // Helper to get image sizes
-            const getImageDimensions = (blobUrl) => {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        resolve({ w: img.naturalWidth, h: img.naturalHeight });
-                    };
-                    img.onerror = () => resolve({ w: 940, h: 660 });
-                    img.src = blobUrl;
-                });
-            };
 
             try {
                 // Fetch directly from DB to ensure we have the absolute latest URL
@@ -1882,53 +1865,20 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 if (dbErr) throw dbErr;
                 const bab5Raw = b5Data?.content;
                 
-                if (!bab5Raw) {
-                    bab5DebugInfo = 'Data BAB V kosong di database.';
-                } else {
-                    if (bab5Raw.startsWith('http')) {
-                        bab5DebugInfo = `URL ditemukan: ${bab5Raw.substring(0, 40)}... mencoba fetch...`;
-                        try {
-                            // Extract filepath from public URL (everything after /report-images/)
-                            const bucketPrefix = '/report-images/';
-                            const bucketIdx = bab5Raw.indexOf(bucketPrefix);
-                            let blob = null;
-
-                            // Extract type from URL extension
-                            if (bab5Raw.toLowerCase().includes('.jpg') || bab5Raw.toLowerCase().includes('.jpeg')) bab5ImgType = 'jpeg';
-                            else if (bab5Raw.toLowerCase().includes('.png')) bab5ImgType = 'png';
-
-                            if (bucketIdx !== -1) {
-                                const filePath = bab5Raw.substring(bucketIdx + bucketPrefix.length);
-                                // Use Supabase authenticated SDK to download the file directly, bypassing raw CDN CORS limits
-                                const { data: downloadedBlob, error: downloadErr } = await supabase.storage
-                                    .from('report-images')
-                                    .download(filePath);
-                                    
-                                if (downloadErr) throw downloadErr;
-                                blob = downloadedBlob;
-                                
-                                // Re-verify type if needed
-                                if (blob.type.includes('jpeg') || blob.type.includes('jpg')) bab5ImgType = 'jpeg';
-                                else if (blob.type.includes('png')) bab5ImgType = 'png';
-                            } else {
-                                // Fallback for external URLs
-                                const res = await fetch(bab5Raw);
-                                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                                blob = await res.blob();
-                            }
-
-                            strukturOrgImageBuf = await blob.arrayBuffer();
-
-                            // Get image dimensions dynamically
-                            const blobUrl = URL.createObjectURL(blob);
-                            const dim = await getImageDimensions(blobUrl);
-                            URL.revokeObjectURL(blobUrl);
-
-                            // Proportional scaling for A4 landscape (Max W: ~940px, Max H: ~660px)
+                if (bab5Raw) {
+                    // Normalize ANY image utilizing the browser's DOM Canvas.
+                    // This converts unsupported formats (WEBP/HEIC) to pure JPEG buffer
+                    // preventing MS Word from crashing.
+                    const { buffer, width, height } = await new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.crossOrigin = 'Anonymous'; // Crucial for canvas export if fetching from Supabase URLs
+                        
+                        img.onload = () => {
+                            // Max dimensions for A4 Landscape
                             const MAX_W = 940;
                             const MAX_H = 660;
-                            let newW = dim.w;
-                            let newH = dim.h;
+                            let newW = img.naturalWidth;
+                            let newH = img.naturalHeight;
 
                             if (newW > MAX_W) {
                                 newH = Math.round(newH * (MAX_W / newW));
@@ -1938,50 +1888,60 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 newW = Math.round(newW * (MAX_H / newH));
                                 newH = MAX_H;
                             }
-                            bab5ImgDim = { width: newW, height: newH };
 
-                            bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes, Type: ${bab5ImgType}, Dim: ${newW}x${newH})`;
-                        } catch (fetchErr) {
-                            bab5DebugInfo = `GAGAL FETCH URL: ${fetchErr.message}. `;
-                        }
+                            // Draw to canvas for pure JPEG normalization
+                            const canvas = document.createElement('canvas');
+                            canvas.width = newW;
+                            canvas.height = newH;
+                            const ctx = canvas.getContext('2d');
+                            // Fill background white in case of transparent png
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, newW, newH);
+                            ctx.drawImage(img, 0, 0, newW, newH);
 
-                    } else if (bab5Raw.startsWith('data:image')) {
-                        bab5DebugInfo = 'Base64 ditemukan... decode...';
+                            // Extract standard JPEG Base64
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            const b64 = dataUrl.split(',')[1];
+                            const binary = atob(b64);
+                            const bytes = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+                            resolve({ buffer: bytes.buffer, width: newW, height: newH });
+                        };
                         
-                        // Extract type from base64 header
-                        const m = bab5Raw.match(/^data:image\/([a-zA-Z+]+);base64,/);
-                        if (m && (m[1] === 'jpeg' || m[1] === 'jpg')) bab5ImgType = 'jpeg';
-                        else if (m && m[1] === 'png') bab5ImgType = 'png';
-
-                        // Get image dimensions dynamically from base64
-                        const dim = await getImageDimensions(bab5Raw);
-                        const MAX_W = 940;
-                        const MAX_H = 660;
-                        let newW = dim.w;
-                        let newH = dim.h;
+                        img.onerror = () => reject(new Error('Canvas image rendering failed'));
                         
-                        if (newW > MAX_W) {
-                            newH = Math.round(newH * (MAX_W / newW));
-                            newW = MAX_W;
+                        // Feed image source
+                        if (bab5Raw.startsWith('http')) {
+                            // Extract path to bypass CORS via JS-SDK download if necessary
+                            const bucketPrefix = '/report-images/';
+                            const bucketIdx = bab5Raw.indexOf(bucketPrefix);
+                            if (bucketIdx !== -1) {
+                                const filePath = bab5Raw.substring(bucketIdx + bucketPrefix.length);
+                                supabase.storage.from('report-images').download(filePath)
+                                    .then(({ data: blob }) => {
+                                        if (!blob) throw new Error('Blob empty');
+                                        img.src = URL.createObjectURL(blob);
+                                    })
+                                    .catch(() => {
+                                        // Ultimate fallback: direct URL
+                                        img.src = bab5Raw;
+                                    });
+                            } else {
+                                img.src = bab5Raw;
+                            }
+                        } else if (bab5Raw.startsWith('data:image')) {
+                            img.src = bab5Raw;
+                        } else {
+                            reject(new Error('Unknown format'));
                         }
-                        if (newH > MAX_H) {
-                            newW = Math.round(newW * (MAX_H / newH));
-                            newH = MAX_H;
-                        }
-                        bab5ImgDim = { width: newW, height: newH };
+                    });
 
-                        const b64 = bab5Raw.split(',')[1];
-                        const bin = atob(b64);
-                        strukturOrgImageBuf = new Uint8Array(bin.length);
-                        for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
-                        bab5DebugInfo = `Success decode Base64 (Size: ${strukturOrgImageBuf.byteLength} bytes)`;
-                    } else {
-                        bab5DebugInfo = 'Format data BAB V tidak dikenali.';
-                    }
+                    strukturOrgImageBuf = buffer;
+                    bab5ImgDim = { width, height };
                 }
             } catch (err) {
-                console.warn('[GabungLaporan] Gagal memuat image bab5:', err);
-                bab5DebugInfo = `ERROR DB/TRY: ${err.message}`;
+                console.warn('[GabungLaporan] Gagal merender image bab5:', err);
             }
 
             const bab5 = [
@@ -1997,7 +1957,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         children: [
                             new ImageRun({
                                 data: strukturOrgImageBuf,
-                                type: bab5ImgType,
+                                type: 'jpeg', // Guaranteed by Canvas normalization
                                 transformation: {
                                     width: bab5ImgDim.width,
                                     height: bab5ImgDim.height,
