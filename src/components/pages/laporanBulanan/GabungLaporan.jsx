@@ -128,7 +128,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         if (item.section_key === 'cover_letter') setCoverLetterData(parsed || {});
                         if (item.section_key === 'cover_page')   setCoverPageData(parsed || {});
                         if (item.section_key === 'foreword')      setForewordData(parsed || {});
-                        if (item.section_key === 'bab5' && typeof item.content === 'string' && item.content.startsWith('data:image')) {
+                        // bab5: accept both public URL (https) and legacy base64
+                        if (item.section_key === 'bab5' && typeof item.content === 'string' &&
+                            (item.content.startsWith('https') || item.content.startsWith('http') || item.content.startsWith('data:image'))) {
                             setBab5ImageBase64(item.content);
                         }
                     } catch { /* keep defaults */ }
@@ -1971,15 +1973,36 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     // 5. BAB II PELAKSANAAN TUGAS → LANDSCAPE (wajib)
                     ...bab2Sections,
                     // 6. BAB III PERMASALAHAN → PORTRAIT (wajib)
+                    // Explicit A4 portrait dimensions to override landscape inheritance from BAB II
                     {
-                        properties: mkSecProps(false),
+                        properties: {
+                            type: SectionType.NEXT_PAGE,
+                            page: {
+                                margin: MARGIN,
+                                size: {
+                                    width: cm(21),    // A4 portrait: 21cm wide
+                                    height: cm(29.7), // A4 portrait: 29.7cm tall
+                                    orientation: PageOrientation.PORTRAIT,
+                                },
+                            },
+                        },
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab3,
                     },
-                    // 7. BAB IV PENUTUP → PORTRAIT (wajib)
+                    // 7. BAB IV PENUTUP → PORTRAIT, SATU HALAMAN
                     {
-                        properties: mkSecProps(false),
+                        properties: {
+                            type: SectionType.NEXT_PAGE,
+                            page: {
+                                margin: { top: cm(2), bottom: cm(2), left: cm(2.5), right: cm(2) },
+                                size: {
+                                    width: cm(21),
+                                    height: cm(29.7),
+                                    orientation: PageOrientation.PORTRAIT,
+                                },
+                            },
+                        },
                         headers: { default: makeHeader() },
                         footers: { default: makeFooter() },
                         children: bab4,
