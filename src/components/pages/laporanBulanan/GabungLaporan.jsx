@@ -1869,12 +1869,40 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     // Normalize ANY image utilizing the browser's DOM Canvas.
                     // This converts unsupported formats (WEBP/HEIC) to pure JPEG buffer
                     // preventing MS Word from crashing.
+                    // Prevent Canvas CORS issues: ALWAYS fetch image to a local Blob first
+                    let blob = null;
+                    if (bab5Raw.startsWith('http')) {
+                        const bucketPrefix = '/report-images/';
+                        const bucketIdx = bab5Raw.indexOf(bucketPrefix);
+                        if (bucketIdx !== -1) {
+                            const filePath = bab5Raw.substring(bucketIdx + bucketPrefix.length);
+                            const { data: downloadedBlob } = await supabase.storage.from('report-images').download(filePath);
+                            if (downloadedBlob) blob = downloadedBlob;
+                        }
+                        if (!blob) {
+                            // Fallback if SDK fails
+                            const res = await fetch(bab5Raw);
+                            if (res.ok) blob = await res.blob();
+                        }
+                    } else if (bab5Raw.startsWith('data:image')) {
+                        const b64Data = bab5Raw.split(',')[1];
+                        const matchType = bab5Raw.match(/^data:image\/([a-zA-Z+]+);base64,/);
+                        const mime = matchType ? `image/${matchType[1]}` : 'image/png';
+                        const binary = atob(b64Data);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                        blob = new Blob([bytes.buffer], { type: mime });
+                    }
+
+                    if (!blob) throw new Error('Gagal mendapatkan raw Blob data');
+
+                    // Now load the completely local same-origin Blob onto Canvas.
                     const { buffer, width, height } = await new Promise((resolve, reject) => {
                         const img = new Image();
-                        img.crossOrigin = 'Anonymous'; // Crucial for canvas export if fetching from Supabase URLs
+                        // DO NOT USE crossOrigin='Anonymous' FOR BLOB URIs! It causes rendering rejections on WebKit
+                        const blobUrl = URL.createObjectURL(blob);
                         
                         img.onload = () => {
-                            // Max dimensions for A4 Landscape
                             const MAX_W = 940;
                             const MAX_H = 660;
                             let newW = img.naturalWidth;
@@ -1889,52 +1917,30 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 newH = MAX_H;
                             }
 
-                            // Draw to canvas for pure JPEG normalization
                             const canvas = document.createElement('canvas');
                             canvas.width = newW;
                             canvas.height = newH;
                             const ctx = canvas.getContext('2d');
-                            // Fill background white in case of transparent png
                             ctx.fillStyle = '#FFFFFF';
                             ctx.fillRect(0, 0, newW, newH);
                             ctx.drawImage(img, 0, 0, newW, newH);
 
-                            // Extract standard JPEG Base64
                             const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
                             const b64 = dataUrl.split(',')[1];
                             const binary = atob(b64);
                             const bytes = new Uint8Array(binary.length);
                             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
+                            URL.revokeObjectURL(blobUrl);
                             resolve({ buffer: bytes.buffer, width: newW, height: newH });
                         };
                         
-                        img.onerror = () => reject(new Error('Canvas image rendering failed'));
+                        img.onerror = () => {
+                            URL.revokeObjectURL(blobUrl);
+                            reject(new Error('Canvas image rendering failed pada tahap HTMLImageElement load'));
+                        };
                         
-                        // Feed image source
-                        if (bab5Raw.startsWith('http')) {
-                            // Extract path to bypass CORS via JS-SDK download if necessary
-                            const bucketPrefix = '/report-images/';
-                            const bucketIdx = bab5Raw.indexOf(bucketPrefix);
-                            if (bucketIdx !== -1) {
-                                const filePath = bab5Raw.substring(bucketIdx + bucketPrefix.length);
-                                supabase.storage.from('report-images').download(filePath)
-                                    .then(({ data: blob }) => {
-                                        if (!blob) throw new Error('Blob empty');
-                                        img.src = URL.createObjectURL(blob);
-                                    })
-                                    .catch(() => {
-                                        // Ultimate fallback: direct URL
-                                        img.src = bab5Raw;
-                                    });
-                            } else {
-                                img.src = bab5Raw;
-                            }
-                        } else if (bab5Raw.startsWith('data:image')) {
-                            img.src = bab5Raw;
-                        } else {
-                            reject(new Error('Unknown format'));
-                        }
+                        img.src = blobUrl;
                     });
 
                     strukturOrgImageBuf = buffer;
