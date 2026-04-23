@@ -1856,13 +1856,22 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
             try {
-                if (bab5ImageBase64) {
-                    if (bab5ImageBase64.startsWith('http')) {
+                // Fetch directly from DB to ensure we have the absolute latest URL
+                const { data: b5Data } = await supabase
+                    .from('monthly_reports')
+                    .select('content')
+                    .eq('section_key', 'bab5')
+                    .single();
+
+                const bab5Raw = b5Data?.content;
+                
+                if (bab5Raw) {
+                    if (bab5Raw.startsWith('http')) {
                         // New approach: public URL from Supabase Storage
-                        strukturOrgImageBuf = await fetchImageAsArrayBuffer(bab5ImageBase64);
-                    } else if (bab5ImageBase64.startsWith('data:image')) {
+                        strukturOrgImageBuf = await fetchImageAsArrayBuffer(bab5Raw);
+                    } else if (bab5Raw.startsWith('data:image')) {
                         // Legacy approach: base64 data URL
-                        const b64 = bab5ImageBase64.split(',')[1];
+                        const b64 = bab5Raw.split(',')[1];
                         const bin = atob(b64);
                         strukturOrgImageBuf = new Uint8Array(bin.length);
                         for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
