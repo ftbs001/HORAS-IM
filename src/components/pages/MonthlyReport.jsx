@@ -393,10 +393,10 @@ const TableOfContentsPreview = () => {
 };
 
 // Bab 5 Preview Component (for preview and edit modes)
-const Bab5OrgChartView = () => {
+const Bab5OrgChartView = ({ editMode = false }) => {
     return (
-        <div className="w-full flex justify-center bg-white p-4 overflow-x-auto min-h-[900px]">
-            <Bab5OrgChart />
+        <div className="w-full flex justify-center bg-white overflow-x-auto" style={{ minHeight: editMode ? 'auto' : '210mm' }}>
+            <Bab5OrgChart editMode={editMode} />
         </div>
     );
 };
@@ -1843,7 +1843,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                         ) : activeSection === 'bab4_penutup' ? (
                             <TemplatePenutupEmbedded key={activeSection} embedded />
                         ) : activeSection === 'bab5' ? (
-                            <Bab5OrgChartView />
+                            <Bab5OrgChartView editMode={true} />
                         ) : (
                             <SectionEditor />
                         )
@@ -1906,7 +1906,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                             {/* ── BAB V LAMPIRAN — LANDSCAPE with Org Chart Image ── */}
                             {filteredToc && filteredToc.some(c => c.id === 'bab5') && (
                                 <div id="preview-section-bab5" className="w-[297mm] shadow-2xl bg-white min-h-[210mm] font-serif print:p-0 print:shadow-none shrink-0 border border-gray-300">
-                                    <Bab5OrgChartView />
+                                    <Bab5OrgChartView editMode={false} />
                                 </div>
                             )}
                         </div>

@@ -10,7 +10,7 @@ import {
 } from '../../../utils/templateDocxExporter.js';
 import { fetchImageAsArrayBuffer } from '../../../utils/imageHandler';
 import { getDefaultPenutupData } from '../../../utils/penutupSchema.js';
-import Bab5OrgChart from '../Bab5OrgChart';
+// Note: Bab5OrgChart import removed — image now stored as base64 in monthly_reports
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
 // Dynamic import('docx') conflicts with static imports in other files and breaks
@@ -108,6 +108,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     const [coverLetterData, setCoverLetterData] = useState({});
     const [coverPageData, setCoverPageData] = useState({});
     const [forewordData, setForewordData] = useState({});
+    const [bab5ImageBase64, setBab5ImageBase64] = useState(null); // base64 org chart
 
     // Fetch monthly_reports data on mount so Surat Pengantar, Cover, & Kata Pengantar
     // reflect what was saved in menu "Semua Laporan"
@@ -117,7 +118,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 const { data } = await supabase
                     .from('monthly_reports')
                     .select('section_key, content')
-                    .in('section_key', ['cover_letter', 'cover_page', 'foreword']);
+                    .in('section_key', ['cover_letter', 'cover_page', 'foreword', 'bab5']);
                 if (!data) return;
                 data.forEach(item => {
                     try {
@@ -127,6 +128,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         if (item.section_key === 'cover_letter') setCoverLetterData(parsed || {});
                         if (item.section_key === 'cover_page')   setCoverPageData(parsed || {});
                         if (item.section_key === 'foreword')      setForewordData(parsed || {});
+                        if (item.section_key === 'bab5' && typeof item.content === 'string' && item.content.startsWith('data:image')) {
+                            setBab5ImageBase64(item.content);
+                        }
                     } catch { /* keep defaults */ }
                 });
             } catch (e) {
@@ -1850,21 +1854,15 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
             try {
-                // Dynamically capture the coded org chart
-                const [{ default: html2canvas }] = await Promise.all([import('html2canvas')]);
-                const orgEl = document.getElementById('bab5-org-chart-render');
-                if (orgEl) {
-                    const canvas = await html2canvas(orgEl, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-                    const dataUrl = canvas.toDataURL('image/png');
-                    const b64 = dataUrl.split(',')[1];
+                if (bab5ImageBase64 && bab5ImageBase64.startsWith('data:image')) {
+                    // User-uploaded base64 image — convert directly to Uint8Array
+                    const b64 = bab5ImageBase64.split(',')[1];
                     const bin = atob(b64);
                     strukturOrgImageBuf = new Uint8Array(bin.length);
                     for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
-                } else {
-                    strukturOrgImageBuf = await fetchImageAsArrayBuffer('/struktur_organisasi.png');
                 }
             } catch (err) {
-                console.warn('[GabungLaporan] Gagal capture image struktur organisasi', err);
+                console.warn('[GabungLaporan] Gagal mengkonversi image bab5:', err);
             }
 
             const bab5 = [
