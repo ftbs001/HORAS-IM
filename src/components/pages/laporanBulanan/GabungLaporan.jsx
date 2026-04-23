@@ -435,6 +435,76 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 spacing: { after },
             });
 
+            // ── Bounded HTML Canvas Fetcher (Reusable) ────────────────────────
+            const fetchImageToStandardJpegBuffer = async (rawUrl, maxWidth = 600, maxHeight = 400) => {
+                let blob = null;
+                if (rawUrl.startsWith('http')) {
+                    const bucketPrefix = '/report-images/';
+                    const bucketIdx = rawUrl.indexOf(bucketPrefix);
+                    if (bucketIdx !== -1) {
+                        const filePath = rawUrl.substring(bucketIdx + bucketPrefix.length);
+                        // Convert URL encoding gracefully just in case file has spaces
+                        const { data } = await supabase.storage.from('report-images').download(decodeURIComponent(filePath));
+                        if (data) blob = data;
+                    }
+                    if (!blob) {
+                        const res = await fetch(rawUrl);
+                        if (res.ok) blob = await res.blob();
+                    }
+                } else if (rawUrl.startsWith('data:image')) {
+                    const b64Data = rawUrl.split(',')[1];
+                    const binary = atob(b64Data);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                    blob = new Blob([bytes.buffer], { type: 'image/png' });
+                }
+
+                if (!blob) throw new Error('Bad image data');
+
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    img.onload = () => {
+                        let newW = img.naturalWidth;
+                        let newH = img.naturalHeight;
+
+                        if (newW > maxWidth) {
+                            newH = Math.round(newH * (maxWidth / newW));
+                            newW = maxWidth;
+                        }
+                        if (newH > maxHeight) {
+                            newW = Math.round(newW * (maxHeight / newH));
+                            newH = maxHeight;
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = newW;
+                        canvas.height = newH;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, newW, newH);
+                        ctx.drawImage(img, 0, 0, newW, newH);
+
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                        const b64 = dataUrl.split(',')[1];
+                        const binary = atob(b64);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+                        URL.revokeObjectURL(blobUrl);
+                        resolve({ buffer: bytes.buffer, width: newW, height: newH });
+                    };
+                    
+                    img.onerror = () => {
+                        URL.revokeObjectURL(blobUrl);
+                        reject(new Error('Canvas image rendering failed'));
+                    };
+                    
+                    img.src = blobUrl;
+                });
+            };
+
             // ── HELPER: page break ───────────────────────────────────────────
             const PB = () => new Paragraph({ children: [new PageBreak()], spacing: { after: 0 } });
 
@@ -830,53 +900,89 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             // SECTION 4: BAB I PENDAHULUAN
             // ══════════════════════════════════════════════════════════════════
+            
+            // Helper: parse Quill HTML into Docx Paragraphs (supporting inline images)
+            const parseRichTextToParagraphs = async (htmlString) => {
+                if (!htmlString) return [PARA('Kosong (Belum diisi).')];
+                const parser = new DOMParser();
+                const docNode = parser.parseFromString(htmlString, 'text/html');
+                const paragraphs = [];
+
+                for (const node of Array.from(docNode.body.childNodes)) {
+                    if (node.nodeName === 'P' || node.nodeName === 'DIV' || node.nodeName === 'LI' || node.nodeName === 'H1' || node.nodeName === 'H2') {
+                        // Check if block contains an image directly
+                        const img = node.querySelector('img');
+                        if (img) {
+                            const src = img.getAttribute('src');
+                            if (src) {
+                                try {
+                                    // Bounded Canvas Fetcher - Reuses safe pattern from BAB V
+                                    const { buffer, width, height } = await fetchImageToStandardJpegBuffer(src);
+                                    paragraphs.push(new Paragraph({
+                                        children: [
+                                            new ImageRun({
+                                                data: buffer, type: 'jpeg',
+                                                transformation: { width: width, height: height }
+                                            })
+                                        ],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { ...LS_15, before: 120, after: 120 }
+                                    }));
+                                } catch (e) {
+                                    paragraphs.push(PARA('(Gambar gagal dimuat pada ekspor DOCX. Kemungkinan rusak atau diblokir browser)', { noIndent: true }));
+                                }
+                            }
+                            // Also extract text if image was inline with text
+                            const textStr = cleanXml(node.textContent.replace(/&nbsp;/g, ' '));
+                            if (textStr.trim()) paragraphs.push(PARA(textStr));
+                        } else {
+                            // Standard Text Paragraph
+                            const textStr = cleanXml(node.textContent.replace(/&nbsp;/g, ' '));
+                            if (textStr.trim()) paragraphs.push(PARA(textStr));
+                        }
+                    } else if (node.nodeName === 'IMG') {
+                        const src = node.getAttribute('src');
+                        try {
+                            const { buffer, width, height } = await fetchImageToStandardJpegBuffer(src);
+                            paragraphs.push(new Paragraph({
+                                children: [
+                                    new ImageRun({
+                                        data: buffer, type: 'jpeg',
+                                        transformation: { width: width, height: height }
+                                    })
+                                ],
+                                alignment: AlignmentType.CENTER,
+                                spacing: { ...LS_15, before: 120, after: 120 }
+                            }));
+                        } catch (e) {
+                            paragraphs.push(PARA('(Gambar gagal dimuat pada ekspor DOCX)', { noIndent: true }));
+                        }
+                    } else if (node.nodeType === Node.TEXT_NODE) {
+                        const textStr = cleanXml(node.textContent.replace(/&nbsp;/g, ' '));
+                        if (textStr.trim()) paragraphs.push(PARA(textStr));
+                    }
+                }
+                return paragraphs.length > 0 ? paragraphs : [PARA('Kosong (Belum diisi).')];
+            };
+
+            // Fetch BAB I dynamically
+            let bab1Raw = '';
+            try {
+                const { data } = await supabase.from('monthly_reports').select('content').eq('section_key', 'bab1').single();
+                if (data) bab1Raw = data.content;
+            } catch (e) { console.warn('Gagal load BAB I', e); }
+
+            const bab1Dyn = await parseRichTextToParagraphs(bab1Raw);
             const bab1 = [
                 ...babTitleNoPB('I', 'PENDAHULUAN'),
-
-                ...subBab('A.  PENGANTAR', ''),
-                ...subSubBab('1.  Gambaran Umum Kantor Imigrasi Kelas II TPI Pematang Siantar',
-                    `Kantor Imigrasi Kelas II TPI Pematang Siantar merupakan Unit Pelaksana Teknis (UPT) Direktorat Jenderal Imigrasi di bawah Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia yang berkedudukan di Kota Pematang Siantar, Sumatera Utara. Kantor ini menyelenggarakan fungsi keimigrasian di wilayah kerjanya sesuai ketentuan peraturan perundang-undangan yang berlaku.`),
-                ...subSubBab('2.  Wilayah Kerja',
-                    `Wilayah kerja Kantor Imigrasi Kelas II TPI Pematang Siantar meliputi: Kota Pematang Siantar, Kabupaten Simalungun, Kabupaten Dairi, Kabupaten Pakpak Bharat, Kabupaten Karo, Kabupaten Samosir, dan Kabupaten Toba. Dalam pelaksanaan tugasnya, Kantor Imigrasi dibantu oleh Unit Kerja Kantor (UKK) dan Pos Lintas Batas (PLB) di beberapa daerah.`),
-                ...subSubBab('3.  Pelaksanaan Tugas',
-                    `Pelaksanaan tugas pada Kantor Imigrasi Kelas II TPI Pematang Siantar berpedoman pada prinsip PASTI (Profesional, Akuntabel, Sinergi, Transparan, dan Inovatif) sebagaimana ditetapkan dalam visi dan misi Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia. Seluruh kegiatan operasional dilaksanakan oleh unit-unit kerja yang terstruktur sesuai tugas pokok dan fungsi masing-masing seksi.`),
-
-                ...subBab('B.  DASAR HUKUM', ''),
-                PARA([
-                    TR('Pelaksanaan kegiatan Kantor Imigrasi Kelas II TPI Pematang Siantar didasarkan pada ketentuan peraturan perundang-undangan sebagai berikut:'),
-                ]),
-                ...([
-                    '1.  Undang-Undang Nomor 6 Tahun 2011 tentang Keimigrasian;',
-                    '2.  Peraturan Pemerintah Nomor 31 Tahun 2013 tentang Peraturan Pelaksanaan UU Keimigrasian;',
-                    '3.  Peraturan Presiden Nomor 125 Tahun 2016 tentang Penanganan Pengungsi dari Luar Negeri;',
-                    '4.  Peraturan Menteri terkait pengelolaan keimigrasian yang berlaku;',
-                    '5.  Surat Edaran Direktur Jenderal Imigrasi yang relevan.',
-                ].map(t => new Paragraph({
-                    children: [TR(t)],
-                    alignment: AlignmentType.JUSTIFIED,
-                    spacing: { ...LS_15, after: 60 },
-                    indent: { left: cm(1.25) },
-                }))),
-
-                ...subBab('C.  RUANG LINGKUP', ''),
-                PARA('Laporan Bulanan ini mencakup kegiatan pada:'),
-                ...([
-                    '1.  Bidang Substantif: Penerbitan Dokumen Perjalanan, Izin Tinggal, Perlintasan, Intelijen dan Penindakan, serta Informasi dan Komunikasi Keimigrasian;',
-                    '2.  Bidang Fasilitatif: Urusan Keuangan, Kepegawaian, dan Umum.',
-                ].map(t => new Paragraph({
-                    children: [TR(t)],
-                    alignment: AlignmentType.JUSTIFIED,
-                    spacing: { ...LS_15, after: 80 },
-                    indent: { left: cm(1.25) },
-                }))),
+                ...bab1Dyn
             ];
-
 
             // ══════════════════════════════════════════════════════════════
             // SECTION 5: BAB II PELAKSANAAN TUGAS
             // ══════════════════════════════════════════════════════════════
 
-            // Helper: strip HTML tags to plain text
+            // Helper: strip HTML tags to plain text for unsupported sections
             const stripHtml = (html) => {
                 if (!html) return '';
                 return html
@@ -1852,10 +1958,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             ];
 
             let strukturOrgImageBuf = null;
-            let bab5ImgDim = { width: 940, height: 660 }; // Default dimension fallback
+            let bab5ImgDim = { width: 940, height: 660 };
 
             try {
-                // Fetch directly from DB to ensure we have the absolute latest URL
                 const { data: b5Data, error: dbErr } = await supabase
                     .from('monthly_reports')
                     .select('content')
@@ -1866,83 +1971,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 const bab5Raw = b5Data?.content;
                 
                 if (bab5Raw) {
-                    // Normalize ANY image utilizing the browser's DOM Canvas.
-                    // This converts unsupported formats (WEBP/HEIC) to pure JPEG buffer
-                    // preventing MS Word from crashing.
-                    // Prevent Canvas CORS issues: ALWAYS fetch image to a local Blob first
-                    let blob = null;
-                    if (bab5Raw.startsWith('http')) {
-                        const bucketPrefix = '/report-images/';
-                        const bucketIdx = bab5Raw.indexOf(bucketPrefix);
-                        if (bucketIdx !== -1) {
-                            const filePath = bab5Raw.substring(bucketIdx + bucketPrefix.length);
-                            const { data: downloadedBlob } = await supabase.storage.from('report-images').download(filePath);
-                            if (downloadedBlob) blob = downloadedBlob;
-                        }
-                        if (!blob) {
-                            // Fallback if SDK fails
-                            const res = await fetch(bab5Raw);
-                            if (res.ok) blob = await res.blob();
-                        }
-                    } else if (bab5Raw.startsWith('data:image')) {
-                        const b64Data = bab5Raw.split(',')[1];
-                        const matchType = bab5Raw.match(/^data:image\/([a-zA-Z+]+);base64,/);
-                        const mime = matchType ? `image/${matchType[1]}` : 'image/png';
-                        const binary = atob(b64Data);
-                        const bytes = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                        blob = new Blob([bytes.buffer], { type: mime });
-                    }
-
-                    if (!blob) throw new Error('Gagal mendapatkan raw Blob data');
-
-                    // Now load the completely local same-origin Blob onto Canvas.
-                    const { buffer, width, height } = await new Promise((resolve, reject) => {
-                        const img = new Image();
-                        // DO NOT USE crossOrigin='Anonymous' FOR BLOB URIs! It causes rendering rejections on WebKit
-                        const blobUrl = URL.createObjectURL(blob);
-                        
-                        img.onload = () => {
-                            const MAX_W = 940;
-                            const MAX_H = 660;
-                            let newW = img.naturalWidth;
-                            let newH = img.naturalHeight;
-
-                            if (newW > MAX_W) {
-                                newH = Math.round(newH * (MAX_W / newW));
-                                newW = MAX_W;
-                            }
-                            if (newH > MAX_H) {
-                                newW = Math.round(newW * (MAX_H / newH));
-                                newH = MAX_H;
-                            }
-
-                            const canvas = document.createElement('canvas');
-                            canvas.width = newW;
-                            canvas.height = newH;
-                            const ctx = canvas.getContext('2d');
-                            ctx.fillStyle = '#FFFFFF';
-                            ctx.fillRect(0, 0, newW, newH);
-                            ctx.drawImage(img, 0, 0, newW, newH);
-
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                            const b64 = dataUrl.split(',')[1];
-                            const binary = atob(b64);
-                            const bytes = new Uint8Array(binary.length);
-                            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-                            URL.revokeObjectURL(blobUrl);
-                            resolve({ buffer: bytes.buffer, width: newW, height: newH });
-                        };
-                        
-                        img.onerror = () => {
-                            URL.revokeObjectURL(blobUrl);
-                            reject(new Error('Canvas image rendering failed pada tahap HTMLImageElement load'));
-                        };
-                        
-                        img.src = blobUrl;
-                    });
-
+                    const { buffer, width, height } = await fetchImageToStandardJpegBuffer(bab5Raw, 940, 660);
                     strukturOrgImageBuf = buffer;
                     bab5ImgDim = { width, height };
                 }

@@ -644,48 +644,49 @@ const MonthlyReport = ({ sectionFilter = null }) => {
             const file = input.files?.[0];
             if (!file) return;
 
-            // Show loading state
             const quill = quillRef.current?.getEditor();
             if (!quill) return;
 
-            const range = quill.getSelection(true);
-            quill.insertText(range.index, 'Mengupload gambar...');
-            quill.setSelection(range.index + 'Mengupload gambar...'.length);
+            // Extract reliable cursor position
+            const range = quill.getSelection(true) || { index: quill.getLength() };
+            // Use global notification instead of polluting editor text blocks which can shift during typing
+            showNotification('⏳ Mengupload gambar ke peladen...', 'info');
 
             try {
-                // Upload to Supabase Storage
-                const fileName = `${Date.now()}_${file.name}`;
-                const filePath = `reports/${activeSection}/${fileName}`;
+                // Sanitize file name completely to avoid URL decoding or RLS issues in Supabase
+                const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const fileName = `${Date.now()}_${safeName}`;
+                // Upload strictly to a flat folder to bypass complex dynamic section RLS masks if any
+                const filePath = `rich_text/${fileName}`;
 
                 const { data, error } = await supabase.storage
                     .from('report-images')
-                    .upload(filePath, file, {
-                        cacheControl: '3600',
-                        upsert: false
-                    });
+                    .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
 
-                // Get public URL
                 const { data: { publicUrl } } = supabase.storage
                     .from('report-images')
                     .getPublicUrl(filePath);
 
-                // Remove loading text and insert image
-                quill.deleteText(range.index, 'Mengupload gambar...'.length);
-                quill.insertEmbed(range.index, 'image', publicUrl);
-                quill.setSelection(range.index + 1);
+                const currentRange = quill.getSelection() || range;
+                quill.insertEmbed(currentRange.index, 'image', publicUrl);
+                quill.setSelection(currentRange.index + 1);
 
-                showNotification('Gambar berhasil diupload', 'success');
+                showNotification('✅ Gambar berhasil ditambahkan!', 'success');
             } catch (error) {
                 console.error('Error uploading image:', error);
-
-                // Remove loading text
-                quill.deleteText(range.index, 'Mengupload gambar...'.length);
-
-                showNotification('Gagal upload gambar: ' + error.message, 'error');
+                
+                // Ultimate Fallback: if server upload completely fails, embed directly as Base64. 
+                // It ensures the user never fails to submit their picture inside the report itself.
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const currentRange = quill.getSelection() || range;
+                    quill.insertEmbed(currentRange.index, 'image', e.target.result);
+                    quill.setSelection(currentRange.index + 1);
+                    showNotification('⚠️ Gambar gagal diupload, beralih ke mode offline (Base64).', 'warning');
+                };
+                reader.readAsDataURL(file);
             }
         };
     };
