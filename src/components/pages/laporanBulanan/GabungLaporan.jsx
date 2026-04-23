@@ -1854,15 +1854,20 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
             try {
-                if (bab5ImageBase64 && bab5ImageBase64.startsWith('data:image')) {
-                    // User-uploaded base64 image — convert directly to Uint8Array
-                    const b64 = bab5ImageBase64.split(',')[1];
-                    const bin = atob(b64);
-                    strukturOrgImageBuf = new Uint8Array(bin.length);
-                    for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
+                if (bab5ImageBase64) {
+                    if (bab5ImageBase64.startsWith('http')) {
+                        // New approach: public URL from Supabase Storage
+                        strukturOrgImageBuf = await fetchImageAsArrayBuffer(bab5ImageBase64);
+                    } else if (bab5ImageBase64.startsWith('data:image')) {
+                        // Legacy approach: base64 data URL
+                        const b64 = bab5ImageBase64.split(',')[1];
+                        const bin = atob(b64);
+                        strukturOrgImageBuf = new Uint8Array(bin.length);
+                        for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
+                    }
                 }
             } catch (err) {
-                console.warn('[GabungLaporan] Gagal mengkonversi image bab5:', err);
+                console.warn('[GabungLaporan] Gagal memuat image bab5:', err);
             }
 
             const bab5 = [
