@@ -36,6 +36,8 @@ import TemplateUmumEmbedded from '../pages/laporanBulanan/TemplateUmum';
 // Template BAB IV Penutup
 import TemplatePenutupEmbedded from '../pages/laporanBulanan/TemplatePenutup';
 
+// Coded Org Chart
+import Bab5OrgChart from './Bab5OrgChart';
 
 // Register custom fonts
 const Font = Quill.import('formats/font');
@@ -393,12 +395,8 @@ const TableOfContentsPreview = () => {
 // Bab 5 Preview Component (for preview and edit modes)
 const Bab5OrgChartView = () => {
     return (
-        <div className="w-full flex flex-col items-center justify-center bg-white p-4 h-full">
-            <img 
-                src="/struktur_organisasi.png" 
-                alt="Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar"
-                style={{ width: '100%', maxHeight: '180mm', objectFit: 'contain' }}
-            />
+        <div className="w-full flex justify-center bg-white p-4 overflow-x-auto min-h-[900px]">
+            <Bab5OrgChart />
         </div>
     );
 };

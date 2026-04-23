@@ -10,6 +10,7 @@ import {
 } from '../../../utils/templateDocxExporter.js';
 import { fetchImageAsArrayBuffer } from '../../../utils/imageHandler';
 import { getDefaultPenutupData } from '../../../utils/penutupSchema.js';
+import Bab5OrgChart from '../Bab5OrgChart';
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
 // Dynamic import('docx') conflicts with static imports in other files and breaks
@@ -1849,47 +1850,53 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // ══════════════════════════════════════════════════════════════════
             let strukturOrgImageBuf = null;
             try {
-                strukturOrgImageBuf = await fetchImageAsArrayBuffer('/struktur_organisasi.png');
+                // Dynamically capture the coded org chart
+                const [{ default: html2canvas }] = await Promise.all([import('html2canvas')]);
+                const orgEl = document.getElementById('bab5-org-chart-render');
+                if (orgEl) {
+                    const canvas = await html2canvas(orgEl, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const b64 = dataUrl.split(',')[1];
+                    const bin = atob(b64);
+                    strukturOrgImageBuf = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) strukturOrgImageBuf[i] = bin.charCodeAt(i);
+                } else {
+                    strukturOrgImageBuf = await fetchImageAsArrayBuffer('/struktur_organisasi.png');
+                }
             } catch (err) {
-                console.warn('[GabungLaporan] Gagal memuat image struktur organisasi', err);
+                console.warn('[GabungLaporan] Gagal capture image struktur organisasi', err);
             }
 
             const bab5 = [
                 ...babTitleNoPB('V', 'LAMPIRAN'),
-                PARA(`Lampiran Laporan Bulanan Kantor Imigrasi Kelas II TPI Pematang Siantar bulan ${bNama} ${tahun}, terdiri dari:`),
-                
+                new Paragraph({
+                    children: [TR('Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar', { bold: true, size: F_SUBBAB })],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 120, after: 200 },
+                }),
+
                 ...(strukturOrgImageBuf ? [
                     new Paragraph({
                         children: [
                             new ImageRun({
                                 data: strukturOrgImageBuf,
                                 type: 'png',
-                                transformation: { 
-                                    width: 900, 
-                                    height: 600 // Aspect ratio ~1.5 (A4 Landscape usable area)
+                                // A4 Landscape usable w≈25.7cm, h≈18cm at 96dpi
+                                // pxCm: 96/2.54 ≈ 37.8 px/cm → 25.7cm≈970px, 18cm≈680px
+                                // Reduce slightly for margins: 940 x 660
+                                transformation: {
+                                    width: 940,
+                                    height: 660,
                                 }
                             })
                         ],
                         alignment: AlignmentType.CENTER,
-                        spacing: { before: 240, after: 360 }
-                    })
-                ] : []),
-
-                ...([
-                    '1.  Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar;',
-                    '2.  Grafik Rekapitulasi Data Perlintasan;',
-                    '3.  Grafik Realisasi Anggaran dan PNBP;',
-                    '4.  Data Bezetting Pegawai;',
-                    '5.  Dokumentasi Kegiatan Operasional;',
-                    '6.  Data Pendukung lainnya.',
-                ].map(t => new Paragraph({
-                    children: [TR(t)],
-                    alignment: AlignmentType.JUSTIFIED,
-                    spacing: { ...LS_15, after: 80 },
-                    indent: { left: cm(1.25) },
-                }))),
-                EMPTY(200),
-                PARA('(Lampiran terlampir pada dokumen terpisah atau disertakan bersama laporan ini.)', { noIndent: true }),
+                        spacing: { before: 0, after: 0 }
+                    }),
+                ] : [
+                    PARA('(Gambar Struktur Organisasi tidak dapat dimuat. Pastikan halaman preview sudah dibuka terlebih dahulu sebelum export.)', { noIndent: true })
+                ]),
+                EMPTY(10),
             ];
 
 
@@ -2300,7 +2307,13 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         : '📑 Export PDF'}
                 </button>
             </div>
+            
+            {/* Hidden Org Chart Render Engine */}
+            <div style={{ position: 'fixed', bottom: 0, right: 0, opacity: 0.01, pointerEvents: 'none', zIndex: -9999 }}>
+                <Bab5OrgChart />
+            </div>
         </div>
         </div>
     );
 }
+
