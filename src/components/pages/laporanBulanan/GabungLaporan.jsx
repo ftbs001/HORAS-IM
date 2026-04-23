@@ -1888,16 +1888,35 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     if (bab5Raw.startsWith('http')) {
                         bab5DebugInfo = `URL ditemukan: ${bab5Raw.substring(0, 40)}... mencoba fetch...`;
                         try {
-                            const res = await fetch(bab5Raw);
-                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                            
-                            // Extract type from Content-Type or URL extension
-                            const contentType = res.headers.get('content-type') || '';
-                            if (contentType.includes('jpeg') || contentType.includes('jpg')) bab5ImgType = 'jpeg';
-                            else if (contentType.includes('png')) bab5ImgType = 'png';
-                            else if (bab5Raw.toLowerCase().includes('.jpg') || bab5Raw.toLowerCase().includes('.jpeg')) bab5ImgType = 'jpeg';
-                            
-                            const blob = await res.blob();
+                            // Extract filepath from public URL (everything after /report-images/)
+                            const bucketPrefix = '/report-images/';
+                            const bucketIdx = bab5Raw.indexOf(bucketPrefix);
+                            let blob = null;
+
+                            // Extract type from URL extension
+                            if (bab5Raw.toLowerCase().includes('.jpg') || bab5Raw.toLowerCase().includes('.jpeg')) bab5ImgType = 'jpeg';
+                            else if (bab5Raw.toLowerCase().includes('.png')) bab5ImgType = 'png';
+
+                            if (bucketIdx !== -1) {
+                                const filePath = bab5Raw.substring(bucketIdx + bucketPrefix.length);
+                                // Use Supabase authenticated SDK to download the file directly, bypassing raw CDN CORS limits
+                                const { data: downloadedBlob, error: downloadErr } = await supabase.storage
+                                    .from('report-images')
+                                    .download(filePath);
+                                    
+                                if (downloadErr) throw downloadErr;
+                                blob = downloadedBlob;
+                                
+                                // Re-verify type if needed
+                                if (blob.type.includes('jpeg') || blob.type.includes('jpg')) bab5ImgType = 'jpeg';
+                                else if (blob.type.includes('png')) bab5ImgType = 'png';
+                            } else {
+                                // Fallback for external URLs
+                                const res = await fetch(bab5Raw);
+                                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                blob = await res.blob();
+                            }
+
                             strukturOrgImageBuf = await blob.arrayBuffer();
 
                             // Get image dimensions dynamically
@@ -1923,8 +1942,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
                             bab5DebugInfo = `Success fetch URL (Size: ${strukturOrgImageBuf.byteLength} bytes, Type: ${bab5ImgType}, Dim: ${newW}x${newH})`;
                         } catch (fetchErr) {
-                            bab5DebugInfo = `GAGAL FETCH URL: ${fetchErr.message}. Mungkin masalah CORS atau jaringan.`;
+                            bab5DebugInfo = `GAGAL FETCH URL: ${fetchErr.message}. `;
                         }
+
                     } else if (bab5Raw.startsWith('data:image')) {
                         bab5DebugInfo = 'Base64 ditemukan... decode...';
                         
@@ -1988,8 +2008,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         spacing: { before: 0, after: 0 }
                     }),
                 ] : [
-                    PARA('(Gambar Struktur Organisasi tidak dapat dimuat.)', { noIndent: true }),
-                    PARA(`[DEBUG INFO]: ${bab5DebugInfo}`, { noIndent: true })
+                    // Remove all debug info completely, keeping standard error fallback 
+                    // without leaking messy string variables into the final clean document.
+                    PARA('(Gambar Struktur Organisasi tidak dapat dimuat. Pastikan koneksi internet stabil dan ukuran gambar tidak melebihi batas yang diizinkan.)', { noIndent: true })
                 ]),
                 EMPTY(10),
             ];
