@@ -1358,48 +1358,110 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         return null;
     };
 
-    // Recursive Render for Preview
+    // Map template node IDs to their component family key.
+    // Sibling nodes with the same family key share one component instance — only the first is rendered.
+    const TEMPLATE_FAMILY = {
+        // Lalintalkim — paspor group
+        bab2_substantif_dokumen_paspor:   'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_b: 'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_c: 'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_d: 'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_e: 'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_f: 'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_g: 'lalintalkim_paspor',
+        bab2_substantif_dokumen_paspor_h: 'lalintalkim_paspor',
+        // Lalintalkim — izin tinggal group
+        bab2_substantif_dokumen_izintinggal_itk:  'lalintalkim_izintinggal',
+        bab2_substantif_dokumen_izintinggal_itas: 'lalintalkim_izintinggal',
+        bab2_substantif_dokumen_izintinggal_itap: 'lalintalkim_izintinggal',
+        bab2_substantif_dokumen_izintinggal_lain: 'lalintalkim_izintinggal',
+        // Lalintalkim — rekapitulasi (solo)
+        bab2_substantif_rekapitulasi: 'lalintalkim_rekap',
+        // Inteldalim
+        bab2_substantif_intel_yustisia: 'inteldakim',
+        bab2_substantif_intel_admin:    'inteldakim',
+        bab2_substantif_intel_timpora:  'inteldakim',
+        // Infokim / Pengaduan
+        bab2_substantif_infokim:    'infokim',
+        bab2_substantif_pengaduan:  'pengaduan',
+        // Keuangan
+        bab2_fasilitatif_keuangan_rm:       'keuangan_realisasi',
+        bab2_fasilitatif_keuangan_pnp:      'keuangan_realisasi',
+        bab2_fasilitatif_keuangan_gabungan: 'keuangan_realisasi',
+        bab2_fasilitatif_keuangan_pnbp:     'keuangan_pnbp',
+        // Kepegawaian
+        bab2_fasilitatif_kepegawaian_bezetting:  'kepegawaian_bezetting',
+        bab2_fasilitatif_kepegawaian_rekap:      'kepegawaian_rekap',
+        bab2_fasilitatif_kepegawaian_cuti:       'kepegawaian_lainnya',
+        bab2_fasilitatif_kepegawaian_pembinaan:  'kepegawaian_lainnya',
+        bab2_fasilitatif_kepegawaian_persuratan: 'kepegawaian_lainnya',
+        // Umum
+        bab2_fasilitatif_umum_kendaraan: 'umum_kendaraan',
+        bab2_fasilitatif_umum_sarana:    'umum_sarana',
+        bab2_fasilitatif_umum_gedung:    'umum_gedung',
+    };
+
+    // Recursive Render for Preview — deduplicates grouped template nodes
     const renderPreviewNodes = (nodes) => {
-        // Safety check: return empty array if nodes is undefined or not an array
-        if (!nodes || !Array.isArray(nodes)) {
-            return [];
-        }
+        if (!nodes || !Array.isArray(nodes)) return [];
+
+        const rendered = new Set(); // Track already-rendered template families in this sibling group
 
         return nodes.map(node => {
-            const templateView = node.type === 'file' ? renderTemplateForPreview(node.id) : null;
-            
-            return (
-                <div key={node.id} id={`preview-section-${node.id}`} className={node.type === 'folder' ? 'mt-4' : 'mb-4'}>
-                    <h4 className={`font-bold ${node.type === 'folder' ? 'text-lg text-imigrasi-navy underline' : 'text-md text-gray-800'}`}>
-                        {node.label}
-                    </h4>
-                    {node.type === 'file' ? (
-                        templateView ? (
+            const family = TEMPLATE_FAMILY[node.id];
+
+            if (node.type === 'file' && family) {
+                // Template file node — only render the component for the FIRST node in this family
+                if (rendered.has(family)) {
+                    // Subsequent sibling with the same template — skip silently
+                    return null;
+                }
+                rendered.add(family);
+                const templateView = renderTemplateForPreview(node.id);
+                return templateView ? (
+                    <div key={node.id} id={`preview-section-${node.id}`} className="mb-4">
+                        <div className="mt-2 preview-template-container border border-gray-200 rounded-md overflow-hidden bg-white">
+                            {templateView}
+                        </div>
+                    </div>
+                ) : null;
+            }
+
+            // Non-template file node (rich-text content)
+            if (node.type === 'file') {
+                const templateView = renderTemplateForPreview(node.id);
+                return (
+                    <div key={node.id} id={`preview-section-${node.id}`} className="mb-4">
+                        <h4 className="font-bold text-md text-gray-800">{node.label}</h4>
+                        {templateView ? (
                             <div className="mt-2 preview-template-container border border-gray-200 rounded-md overflow-hidden bg-white">
                                 {templateView}
                             </div>
                         ) : (
                             <div
                                 className="preview-content text-justify leading-relaxed mt-2 text-gray-700 break-words overflow-wrap-anywhere"
-                                style={{
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word',
-                                    maxWidth: '100%'
-                                }}
+                                style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%' }}
                                 dangerouslySetInnerHTML={{
                                     __html: reportData[node.id] || '<span class="text-gray-300 italic">[Belum ada konten]</span>'
                                 }}
                             />
-                        )
-                    ) : (
-                        <div className="pl-4 border-l border-gray-100 mt-2 space-y-4">
-                            {node.children && renderPreviewNodes(node.children)}
-                        </div>
-                    )}
+                        )}
+                    </div>
+                );
+            }
+
+            // Folder node — show heading + recurse into children
+            return (
+                <div key={node.id} id={`preview-section-${node.id}`} className="mt-4">
+                    <h4 className="font-bold text-lg text-imigrasi-navy underline">{node.label}</h4>
+                    <div className="pl-4 border-l border-gray-100 mt-2 space-y-4">
+                        {node.children && renderPreviewNodes(node.children)}
+                    </div>
                 </div>
             );
-        });
+        }).filter(Boolean);
     };
+
 
     // Components
     const DashboardView = () => (
