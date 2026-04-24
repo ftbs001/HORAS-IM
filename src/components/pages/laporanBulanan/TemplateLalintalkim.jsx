@@ -950,23 +950,8 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
                     </div>
                 )}
 
-                {activeTab === 'perlintasan' && (
-                    <div>
-                        <Section title="3. REKAPITULASI DATA PERLINTASAN" isPreview={isPreview}>
-                            <div style={{ marginBottom: '40px' }}>
-                                <TabelPerlintasan data={tabelUdara} onChange={w(setTabelUdara)} isPreview={isPreview} loading={loading} tableName="udara" schemaRows={TABEL_PERLINTASAN_ROWS} customHeader="A. BANDARA SILANGIT (UDARA)" />
-                            </div>
-                            <div style={{ marginBottom: '40px' }}>
-                                <TabelPerlintasan data={tabelLaut} onChange={w(setTabelLaut)} isPreview={isPreview} loading={loading} tableName="laut" schemaRows={TABEL_PERLINTASAN_ROWS} customHeader="B. PELABUHAN TANJUNG BALAI ASAHAN (LAUT)" />
-                            </div>
-                            <div style={{ marginBottom: '20px' }}>
-                                <TabelPerlintasan data={tabelDarat} onChange={w(setTabelDarat)} isPreview={isPreview} loading={loading} tableName="darat" schemaRows={TABEL_PERLINTASAN_ROWS} customHeader="C. POS LINTAS BATAS NEGARA (DARAT)" />
-                            </div>
-                        </Section>
-                    </div>
-                )}
-
             </div>
         </div>
     );
 }
+
