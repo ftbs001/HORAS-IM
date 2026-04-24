@@ -1099,6 +1099,47 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 }
             }
 
+            // ── DIRECT INJECT: BAB V from Supabase (bypass filteredToc entirely) ──────
+            // bab5 image URL is stored in monthly_reports.content where section_key='bab5'
+            // This ensures it's ALWAYS included regardless of filteredToc role filters.
+            try {
+                const { data: bab5Row } = await supabase
+                    .from('monthly_reports')
+                    .select('content')
+                    .eq('section_key', 'bab5')
+                    .maybeSingle();
+
+                const bab5Url = bab5Row?.content || reportData?.['bab5'] || null;
+                const existingBab5ChapterIdx = chapters.findIndex(c => c.title && c.title.toUpperCase().startsWith('BAB V'));
+                
+                const bab5Chapter = {
+                    title: 'BAB V LAMPIRAN STRUKTUR ORGANISASI',
+                    sections: [{
+                        title: '',
+                        level: 2,
+                        isBab5Template: true,
+                        bab5ImageUrl: bab5Url,
+                    }],
+                };
+
+                if (existingBab5ChapterIdx >= 0) {
+                    // Replace existing BAB V sections with the direct injection
+                    chapters[existingBab5ChapterIdx].sections = [{
+                        title: '',
+                        level: 2,
+                        isBab5Template: true,
+                        bab5ImageUrl: bab5Url,
+                    }];
+                } else {
+                    // Insert BAB V at end
+                    chapters.push(bab5Chapter);
+                }
+            } catch (e) {
+                console.warn('[handleExportWord] Failed to inject BAB V from Supabase:', e);
+            }
+
+            showNotification(`⚙️ Membuat dokumen DOCX (${chapters.length} BAB)... Mohon tunggu.`, 'info');
+
             // Generate DOCX with hierarchical structure and logos
             await generateDocx({
                 coverLetterData: coverLetterData,
@@ -1115,10 +1156,10 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 tahun: tahunInt,
             });
 
-            showNotification('Ekspor Word berhasil! File DOCX telah diunduh.', 'success');
+            showNotification('✅ Ekspor Word berhasil! File DOCX telah diunduh.', 'success');
         } catch (error) {
             console.error('Word export error:', error);
-            showNotification('Gagal ekspor Word: ' + error.message, 'error');
+            showNotification('❌ Gagal ekspor Word: ' + error.message, 'error');
         }
     };
 

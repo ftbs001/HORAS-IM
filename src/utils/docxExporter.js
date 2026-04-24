@@ -397,6 +397,20 @@ export const htmlToDocxElements = async (htmlStr) => {
 
         // ── Paragraphs ────────────────────────────────────────────
         if (tag === 'p') {
+            // CRITICAL: Quill wraps images in <p> tags.
+            // Check if ANY direct child is an <img> and process them as images
+            const imgChildren = Array.from(node.querySelectorAll('img'));
+            if (imgChildren.length > 0) {
+                for (const imgNode of imgChildren) {
+                    await processNode(imgNode);
+                }
+                // Also capture any text siblings (text beside an image)
+                const textContent = node.textContent?.trim();
+                if (textContent) {
+                    elements.push(para(textContent, { indent: true }));
+                }
+                return;
+            }
             const runs = [];
             node.childNodes.forEach(child => runs.push(...inlineNodeToRuns(child, {})));
             if (runs.length > 0 && runs.some(r => r.root?.children?.[0]?.options?.text?.trim())) {
