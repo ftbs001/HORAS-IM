@@ -1028,6 +1028,61 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
             continue;
         }
 
+        // ── BAB V Lampiran: Org Chart Image ─────────────────────────────────────
+        if (section.isBab5Template) {
+            const { ImageRun: IR } = await import('docx');
+            // Sub-heading for structure org
+            elems.push(new Paragraph({
+                children: [new TextRun({
+                    text: 'Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar',
+                    font: FONT.NAME, size: FONT.SIZE.SUB_BAB, bold: true, color: '000000',
+                })],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 120, after: 200 },
+            }));
+
+            const imageUrl = section.bab5ImageUrl;
+            if (imageUrl) {
+                try {
+                    const imgBuf = await fetchImageAsArrayBuffer(imageUrl);
+                    if (imgBuf) {
+                        // Landscape page: usable width ≈ 25cm (29.7cm – 2×2cm margins)
+                        // Scale to fill the page width, height proportional (~660/940 ratio = 0.7)
+                        const W = 900, H = Math.round(900 * 0.7); // px
+                        // Detect MIME: base64 data URL or Supabase HTTPS URL (check file extension)
+                        let imgType = 'jpeg';
+                        if (imageUrl.startsWith('data:')) {
+                            imgType = getMimeFromBase64(imageUrl) || 'jpeg';
+                        } else {
+                            const ext = imageUrl.split('?')[0].split('.').pop().toLowerCase();
+                            if (ext === 'png') imgType = 'png';
+                            else if (ext === 'gif') imgType = 'gif';
+                            else if (ext === 'webp') imgType = 'webp';
+                            else imgType = 'jpeg';
+                        }
+                        elems.push(new Paragraph({
+                            children: [new IR({
+                                data: imgBuf,
+                                type: imgType,
+                                transformation: { width: W, height: H },
+                            })],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { before: 0, after: 0 },
+                        }));
+                    } else {
+                        elems.push(para('(Gambar Struktur Organisasi tidak dapat dimuat.)', { alignment: AlignmentType.CENTER }));
+                    }
+                } catch (e) {
+                    console.warn('[docxExporter] BAB V org chart fetch failed:', e);
+                    elems.push(para('(Gambar Struktur Organisasi tidak dapat dimuat.)', { alignment: AlignmentType.CENTER }));
+                }
+            } else {
+                elems.push(para('(Gambar Struktur Organisasi belum diupload.)', { alignment: AlignmentType.CENTER }));
+            }
+            elems.push(new Paragraph({ children: [] }));
+            continue;
+        }
+
         // Priority 1: content_json blocks (rich content with images)
         if (section.blocks && section.blocks.length > 0) {
             for (const block of section.blocks) {

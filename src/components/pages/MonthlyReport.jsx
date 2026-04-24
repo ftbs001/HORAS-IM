@@ -1041,6 +1041,14 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                     } else if (child.id === 'bab4_penutup') {
                                         // Inject Penutup Data, which is stored in TU row
                                         chapter.sections.push({ title: child.label, level: sectionLevel, isPenutupTemplate: true, templateData: tuTemplateData });
+                                    } else if (child.id === 'bab5') {
+                                        // BAB V Lampiran — inject the org chart image URL for docxExporter to fetch
+                                        chapter.sections.push({
+                                            title: child.label,
+                                            level: sectionLevel,
+                                            isBab5Template: true,
+                                            bab5ImageUrl: htmlContent || null, // htmlContent = reportData['bab5'] = Supabase public URL
+                                        });
                                     } else if (htmlContent && htmlContent.trim() && !htmlContent.includes('[Belum ada konten]')) {
                                         chapter.sections.push({
                                             title: child.label,
