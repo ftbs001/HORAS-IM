@@ -1323,11 +1323,15 @@ const A4_L = { width: 11906, height: 16838, orientation: PageOrientation.LANDSCA
 // Chapters that should be rendered in LANDSCAPE orientation
 // STRICT: ONLY BAB II (Pelaksanaan Tugas) and BAB V (Lampiran) use Landscape.
 // BAB I, BAB III, BAB IV and everything else must be Portrait.
-const LANDSCAPE_CHAPTERS = ['BAB II', 'BAB V'];
+// IMPORTANT: Do NOT use startsWith('BAB II') — 'BAB III'.startsWith('BAB II') is TRUE in JS!
+// Use word-boundary regex: /^BAB\s+II(\s|$)/ to match exactly BAB II and not BAB III, BAB IIa, etc.
+const LANDSCAPE_CHAPTER_PATTERNS = [
+    /^BAB\s+II(\s|$)/i,   // BAB II only — NOT BAB III, BAB IIa
+    /^BAB\s+V(\s|$)/i,    // BAB V only — NOT BAB VI, BAB VII
+];
 
 const isLandscapeChapter = (title = '') => {
-    const upper = title.toUpperCase();
-    return LANDSCAPE_CHAPTERS.some(prefix => upper.startsWith(prefix));
+    return LANDSCAPE_CHAPTER_PATTERNS.some(pat => pat.test(title.trim()));
 };
 
 const buildSectionProps = (landscape, pageStart = null, includePageNumbers = true, customMargin = null) => {

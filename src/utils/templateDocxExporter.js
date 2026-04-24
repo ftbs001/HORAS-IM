@@ -145,7 +145,7 @@ function buildTabelA(data) {
         });
     });
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...rows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...rows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -184,7 +184,7 @@ function buildTabelB(data) {
         });
     });
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...rows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...rows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -221,7 +221,7 @@ function buildTabelC(data) {
         });
     });
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...rows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...rows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -275,7 +275,7 @@ function buildTabelMultiHeader(tableName, data, schemaRows) {
         });
     });
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr1, hr2, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, ...dataRows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -338,7 +338,7 @@ function buildTabelSimple(tableName, data, schemaRows) {
         });
     });
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr1, hr2, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, ...dataRows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -429,7 +429,7 @@ function buildTabelPerlintasan(tableName, data, schemaRows, customHeader) {
         });
     });
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr0, hr1, hr2, hr3, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr0, hr1, hr2, hr3, ...dataRows] });
 }
 
 
@@ -487,7 +487,7 @@ function buildProjusDocx(projusData) {
         ]),
         numCell(totals.total?.jumlah, { bg: GRAND_BG, bold: true, sz: FONT_SM }),
     ]});
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr1, hr2, hr3, hr4, ...dataRows, totalRow] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, hr3, hr4, ...dataRows, totalRow] });
 }
 
 function buildTAKDocx(takData) {
@@ -541,7 +541,7 @@ function buildTAKDocx(takData) {
         ]),
         numCell(totals.total?.jumlah, { bg: GRAND_BG, bold: true, sz: FONT_XS }),
     ]});
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr1, hr2, hr3, hr4, ...dataRows, totalRow] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, hr3, hr4, ...dataRows, totalRow] });
 }
 
 function buildTimporaDocx(timporaData, bulanName, tahun) {
@@ -592,7 +592,7 @@ function buildTimporaDocx(timporaData, bulanName, tahun) {
                 cell(d.ops_ket     || '-', { center: true, bg, sz: FONT_SM, w: colW }),
             ]});
         });
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [titleRow, hr1, hr2, hr3, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [titleRow, hr1, hr2, hr3, ...dataRows] });
 }
 
 /**
@@ -638,7 +638,7 @@ function buildInfokimDocx(infokimData, bulanName, tahun) {
             cell(val > 0 ? String(val) : '-', { center: true, sz: FONT_SM, w: jmlW }),
         ]});
     });
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [titleRow, subTitleRow, headerRow, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [titleRow, subTitleRow, headerRow, ...dataRows] });
 }
 
 function buildPengaduanDocx(pgRows, bulanName, tahun) {
@@ -666,7 +666,7 @@ function buildPengaduanDocx(pgRows, bulanName, tahun) {
             ...PENGADUAN_COLS.map(col => cell(row[col.key] || '-', { sz: FONT_XS, w: colCW })),
         ]}));
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [titleRow, subTitleRow, headerRow, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [titleRow, subTitleRow, headerRow, ...dataRows] });
 }
 
 /**
@@ -868,7 +868,7 @@ function buildRealisasiDocx(dataArray) {
         cell('', {})
     ]});
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [h1, h2, ...dataRows, totalRow] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [h1, h2, ...dataRows, totalRow] });
 }
 
 function buildGabunganDocx(rmData, pnpData) {
@@ -918,7 +918,7 @@ function buildGabunganDocx(rmData, pnpData) {
         cell('', {})
     ]});
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [h1, h2, ...tempRows, totalRow] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [h1, h2, ...tempRows, totalRow] });
 }
 
 function buildBendaharaDocx(dataArray) {
@@ -950,7 +950,7 @@ function buildBendaharaDocx(dataArray) {
         cell(formatRpDocx(total?.realisasi_span), { bold: true, center: true })
     ]});
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...dataRows, totalRow] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...dataRows, totalRow] });
 }
 
 /**
@@ -1043,7 +1043,7 @@ function buildPegawaiDetailDocx(detail) {
         cell(r.keterangan || '', { center: true })
     ]}));
 
-    return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...dataRows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...dataRows] });
 }
 
 function buildSummaryDocx(title, dataArray, totalKey) {
@@ -1119,7 +1119,7 @@ function buildPegawaiPPPKDocx(data) {
         spacing: { before: 200, after: 200 }
     });
 
-    return [titlePara, new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow1, headerRow2, ...dataRows] })];
+    return [titlePara, new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow1, headerRow2, ...dataRows] })];
 }
 
 function buildPegawaiNonASNDocx(data) {
@@ -1173,7 +1173,7 @@ function buildPegawaiNonASNDocx(data) {
         spacing: { before: 200, after: 200 }
     });
 
-    return [titlePara, new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow1, headerRow2, ...dataRows] })];
+    return [titlePara, new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow1, headerRow2, ...dataRows] })];
 }
 
 function buildRekapitulasiPegawaiDocx(data) {
@@ -1214,7 +1214,7 @@ function buildRekapitulasiPegawaiDocx(data) {
     return [
         subHeading('2. Rekapitulasi Pegawai'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr1, hr2, ...rows, sumRow] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, ...rows, sumRow] })
     ];
 }
 
@@ -1249,7 +1249,7 @@ function buildDataCutiDocx(data, totalCuti) {
     return [
         subHeading('3. Data Cuti Pegawai'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows, sumRow] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr, ...rows, sumRow] })
     ];
 }
 
@@ -1275,7 +1275,7 @@ function buildPembinaanDocx(data) {
     return [
         subHeading('4. Pembinaan Pegawai'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr, ...rows] })
     ];
 }
 
@@ -1301,7 +1301,7 @@ function buildTataUsahaDocx(data) {
     return [
         subHeading('5. Tata Usaha (Persuratan)'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr, ...rows] })
     ];
 }
 
@@ -1464,7 +1464,7 @@ function buildKendaraanDocx(data) {
         subHeading('3) URUSAN UMUM'),
         subHeading('a. Kendaraan Operasional'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr, ...rows] })
     ];
 }
 
@@ -1494,7 +1494,7 @@ function buildSaranaDocx(data) {
     return [
         subHeading('b. Sarana dan Prasarana'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr, ...rows] })
     ];
 }
 
@@ -1545,7 +1545,7 @@ function buildGedungDocx(data) {
     return [
         subHeading('c. Gedung Dan Bangunan'),
         spacer(),
-        new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows] })
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr, ...rows] })
     ];
 }
 
