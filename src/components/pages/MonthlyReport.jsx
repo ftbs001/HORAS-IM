@@ -1888,7 +1888,16 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                             {focusNode ? (
                                                 <div>
                                                     <h4 className="font-bold text-lg text-imigrasi-navy underline mb-4">{focusNode.label}</h4>
-                                                    {focusNode.type === 'file' ? (
+                                                    {/* Special top-level sections have dedicated React preview components */}
+                                                    {focusNode.id === 'cover_letter' ? (
+                                                        <CoverLetterPreview />
+                                                    ) : focusNode.id === 'cover_page' ? (
+                                                        <CoverPagePreview />
+                                                    ) : focusNode.id === 'foreword' ? (
+                                                        <ForewordPreview />
+                                                    ) : focusNode.id === 'toc' ? (
+                                                        <TableOfContentsPreview />
+                                                    ) : focusNode.type === 'file' ? (
                                                         renderTemplateForPreview(focusNode.id) ? (
                                                             <div className="mt-2">
                                                                 {renderTemplateForPreview(focusNode.id)}
@@ -1903,6 +1912,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                                             {renderPreviewNodes(focusNode.children)}
                                                         </div>
                                                     )}
+
                                                 </div>
                                             ) : (
                                                 <p className="text-gray-400 italic">Konten tidak ditemukan.</p>
