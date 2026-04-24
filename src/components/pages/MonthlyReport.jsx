@@ -409,6 +409,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
     // State
     const [activeSection, setActiveSection] = useState('cover_letter');
+    const [previewFocusId, setPreviewFocusId] = useState(null); // null = show all sections; nodeId = focused single-section view
     const [expandedNodes, setExpandedNodes] = useState(['bab1', 'bab1_pengantar', 'bab2', 'bab2_substantif']);
     const [viewMode, setViewMode] = useState(sectionFilter ? 'edit' : 'dashboard'); // Default to dashboard if no section filter
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1478,11 +1479,21 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                 setExpandedNodes(prev => prev.includes(node.id)
                     ? prev.filter(n => n !== node.id)
                     : [...prev, node.id]);
-                // Also auto-expand and navigate to first file child if exists
             } else if (viewMode === 'preview') {
                 setActiveSection(node.id);
-                const el = document.getElementById(`preview-section-${node.id}`);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // FILE node click in preview → show focused single-section view
+                if (node.type === 'file' || TEMPLATE_FOLDERS.includes(node.id)) {
+                    setPreviewFocusId(node.id);
+                    const contentArea = document.getElementById('content-main-area');
+                    if (contentArea) contentArea.scrollTop = 0;
+                } else {
+                    // Folder click: clear focus and scroll to section
+                    setPreviewFocusId(null);
+                    setTimeout(() => {
+                        const el = document.getElementById(`preview-section-${node.id}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                }
             } else {
                 setActiveSection(node.id);
                 setViewMode('edit');
@@ -1843,8 +1854,66 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                         )
                     ) : (
                         // PREVIEW MODE — sidebar stays visible on scroll
-                        // PREVIEW MODE — sidebar stays visible on scroll
                         <div id="preview-container" className="p-8 bg-gray-200 min-h-full print:bg-white print:p-0 flex flex-col gap-8 items-center">
+
+                            {/* ── FOCUSED SINGLE-SECTION VIEW ── */}
+                            {previewFocusId && (() => {
+                                const focusNode = (() => {
+                                    const find = (nodes) => {
+                                        for (const n of nodes || []) {
+                                            if (n.id === previewFocusId) return n;
+                                            const found = find(n.children);
+                                            if (found) return found;
+                                        }
+                                        return null;
+                                    };
+                                    return find(filteredToc);
+                                })();
+                                const isLandscape = filteredToc?.some(c => (c.id === 'bab2' || c.id === 'bab5') &&
+                                    JSON.stringify(c).includes(`"id":"${previewFocusId}"`));
+                                return (
+                                    <div className="w-full max-w-5xl">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-white font-bold text-lg">
+                                                🔍 Tampilan Fokus: <span className="text-imigrasi-gold">{focusNode?.label || previewFocusId}</span>
+                                            </h4>
+                                            <button
+                                                onClick={() => { setPreviewFocusId(null); }}
+                                                className="bg-white/20 hover:bg-white/30 text-white text-sm px-3 py-1 rounded-lg transition-colors"
+                                            >
+                                                ✕ Tampilkan Semua
+                                            </button>
+                                        </div>
+                                        <div className={`shadow-2xl bg-white font-serif border border-gray-300 overflow-x-auto ${isLandscape ? 'w-[297mm] p-[20mm] min-h-[210mm]' : 'w-[210mm] p-[25mm] min-h-[297mm]'}`}>
+                                            {focusNode ? (
+                                                <div>
+                                                    <h4 className="font-bold text-lg text-imigrasi-navy underline mb-4">{focusNode.label}</h4>
+                                                    {focusNode.type === 'file' ? (
+                                                        renderTemplateForPreview(focusNode.id) ? (
+                                                            <div className="mt-2">
+                                                                {renderTemplateForPreview(focusNode.id)}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="preview-content text-justify leading-relaxed mt-2 text-gray-700"
+                                                                dangerouslySetInnerHTML={{ __html: reportData[focusNode.id] || '<span class="text-gray-300 italic">[Belum ada konten]</span>' }}
+                                                            />
+                                                        )
+                                                    ) : (
+                                                        <div className="space-y-4">
+                                                            {renderPreviewNodes(focusNode.children)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-400 italic">Konten tidak ditemukan.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── FULL PREVIEW (when no section is focused) ── */}
+                            {!previewFocusId && (<>
                             
                             {/* ── PORTRAIT PAGES (Bab 1, 3, 4) ── */}
                             <div className="w-[210mm] shadow-2xl bg-white p-[25mm] min-h-[297mm] font-serif print:p-0 print:shadow-none shrink-0 border border-gray-300">
@@ -1903,6 +1972,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                     <Bab5OrgChartView editMode={false} />
                                 </div>
                             )}
+                            </>)}
                         </div>
                     )}
                 </div>

@@ -960,32 +960,24 @@ export function getKeuanganDocxElements(part, templateData, bulanName, tahun) {
 
     if (part === 'rm') {
         return [
-            subHeading('1) URUSAN KEUANGAN'),
-            subHeading('1. LAPORAN REALISASI PENYERAPAN ANGGARAN (BERDASARKAN JENIS BELANJA)'),
-            spacer(),
-            subHeading('a. Rupiah Murni (RM)'),
             buildRealisasiDocx(kData.rm || []),
             spacer()
         ];
     }
     if (part === 'pnp') {
         return [
-            subHeading('b. Penerimaan Non Pajak (PNBP)'),
             buildRealisasiDocx(kData.pnp || []),
             spacer()
         ];
     }
     if (part === 'gabungan') {
         return [
-            subHeading('c. Rupiah Murni + PNBP'),
             buildGabunganDocx(kData.rm || [], kData.pnp || []),
             spacer()
         ];
     }
     if (part === 'bendahara') {
         return [
-            subHeading('2. PENERIMAAN NEGARA BUKAN PAJAK (PNBP)'),
-            subHeading('LAPORAN BENDAHARA PENERIMA'),
             spacer(),
             buildBendaharaDocx(kData.bendahara || []),
             spacer()
@@ -1318,8 +1310,6 @@ export function getKepegawaianDocxElements(part, templateData, bulanName, tahun)
 
     if (part === 'bezetting') {
         return [
-            subHeading('2) URUSAN KEPEGAWAIAN'),
-            subHeading('1. LAPORAN BEZETTING PEGAWAI'),
             buildPegawaiDetailDocx(kData.detail),
             spacer(),
             spacer(),
@@ -1349,21 +1339,18 @@ export function getKepegawaianDocxElements(part, templateData, bulanName, tahun)
         ];
     } else if (part === 'rekap') {
         return [
-            subHeading('2. Rekapitulasi Pegawai'),
             spacer(),
             ...buildRekapitulasiPegawaiDocx(kData.rekap_pegawai || []),
             spacer()
         ];
     } else if (part === 'cuti') {
         return [
-            subHeading('3. Data Cuti Pegawai'),
             spacer(),
             ...buildDataCutiDocx(kData.cuti || [], t.cuti),
             spacer()
         ];
     } else if (part === 'pembinaan') {
         return [
-            subHeading('4. Pembinaan Pegawai'),
             spacer(),
             ...buildPembinaanDocx(kData.pembinaan || []),
             spacer()
