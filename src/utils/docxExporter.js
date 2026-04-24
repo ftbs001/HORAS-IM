@@ -1045,14 +1045,15 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
         // ── BAB V Lampiran: Org Chart Image ─────────────────────────────────────
         if (section.isBab5Template) {
             const { ImageRun: IR } = await import('docx');
-            // Sub-heading for structure org
+            // Sub-heading — keepNext: true keeps it on the same page as the image below
             elems.push(new Paragraph({
                 children: [new TextRun({
                     text: 'Struktur Organisasi Kantor Imigrasi Kelas II TPI Pematang Siantar',
                     font: FONT.NAME, size: FONT.SIZE.SUB_BAB, bold: true, color: '000000',
                 })],
                 alignment: AlignmentType.CENTER,
-                spacing: { before: 120, after: 200 },
+                spacing: { before: 80, after: 80 },  // Tight spacing so title+image fit on one landscape page
+                keepNext: true,  // Word will NOT break page here — subtitle always on same page as next element
             }));
 
             const imageUrl = section.bab5ImageUrl;
@@ -1060,9 +1061,9 @@ const buildChapter = async (title, sections, isFirst = false, coverPageData = {}
                 try {
                     const imgBuf = await fetchImageAsArrayBuffer(imageUrl);
                     if (imgBuf) {
-                        // Landscape page: usable width ≈ 25cm (29.7cm – 2×2cm margins)
-                        // Scale to fill the page width, height proportional (~660/940 ratio = 0.7)
-                        const W = 900, H = Math.round(900 * 0.7); // px
+                        // Landscape A4 content height ≈ 17cm – title/subtitle area ~2cm = 15cm ≈ 425px safe
+                        // Use 700×490 (0.7 ratio) which fits comfortably with chapter title on one landscape page
+                        const W = 700, H = 490;
                         // Detect MIME: base64 data URL or Supabase HTTPS URL (check file extension)
                         let imgType = 'jpeg';
                         if (imageUrl.startsWith('data:')) {

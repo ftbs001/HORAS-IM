@@ -1616,7 +1616,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
     // A. SARAN
     elements.push(new Paragraph({
         children: [new TextRun({ text: 'A.', font: FONT_NAME, size: 24 }), new TextRun({ text: '\tSARAN', font: FONT_NAME, size: 24 })],
-        spacing: { before: 240, after: 120 },
+        spacing: { before: 80, after: 60 },
         indent: { left: 400, hanging: 400 }
     }));
 
@@ -1645,7 +1645,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
     // B. KESIMPULAN
     elements.push(new Paragraph({
         children: [new TextRun({ text: 'B.', font: FONT_NAME, size: 24 }), new TextRun({ text: '\tKESIMPULAN', font: FONT_NAME, size: 24 })],
-        spacing: { before: 240, after: 120 },
+        spacing: { before: 80, after: 60 },
         indent: { left: 400, hanging: 400 }
     }));
 
@@ -1699,7 +1699,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
         rightCellChildren.push(eSignTable);
         rightCellChildren.push(new Paragraph({ spacing: { before: 120 } }));
     } else {
-        rightCellChildren.push(new Paragraph({ spacing: { before: 1200 } })); // 1200 twips ~ 4 lines
+        rightCellChildren.push(new Paragraph({ spacing: { before: 600 } })); // 4 lines gap for physical signature
     }
 
     rightCellChildren.push(new Paragraph({ children: [new TextRun({ text: nama, font: FONT_NAME, size: 24 })] }));
@@ -1722,7 +1722,7 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
         ]
     });
 
-    elements.push(new Paragraph({ spacing: { before: 600, after: 0 } }));
+    elements.push(new Paragraph({ spacing: { before: 200, after: 0 } }));
     elements.push(signTable);
     
     // TEMBUSAN
