@@ -71,19 +71,30 @@ const InputRp = ({ value, onChange, disabled }) => {
 
 // ─── COMPONENT: Realisasi Anggaran ───────────────────────────────────────────
 function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading }) {
-    const { rows, total } = readOnly ? data : calcRealisasiTotals(data);
+    const { rows, total } = readOnly ? { rows: data, total: calcRealisasiTotals(data).total } : calcRealisasiTotals(data);
 
-    const PaguCol = (id) => isPreview || readOnly ? formatRp(rows[id].pagu) : <InputRp value={rows[id].pagu} onChange={v => onChange(id, 'pagu', v)} disabled={loading} />;
-    const TargRpCol = (id) => isPreview || readOnly ? formatRp(rows[id].target_rp) : <InputRp value={rows[id].target_rp} onChange={v => onChange(id, 'target_rp', v)} disabled={loading} />;
-    const RealRpCol = (id) => isPreview || readOnly ? formatRp(rows[id].realisasi_rp) : <InputRp value={rows[id].realisasi_rp} onChange={v => onChange(id, 'realisasi_rp', v)} disabled={loading} />;
-    const KetCol = (id) => isPreview || readOnly ? rows[id].keterangan : (
-        <input type="text" value={rows[id].keterangan || ''} onChange={e => onChange(id, 'keterangan', e.target.value)} disabled={loading}
+    const handleAdd = () => onChange([...(data || []), { id: `rm_${Date.now()}`, label: '', pagu: 0, target_rp: 0, realisasi_rp: 0, keterangan: '' }]);
+    const handleRemove = (idx) => { const n = [...data]; n.splice(idx, 1); onChange(n); };
+    const handleChange = (idx, field, val) => { const n = [...data]; n[idx][field] = val; onChange(n); };
+
+    const PaguCol = (idx) => isPreview || readOnly ? formatRp(rows[idx].pagu) : <InputRp value={rows[idx].pagu} onChange={v => handleChange(idx, 'pagu', v)} disabled={loading} />;
+    const TargRpCol = (idx) => isPreview || readOnly ? formatRp(rows[idx].target_rp) : <InputRp value={rows[idx].target_rp} onChange={v => handleChange(idx, 'target_rp', v)} disabled={loading} />;
+    const RealRpCol = (idx) => isPreview || readOnly ? formatRp(rows[idx].realisasi_rp) : <InputRp value={rows[idx].realisasi_rp} onChange={v => handleChange(idx, 'realisasi_rp', v)} disabled={loading} />;
+    const KetCol = (idx) => isPreview || readOnly ? rows[idx].keterangan : (
+        <input type="text" value={rows[idx].keterangan || ''} onChange={e => handleChange(idx, 'keterangan', e.target.value)} disabled={loading}
                style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', fontFamily: FONT, fontSize: '9pt' }} />
+    );
+    const LblCol = (idx) => isPreview || readOnly ? rows[idx].label : (
+        <input type="text" value={rows[idx].label || ''} onChange={e => handleChange(idx, 'label', e.target.value)} disabled={loading}
+               style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', fontFamily: FONT, fontSize: '9pt', fontWeight: 'bold' }} />
     );
 
     return (
         <div style={{ marginBottom: '24px', overflowX: 'auto' }}>
-            <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>{title}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold' }}>{title}</div>
+                {!isPreview && !readOnly && <button onClick={handleAdd} disabled={loading} style={{ padding: '4px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>+ Tambah</button>}
+            </div>
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '900px' }}>
                 <thead>
                     <tr>
@@ -93,6 +104,7 @@ function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading })
                         <th colSpan={2} style={th()}>REALISASI</th>
                         <th rowSpan={2} style={th()}>SISA DANA</th>
                         <th rowSpan={2} style={th()}>KETERANGAN</th>
+                        {!isPreview && !readOnly && <th rowSpan={2} style={th({ background: '#f87171' })}>Aksi</th>}
                     </tr>
                     <tr>
                         <th style={th({ width: '100px' })}>Rp.</th>
@@ -102,33 +114,33 @@ function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading })
                     </tr>
                 </thead>
                 <tbody>
-                    {REALISASI_ROWS.map((r, idx) => {
-                        const isNoInput = readOnly && Object.keys(rows).length === 0;
-                        if (isNoInput) return null; // safety check
-                        const pt = rows[r.id].pagu === 0; // Check if pagu is 0
+                    {(rows || []).map((r, idx) => {
+                        const pt = r.pagu === 0;
                         return (
                             <tr key={r.id}>
-                                <td style={td()}>{r.label}</td>
-                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{PaguCol(r.id)}</td>
-                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{pt ? '-' : TargRpCol(r.id)}</td>
-                                <td style={td({ textAlign: 'center', background: '#f8fafc' })}>{pt ? '-' : formatPct(rows[r.id].target_pct)}</td>
-                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{pt ? '-' : RealRpCol(r.id)}</td>
-                                <td style={td({ textAlign: 'center', background: '#f8fafc' })}>{pt ? '-' : formatPct(rows[r.id].realisasi_pct)}</td>
-                                <td style={td({ textAlign: 'right', background: '#f8fafc' })}>{pt ? '-' : formatRp(rows[r.id].sisa_dana)}</td>
-                                <td style={td({ background: '#fff' })}>{KetCol(r.id)}</td>
+                                <td style={td()}>{LblCol(idx)}</td>
+                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{PaguCol(idx)}</td>
+                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{pt ? '-' : TargRpCol(idx)}</td>
+                                <td style={td({ textAlign: 'center', background: '#f8fafc' })}>{pt ? '-' : formatPct(r.target_pct)}</td>
+                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{pt ? '-' : RealRpCol(idx)}</td>
+                                <td style={td({ textAlign: 'center', background: '#f8fafc' })}>{pt ? '-' : formatPct(r.realisasi_pct)}</td>
+                                <td style={td({ textAlign: 'right', background: '#f8fafc' })}>{pt ? '-' : formatRp(r.sisa_dana)}</td>
+                                <td style={td({ background: '#fff' })}>{KetCol(idx)}</td>
+                                {!isPreview && !readOnly && <td style={td({ textAlign: 'center' })}><button onClick={() => handleRemove(idx)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>x</button></td>}
                             </tr>
                         );
                     })}
                     {/* Total Row */}
                     <tr>
                         <td style={td({ textAlign: 'center', fontWeight: 'bold' })}>JUMLAH</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.pagu)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.target_rp)}</td>
-                        <td style={td({ textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' })}>{formatPct(total.target_pct)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.realisasi_rp)}</td>
-                        <td style={td({ textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' })}>{formatPct(total.realisasi_pct)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.sisa_dana)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.pagu)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.target_rp)}</td>
+                        <td style={td({ textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' })}>{formatPct(total?.target_pct)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.realisasi_rp)}</td>
+                        <td style={td({ textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' })}>{formatPct(total?.realisasi_pct)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.sisa_dana)}</td>
                         <td style={td({ background: '#f8fafc' })}></td>
+                        {!isPreview && !readOnly && <td style={td()}></td>}
                     </tr>
                 </tbody>
             </table>
@@ -140,12 +152,24 @@ function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading })
 function TableBendahara({ data, onChange, isPreview, loading }) {
     const { rows, total } = calcBendaharaTotals(data);
 
-    const TargCol = (id) => isPreview ? formatRp(rows[id].target) : <InputRp value={rows[id].target} onChange={v => onChange(id, 'target', v)} disabled={loading} />;
-    const SimpCol = (id) => isPreview ? formatRp(rows[id].realisasi_simponi) : <InputRp value={rows[id].realisasi_simponi} onChange={v => onChange(id, 'realisasi_simponi', v)} disabled={loading} />;
-    const SpanCol = (id) => isPreview ? formatRp(rows[id].realisasi_span) : <InputRp value={rows[id].realisasi_span} onChange={v => onChange(id, 'realisasi_span', v)} disabled={loading} />;
+    const handleAdd = () => onChange([...(data || []), { id: `bdp_${Date.now()}`, no: '', akun: '', label: '', target: 0, realisasi_simponi: 0, realisasi_span: 0 }]);
+    const handleRemove = (idx) => { const n = [...data]; n.splice(idx, 1); onChange(n); };
+    const handleChange = (idx, field, val) => { const n = [...data]; n[idx][field] = val; onChange(n); };
+
+    const TargCol = (idx) => isPreview ? formatRp(rows[idx].target) : <InputRp value={rows[idx].target} onChange={v => handleChange(idx, 'target', v)} disabled={loading} />;
+    const SimpCol = (idx) => isPreview ? formatRp(rows[idx].realisasi_simponi) : <InputRp value={rows[idx].realisasi_simponi} onChange={v => handleChange(idx, 'realisasi_simponi', v)} disabled={loading} />;
+    const SpanCol = (idx) => isPreview ? formatRp(rows[idx].realisasi_span) : <InputRp value={rows[idx].realisasi_span} onChange={v => handleChange(idx, 'realisasi_span', v)} disabled={loading} />;
+    
+    const TextInput = (idx, field) => isPreview ? rows[idx][field] : (
+        <input type="text" value={rows[idx][field] || ''} onChange={e => handleChange(idx, field, e.target.value)} disabled={loading}
+               style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', fontFamily: FONT, fontSize: '9pt' }} />
+    );
 
     return (
         <div style={{ marginBottom: '24px', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                {!isPreview && <button onClick={handleAdd} disabled={loading} style={{ padding: '4px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>+ Tambah</button>}
+            </div>
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '800px' }}>
                 <thead>
                     <tr>
@@ -155,24 +179,27 @@ function TableBendahara({ data, onChange, isPreview, loading }) {
                         <th style={th({ width: '130px' })}>TARGET</th>
                         <th style={th({ width: '130px' })}>REALISASI SIMPONI</th>
                         <th style={th({ width: '130px' })}>REALISASI SPAN</th>
+                        {!isPreview && <th style={th({ background: '#f87171' })}>Aksi</th>}
                     </tr>
                 </thead>
                 <tbody>
-                    {BENDAHARA_ROWS.map(r => (
+                    {(rows || []).map((r, idx) => (
                         <tr key={r.id}>
-                            <td style={td({ textAlign: 'center' })}>{r.no}</td>
-                            <td style={td({ textAlign: 'center' })}>{r.akun}</td>
-                            <td style={td()}>{r.label}</td>
-                            <td style={td({ textAlign: 'right' })}>{TargCol(r.id)}</td>
-                            <td style={td({ textAlign: 'right' })}>{SimpCol(r.id)}</td>
-                            <td style={td({ textAlign: 'right' })}>{SpanCol(r.id)}</td>
+                            <td style={td({ textAlign: 'center' })}>{TextInput(idx, 'no')}</td>
+                            <td style={td({ textAlign: 'center' })}>{TextInput(idx, 'akun')}</td>
+                            <td style={td()}>{TextInput(idx, 'label')}</td>
+                            <td style={td({ textAlign: 'right' })}>{TargCol(idx)}</td>
+                            <td style={td({ textAlign: 'right' })}>{SimpCol(idx)}</td>
+                            <td style={td({ textAlign: 'right' })}>{SpanCol(idx)}</td>
+                            {!isPreview && <td style={td({ textAlign: 'center' })}><button onClick={() => handleRemove(idx)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>x</button></td>}
                         </tr>
                     ))}
                     <tr>
                         <td colSpan={3} style={td({ textAlign: 'center', fontWeight: 'bold' })}>TOTAL</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.target)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.realisasi_simponi)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total.realisasi_span)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.target)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.realisasi_simponi)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.realisasi_span)}</td>
+                        {!isPreview && <td style={td()}></td>}
                     </tr>
                 </tbody>
             </table>
@@ -221,7 +248,15 @@ export default function TemplateKeuangan({ defaultTab = 'realisasi', embedded = 
             if (error) throw error;
 
             if (data?.template_data?.keuangan) {
-                const k = data.template_data.keuangan;
+                let k = data.template_data.keuangan;
+                
+                // --- Legacy Map to Array Migration ---
+                if (k.rm && !Array.isArray(k.rm)) {
+                     k.rm = REALISASI_ROWS.map(r => ({ id: r.id, label: r.label, ...(k.rm[r.id] || {}) }));
+                     k.pnp = REALISASI_ROWS.map(r => ({ id: r.id, label: r.label, ...(k.pnp[r.id] || {}) }));
+                     k.bendahara = BENDAHARA_ROWS.map(r => ({ id: r.id, no: r.no, akun: r.akun, label: r.label, ...(k.bendahara[r.id] || {}) }));
+                }
+
                 setRmData(k.rm || getDefaultRealisasiData());
                 setPnpData(k.pnp || getDefaultRealisasiData());
                 setBendaharaData(k.bendahara || getDefaultBendaharaData());

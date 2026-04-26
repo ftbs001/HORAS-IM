@@ -26,31 +26,45 @@ export const BENDAHARA_ROWS = [
 ];
 
 export const getDefaultRealisasiRow = () => ({
+    id: `rm_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+    label: '',
     pagu: 0,
     target_rp: 0,
-    // target_pct is computed
     realisasi_rp: 0,
-    // realisasi_pct is computed
-    // sisa_dana is computed
     keterangan: ''
 });
 
 export const getDefaultRealisasiData = () => {
-    const d = {};
-    REALISASI_ROWS.forEach(r => { d[r.id] = getDefaultRealisasiRow(); });
-    return d;
+    return REALISASI_ROWS.map(r => ({
+        id: r.id,
+        label: r.label,
+        pagu: 0,
+        target_rp: 0,
+        realisasi_rp: 0,
+        keterangan: ''
+    }));
 };
 
 export const getDefaultBendaharaRow = () => ({
+    id: `bdp_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+    no: '',
+    akun: '',
+    label: '',
     target: 0,
     realisasi_simponi: 0,
     realisasi_span: 0
 });
 
 export const getDefaultBendaharaData = () => {
-    const d = {};
-    BENDAHARA_ROWS.forEach(r => { d[r.id] = getDefaultBendaharaRow(); });
-    return d;
+    return BENDAHARA_ROWS.map(r => ({
+        id: r.id,
+        no: r.no,
+        akun: r.akun,
+        label: r.label,
+        target: 0,
+        realisasi_simponi: 0,
+        realisasi_span: 0
+    }));
 };
 
 // --- Calculation Logic ---
@@ -60,14 +74,10 @@ export const getPercentage = (value, total) => {
     return (value / total) * 100;
 };
 
-export const calcRealisasiTotals = (data) => {
-    const rows = {};
-    let sumPagu = 0;
-    let sumTargetRp = 0;
-    let sumRealisasiRp = 0;
+export const calcRealisasiTotals = (dataArray) => {
+    let sumPagu = 0, sumTargetRp = 0, sumRealisasiRp = 0;
 
-    REALISASI_ROWS.forEach(r => {
-        const d = data[r.id] || getDefaultRealisasiRow();
+    const rows = (dataArray || []).map(d => {
         const pagu = Number(d.pagu) || 0;
         const targetRp = Number(d.target_rp) || 0;
         const realisasiRp = Number(d.realisasi_rp) || 0;
@@ -76,7 +86,7 @@ export const calcRealisasiTotals = (data) => {
         sumTargetRp += targetRp;
         sumRealisasiRp += realisasiRp;
 
-        rows[r.id] = {
+        return {
             ...d,
             pagu,
             target_rp: targetRp,
@@ -103,27 +113,25 @@ export const calcGabungan = (rmData, pnpData) => {
     const rm = calcRealisasiTotals(rmData || {}).rows;
     const pnp = calcRealisasiTotals(pnpData || {}).rows;
 
-    const gabunganData = {};
-    REALISASI_ROWS.forEach(r => {
-        gabunganData[r.id] = {
-            pagu: (rm[r.id].pagu) + (pnp[r.id].pagu),
-            target_rp: (rm[r.id].target_rp) + (pnp[r.id].target_rp),
-            realisasi_rp: (rm[r.id].realisasi_rp) + (pnp[r.id].realisasi_rp),
-            keterangan: (rm[r.id].keterangan ? rm[r.id].keterangan + '. ' : '') + (pnp[r.id].keterangan || '')
+    const gabunganData = rm.map((r, i) => {
+        const pObj = pnp[i] || {};
+        return {
+            id: r.id,
+            label: r.label,
+            pagu: (r.pagu || 0) + (pObj.pagu || 0),
+            target_rp: (r.target_rp || 0) + (pObj.target_rp || 0),
+            realisasi_rp: (r.realisasi_rp || 0) + (pObj.realisasi_rp || 0),
+            keterangan: (r.keterangan ? r.keterangan + '. ' : '') + (pObj.keterangan || '')
         };
     });
 
     return calcRealisasiTotals(gabunganData);
 };
 
-export const calcBendaharaTotals = (data) => {
-    const rows = {};
-    let sumTarget = 0;
-    let sumSimponi = 0;
-    let sumSpan = 0;
+export const calcBendaharaTotals = (dataArray) => {
+    let sumTarget = 0, sumSimponi = 0, sumSpan = 0;
 
-    BENDAHARA_ROWS.forEach(r => {
-        const d = data[r.id] || getDefaultBendaharaRow();
+    const rows = (dataArray || []).map(d => {
         const target = Number(d.target) || 0;
         const simponi = Number(d.realisasi_simponi) || 0;
         const span = Number(d.realisasi_span) || 0;
@@ -132,7 +140,7 @@ export const calcBendaharaTotals = (data) => {
         sumSimponi += simponi;
         sumSpan += span;
 
-        rows[r.id] = { target, realisasi_simponi: simponi, realisasi_span: span };
+        return { ...d, target, realisasi_simponi: simponi, realisasi_span: span };
     });
 
     return {

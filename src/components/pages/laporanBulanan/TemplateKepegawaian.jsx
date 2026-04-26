@@ -162,20 +162,41 @@ function TablePegawaiNonASN({ data, onChange, isPreview, loading }) {
     );
 }
 
-function TableSummary({ title, structRows, data, totalKey, onChange, isPreview, loading }) {
+function TableSummary({ titleValue, titleKey, data, totalKey, onChange, isPreview, loading, onTitleChange }) {
+    const handleAdd = () => onChange([...(data || []), { id: `rs_${Date.now()}`, label: '', value: 0 }]);
+    const handleRemove = (idx) => { const n = [...data]; n.splice(idx, 1); onChange(n); };
+    const handleChange = (idx, field, val) => { const n = [...data]; n[idx][field] = val; onChange(n); };
+
     return (
         <div style={{ marginBottom: '24px', flex: 1, minWidth: '300px' }}>
-            <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>{title}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                {isPreview ? (
+                    <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold' }}>{titleValue}</div>
+                ) : (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                        <input type="text" value={titleValue || ''} onChange={e => onTitleChange(e.target.value)} disabled={loading}
+                            style={{ flex: 1, fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', border: '1px solid #ddd', padding: '4px', borderRadius: '4px', background: 'transparent' }} />
+                        <button onClick={handleAdd} disabled={loading} style={{ padding: '2px 8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '10px' }}>+ Tambah</button>
+                    </div>
+                )}
+            </div>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                <thead><tr><th style={th()}>NO</th><th style={th()}>URAIAN</th><th style={th()}>JUMLAH</th></tr></thead>
+                <thead><tr><th style={th()}>NO</th><th style={th()}>URAIAN</th><th style={th()}>JUMLAH</th>{!isPreview && <th style={th({ background: '#f87171' })}>Aksi</th>}</tr></thead>
                 <tbody>
-                    {structRows.map((r, idx) => (
+                    {(data || []).map((r, idx) => (
                         <tr key={r.id}>
                             <td style={td({ textAlign: 'center' })}>{idx + 1}</td>
-                            <td style={td()}>{r.label}</td>
-                            <td style={td()}><InputTableNum value={data[r.id] || 0} onChange={v => onChange(r.id, v)} disabled={isPreview||loading} /></td>
+                            <td style={td()}><InputTableText value={r.label} onChange={v => handleChange(idx, 'label', v)} disabled={isPreview||loading} /></td>
+                            <td style={td()}><InputTableNum value={r.value || 0} onChange={v => handleChange(idx, 'value', v)} disabled={isPreview||loading} /></td>
+                            {!isPreview && <td style={td({ textAlign: 'center' })}><button onClick={() => handleRemove(idx)} style={{ color: 'red', border: 'none', background: 'none' }}>x</button></td>}
                         </tr>
                     ))}
+                    {/* Baris Total */}
+                    <tr>
+                        <td colSpan={2} style={td({ textAlign: 'right', fontWeight: 'bold' })}>TOTAL</td>
+                        <td style={td({ textAlign: 'center', fontWeight: 'bold' })}>{totalKey}</td>
+                        {!isPreview && <td style={td()}></td>}
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -261,7 +282,25 @@ export default function TemplateKepegawaian({ embedded = false, defaultTab = 'de
         try {
             const { data, error } = await supabase.from('laporan_template').select('template_data').eq('seksi_id', SEKSI_ID_TU).eq('bulan', b).eq('tahun', t).maybeSingle();
             if (error) throw error;
-            setKData(data?.template_data?.kepegawaian || getDefaultKepegawaianData());
+            let kd = data?.template_data?.kepegawaian || getDefaultKepegawaianData();
+            
+            // Legacy Migration: convert old keyed objects to dynamic arrays
+            if (kd.golongan && !Array.isArray(kd.golongan)) {
+                kd.golongan = GOLONGAN_ROWS.map(r => ({ id: r.id, label: r.label, value: kd.golongan[r.id] || 0 }));
+                kd.jabatan = JABATAN_ROWS.map(r => ({ id: r.id, label: r.label, value: kd.jabatan[r.id] || 0 }));
+                kd.pendidikan = PENDIDIKAN_ROWS.map(r => ({ id: r.id, label: r.label, value: kd.pendidikan[r.id] || 0 }));
+                kd.gender = GENDER_ROWS.map(r => ({ id: r.id, label: r.label, value: kd.gender[r.id] || 0 }));
+                kd.status = STATUS_ROWS.map(r => ({ id: r.id, label: r.label, value: kd.status[r.id] || 0 }));
+            }
+            
+            // Auto inject titles if missing
+            kd.title_golongan = kd.title_golongan || "4.1. Berdasarkan Golongan";
+            kd.title_jabatan = kd.title_jabatan || "4.2. Berdasarkan Jabatan";
+            kd.title_pendidikan = kd.title_pendidikan || "4.3. Berdasarkan Pendidikan";
+            kd.title_gender = kd.title_gender || "4.4. Berdasarkan Jenis Kelamin";
+            kd.title_status = kd.title_status || "4.5. Berdasarkan Status";
+
+            setKData(kd);
             setHasChanges(false);
         } catch (e) { showMsg('error', e.message); } finally { setLoading(false); }
     }, [showMsg]);
@@ -315,7 +354,7 @@ export default function TemplateKepegawaian({ embedded = false, defaultTab = 'de
     };
 
     const updateSection = (s, v) => { setKData(p => ({ ...p, [s]: v })); setHasChanges(true); };
-    const updateSummary = (s, k, v) => { setKData(p => ({ ...p, [s]: { ...p[s], [k]: v } })); setHasChanges(true); };
+
     const totals = useMemo(() => calcAllTotals(kData), [kData]);
 
     const toolBtn = (variant = 'default') => ({
@@ -478,11 +517,11 @@ export default function TemplateKepegawaian({ embedded = false, defaultTab = 'de
                 <div style={{ padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '24px' }}>
                     <div style={{ fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', marginBottom: '12px' }}>4. REKAPITULASI BEZETTING</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                        <TableSummary title="4.1. Berdasarkan Golongan" structRows={GOLONGAN_ROWS} data={kData.golongan} totalKey={totals.golongan} onChange={(k,v)=>updateSummary('golongan',k,v)} isPreview={isPreview} loading={loading} />
-                        <TableSummary title="4.2. Berdasarkan Jabatan" structRows={JABATAN_ROWS} data={kData.jabatan} totalKey={totals.jabatan} onChange={(k,v)=>updateSummary('jabatan',k,v)} isPreview={isPreview} loading={loading} />
-                        <TableSummary title="4.3. Berdasarkan Pendidikan" structRows={PENDIDIKAN_ROWS} data={kData.pendidikan} totalKey={totals.pendidikan} onChange={(k,v)=>updateSummary('pendidikan',k,v)} isPreview={isPreview} loading={loading} />
-                        <TableSummary title="4.4. Berdasarkan Jenis Kelamin" structRows={GENDER_ROWS} data={kData.gender} totalKey={totals.gender} onChange={(k,v)=>updateSummary('gender',k,v)} isPreview={isPreview} loading={loading} />
-                        <TableSummary title="4.5. Berdasarkan Status" structRows={STATUS_ROWS} data={kData.status} totalKey={totals.status} onChange={(k,v)=>updateSummary('status',k,v)} isPreview={isPreview} loading={loading} />
+                        <TableSummary titleValue={kData.title_golongan} titleKey="title_golongan" data={kData.golongan} totalKey={totals.golongan} onChange={(v)=>updateSection('golongan', v)} onTitleChange={(v)=>updateSection('title_golongan', v)} isPreview={isPreview} loading={loading} />
+                        <TableSummary titleValue={kData.title_jabatan} titleKey="title_jabatan" data={kData.jabatan} totalKey={totals.jabatan} onChange={(v)=>updateSection('jabatan', v)} onTitleChange={(v)=>updateSection('title_jabatan', v)} isPreview={isPreview} loading={loading} />
+                        <TableSummary titleValue={kData.title_pendidikan} titleKey="title_pendidikan" data={kData.pendidikan} totalKey={totals.pendidikan} onChange={(v)=>updateSection('pendidikan', v)} onTitleChange={(v)=>updateSection('title_pendidikan', v)} isPreview={isPreview} loading={loading} />
+                        <TableSummary titleValue={kData.title_gender} titleKey="title_gender" data={kData.gender} totalKey={totals.gender} onChange={(v)=>updateSection('gender', v)} onTitleChange={(v)=>updateSection('title_gender', v)} isPreview={isPreview} loading={loading} />
+                        <TableSummary titleValue={kData.title_status} titleKey="title_status" data={kData.status} totalKey={totals.status} onChange={(v)=>updateSection('status', v)} onTitleChange={(v)=>updateSection('title_status', v)} isPreview={isPreview} loading={loading} />
                     </div>
                 </div>
             )}

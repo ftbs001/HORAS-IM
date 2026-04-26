@@ -813,8 +813,8 @@ const formatPctDocx = (num) => {
     return Number(num).toFixed(2).replace('.', ',') + '%';
 };
 
-function buildRealisasiDocx(data) {
-    const { rows, total } = calcRealisasiTotals(data || {});
+function buildRealisasiDocx(dataArray) {
+    const { rows, total } = calcRealisasiTotals(dataArray || []);
 
     // Table widths in dxa
     const wJenis = 3000, wPagu = 1800, wTargRp = 1800, wTargPct = 800, wRealRp = 1800, wRealPct = 800, wSisa = 1800, wKet = 2500;
@@ -835,28 +835,28 @@ function buildRealisasiDocx(data) {
         cell('(%)', { bold: true, center: true, bg: HEADER_BG, w: wRealPct })
     ], tableHeader: true });
 
-    const dataRows = REALISASI_ROWS.map(r => {
-        const pt = rows[r.id].pagu === 0;
+    const dataRows = (rows || []).map(r => {
+        const pt = r.pagu === 0;
         return new TableRow({ children: [
-            cell(r.label, {}),
-            numCell(rows[r.id].pagu, { bg: pt ? 'fafafa' : null }),
-            pt ? cell('-', { center: true }) : numCell(rows[r.id].target_rp),
-            pt ? cell('-', { center: true }) : cell(formatPctDocx(rows[r.id].target_pct), { center: true }),
-            pt ? cell('-', { center: true }) : numCell(rows[r.id].realisasi_rp),
-            pt ? cell('-', { center: true }) : cell(formatPctDocx(rows[r.id].realisasi_pct), { center: true }),
-            pt ? cell('-', { center: true }) : numCell(rows[r.id].sisa_dana),
-            cell(rows[r.id].keterangan || '')
+            cell(r.label || '', {}),
+            numCell(r.pagu, { bg: pt ? 'fafafa' : null }),
+            pt ? cell('-', { center: true }) : numCell(r.target_rp),
+            pt ? cell('-', { center: true }) : cell(formatPctDocx(r.target_pct), { center: true }),
+            pt ? cell('-', { center: true }) : numCell(r.realisasi_rp),
+            pt ? cell('-', { center: true }) : cell(formatPctDocx(r.realisasi_pct), { center: true }),
+            pt ? cell('-', { center: true }) : numCell(r.sisa_dana),
+            cell(r.keterangan || '')
         ]});
     });
 
     const totalRow = new TableRow({ children: [
         cell('JUMLAH', { bold: true, center: true }),
-        cell(formatRpDocx(total.pagu), { bold: true, center: true }),
-        cell(formatRpDocx(total.target_rp), { bold: true, center: true }),
-        cell(formatPctDocx(total.target_pct), { bold: true, center: true }),
-        cell(formatRpDocx(total.realisasi_rp), { bold: true, center: true }),
-        cell(formatPctDocx(total.realisasi_pct), { bold: true, center: true }),
-        cell(formatRpDocx(total.sisa_dana), { bold: true, center: true }),
+        cell(formatRpDocx(total?.pagu), { bold: true, center: true }),
+        cell(formatRpDocx(total?.target_rp), { bold: true, center: true }),
+        cell(formatPctDocx(total?.target_pct), { bold: true, center: true }),
+        cell(formatRpDocx(total?.realisasi_rp), { bold: true, center: true }),
+        cell(formatPctDocx(total?.realisasi_pct), { bold: true, center: true }),
+        cell(formatRpDocx(total?.sisa_dana), { bold: true, center: true }),
         cell('', {})
     ]});
 
@@ -864,21 +864,21 @@ function buildRealisasiDocx(data) {
 }
 
 function buildGabunganDocx(rmData, pnpData) {
-    const data = calcGabungan(rmData || {}, pnpData || {});
+    const data = calcGabungan(rmData || [], pnpData || []);
     const { rows, total } = data; // use already computed data
 
     // Re-pack it as if it's normal data for the builder code block format
-    const tempRows = REALISASI_ROWS.map(r => {
-        const pt = rows[r.id].pagu === 0;
+    const tempRows = (rows || []).map(r => {
+        const pt = r.pagu === 0;
         return new TableRow({ children: [
-            cell(r.label, {}),
-            numCell(rows[r.id].pagu, { bg: pt ? 'fafafa' : null }),
-            pt ? cell('-', { center: true }) : numCell(rows[r.id].target_rp),
-            pt ? cell('-', { center: true }) : cell(formatPctDocx(rows[r.id].target_pct), { center: true }),
-            pt ? cell('-', { center: true }) : numCell(rows[r.id].realisasi_rp),
-            pt ? cell('-', { center: true }) : cell(formatPctDocx(rows[r.id].realisasi_pct), { center: true }),
-            pt ? cell('-', { center: true }) : numCell(rows[r.id].sisa_dana),
-            cell(rows[r.id].keterangan || '')
+            cell(r.label || '', {}),
+            numCell(r.pagu, { bg: pt ? 'fafafa' : null }),
+            pt ? cell('-', { center: true }) : numCell(r.target_rp),
+            pt ? cell('-', { center: true }) : cell(formatPctDocx(r.target_pct), { center: true }),
+            pt ? cell('-', { center: true }) : numCell(r.realisasi_rp),
+            pt ? cell('-', { center: true }) : cell(formatPctDocx(r.realisasi_pct), { center: true }),
+            pt ? cell('-', { center: true }) : numCell(r.sisa_dana),
+            cell(r.keterangan || '')
         ]});
     });
 
@@ -901,20 +901,20 @@ function buildGabunganDocx(rmData, pnpData) {
 
     const totalRow = new TableRow({ children: [
         cell('JUMLAH', { bold: true, center: true }),
-        cell(formatRpDocx(total.pagu), { bold: true, center: true }),
-        cell(formatRpDocx(total.target_rp), { bold: true, center: true }),
-        cell(formatPctDocx(total.target_pct), { bold: true, center: true }),
-        cell(formatRpDocx(total.realisasi_rp), { bold: true, center: true }),
-        cell(formatPctDocx(total.realisasi_pct), { bold: true, center: true }),
-        cell(formatRpDocx(total.sisa_dana), { bold: true, center: true }),
+        cell(formatRpDocx(total?.pagu), { bold: true, center: true }),
+        cell(formatRpDocx(total?.target_rp), { bold: true, center: true }),
+        cell(formatPctDocx(total?.target_pct), { bold: true, center: true }),
+        cell(formatRpDocx(total?.realisasi_rp), { bold: true, center: true }),
+        cell(formatPctDocx(total?.realisasi_pct), { bold: true, center: true }),
+        cell(formatRpDocx(total?.sisa_dana), { bold: true, center: true }),
         cell('', {})
     ]});
 
     return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [h1, h2, ...tempRows, totalRow] });
 }
 
-function buildBendaharaDocx(data) {
-    const { rows, total } = calcBendaharaTotals(data || {});
+function buildBendaharaDocx(dataArray) {
+    const { rows, total } = calcBendaharaTotals(dataArray || []);
 
     const cw = [800, 1500, 5000, 2000, 2500, 2500];
     const headerRow = new TableRow({ children: [
@@ -926,20 +926,20 @@ function buildBendaharaDocx(data) {
         cell('REALISASI SPAN', { bold: true, center: true, bg: HEADER_BG, w: cw[5] })
     ], tableHeader: true });
 
-    const dataRows = BENDAHARA_ROWS.map(r => new TableRow({ children: [
-        cell(r.no, { center: true }),
-        cell(r.akun, { center: true }),
-        cell(r.label, {}),
-        numCell(rows[r.id].target, {}),
-        numCell(rows[r.id].realisasi_simponi, {}),
-        numCell(rows[r.id].realisasi_span, {})
+    const dataRows = (rows || []).map(r => new TableRow({ children: [
+        cell(r.no || '', { center: true }),
+        cell(r.akun || '', { center: true }),
+        cell(r.label || '', {}),
+        numCell(r.target, {}),
+        numCell(r.realisasi_simponi, {}),
+        numCell(r.realisasi_span, {})
     ]}));
 
     const totalRow = new TableRow({ children: [
         cell('TOTAL', { bold: true, center: true, colSpan: 3 }),
-        cell(formatRpDocx(total.target), { bold: true, center: true }),
-        cell(formatRpDocx(total.realisasi_simponi), { bold: true, center: true }),
-        cell(formatRpDocx(total.realisasi_span), { bold: true, center: true })
+        cell(formatRpDocx(total?.target), { bold: true, center: true }),
+        cell(formatRpDocx(total?.realisasi_simponi), { bold: true, center: true }),
+        cell(formatRpDocx(total?.realisasi_span), { bold: true, center: true })
     ]});
 
     return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...dataRows, totalRow] });
@@ -953,7 +953,14 @@ function buildBendaharaDocx(data) {
  * @param {string|number} tahun
  */
 export function getKeuanganDocxElements(part, templateData, bulanName, tahun) {
-    const kData = templateData?.keuangan || {};
+    let kData = templateData?.keuangan;
+    if (!kData || Object.keys(kData).length === 0) {
+        kData = {
+            rm: getDefaultRealisasiData(),
+            pnp: getDefaultRealisasiData(),
+            bendahara: getDefaultBendaharaData()
+        };
+    }
 
     if (part === 'rm') {
         return [
@@ -961,21 +968,21 @@ export function getKeuanganDocxElements(part, templateData, bulanName, tahun) {
             subHeading('1. LAPORAN REALISASI PENYERAPAN ANGGARAN (BERDASARKAN JENIS BELANJA)'),
             spacer(),
             subHeading('a. Rupiah Murni (RM)'),
-            buildRealisasiDocx(kData.rm || {}),
+            buildRealisasiDocx(kData.rm || []),
             spacer()
         ];
     }
     if (part === 'pnp') {
         return [
             subHeading('b. Penerimaan Non Pajak (PNBP)'),
-            buildRealisasiDocx(kData.pnp || {}),
+            buildRealisasiDocx(kData.pnp || []),
             spacer()
         ];
     }
     if (part === 'gabungan') {
         return [
             subHeading('c. Rupiah Murni + PNBP'),
-            buildGabunganDocx(kData.rm || {}, kData.pnp || {}),
+            buildGabunganDocx(kData.rm || [], kData.pnp || []),
             spacer()
         ];
     }
@@ -984,7 +991,7 @@ export function getKeuanganDocxElements(part, templateData, bulanName, tahun) {
             subHeading('2. PENERIMAAN NEGARA BUKAN PAJAK (PNBP)'),
             subHeading('LAPORAN BENDAHARA PENERIMA'),
             spacer(),
-            buildBendaharaDocx(kData.bendahara || {}),
+            buildBendaharaDocx(kData.bendahara || []),
             spacer()
         ];
     }
@@ -1031,7 +1038,7 @@ function buildPegawaiDetailDocx(detail) {
     return new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [headerRow, ...dataRows] });
 }
 
-function buildSummaryDocx(title, structRows, data, totalKey) {
+function buildSummaryDocx(title, dataArray, totalKey) {
     const cw = [800, 3000, 1500];
     const headerRow = new TableRow({ children: [
         cell('NO', { bold: true, center: true, bg: HEADER_BG, w: cw[0] }),
@@ -1039,10 +1046,10 @@ function buildSummaryDocx(title, structRows, data, totalKey) {
         cell('JUMLAH', { bold: true, center: true, bg: HEADER_BG, w: cw[2] })
     ], tableHeader: true });
 
-    const dataRows = structRows.map((r, idx) => new TableRow({ children: [
+    const dataRows = (dataArray || []).map((r, idx) => new TableRow({ children: [
         cell(idx + 1, { center: true }),
-        cell(r.label, {}),
-        numCell(data[r.id], {})
+        cell(r.label || '', {}),
+        numCell(r.value || 0, {})
     ]}));
 
     const totalRow = new TableRow({ children: [
@@ -1328,15 +1335,20 @@ export function getKepegawaianDocxElements(part, templateData, bulanName, tahun)
             spacer(),
             subHeading('1.1 REKAPITULASI BEZETTING'),
             spacer(),
-            buildSummaryDocx('a. Berdasarkan Golongan', GOLONGAN_ROWS, kData.golongan || {}, t.golongan),
+            subHeading(kData.title_golongan || 'a. Berdasarkan Golongan'),
+            buildSummaryDocx(kData.title_golongan, kData.golongan || [], t.golongan),
             spacer(),
-            buildSummaryDocx('b. Berdasarkan Jabatan', JABATAN_ROWS, kData.jabatan || {}, t.jabatan),
+            subHeading(kData.title_jabatan || 'b. Berdasarkan Jabatan'),
+            buildSummaryDocx(kData.title_jabatan, kData.jabatan || [], t.jabatan),
             spacer(),
-            buildSummaryDocx('c. Berdasarkan Pendidikan', PENDIDIKAN_ROWS, kData.pendidikan || {}, t.pendidikan),
+            subHeading(kData.title_pendidikan || 'c. Berdasarkan Pendidikan'),
+            buildSummaryDocx(kData.title_pendidikan, kData.pendidikan || [], t.pendidikan),
             spacer(),
-            buildSummaryDocx('d. Berdasarkan Jenis Kelamin', GENDER_ROWS, kData.gender || {}, t.gender),
+            subHeading(kData.title_gender || 'd. Berdasarkan Jenis Kelamin'),
+            buildSummaryDocx(kData.title_gender, kData.gender || [], t.gender),
             spacer(),
-            buildSummaryDocx('e. Berdasarkan Status', STATUS_ROWS, kData.status || {}, t.status),
+            subHeading(kData.title_status || 'e. Berdasarkan Status'),
+            buildSummaryDocx(kData.title_status, kData.status || [], t.status),
             spacer()
         ];
     } else if (part === 'rekap') {

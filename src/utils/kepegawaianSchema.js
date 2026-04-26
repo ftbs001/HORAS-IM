@@ -266,11 +266,17 @@ export const getDefaultKepegawaianData = () => {
         cuti: [...CUTI_ROWS],
         pembinaan: [...PEMBINAAN_ROWS],
         tata_usaha: [...TATA_USAHA_ROWS],
-        golongan: golData,
-        jabatan: jabData,
-        pendidikan: pendData,
-        gender: genData,
-        status: statData
+        // Migrate legacy objects to dynamic array structures seamlessly!
+        golongan: GOLONGAN_ROWS.map(r => ({ id: r.id, label: r.label, value: golData[r.id] || 0 })),
+        jabatan: JABATAN_ROWS.map(r => ({ id: r.id, label: r.label, value: jabData[r.id] || 0 })),
+        pendidikan: PENDIDIKAN_ROWS.map(r => ({ id: r.id, label: r.label, value: pendData[r.id] || 0 })),
+        gender: GENDER_ROWS.map(r => ({ id: r.id, label: r.label, value: genData[r.id] || 0 })),
+        status: STATUS_ROWS.map(r => ({ id: r.id, label: r.label, value: statData[r.id] || 0 })),
+        title_golongan: "4.1. Berdasarkan Golongan",
+        title_jabatan: "4.2. Berdasarkan Jabatan",
+        title_pendidikan: "4.3. Berdasarkan Pendidikan",
+        title_gender: "4.4. Berdasarkan Jenis Kelamin",
+        title_status: "4.5. Berdasarkan Status"
     };
 };
 
@@ -278,6 +284,9 @@ export const getDefaultKepegawaianData = () => {
 const n = (val) => Number(val) || 0;
 
 export const calcTotal = (data) => {
+    if (Array.isArray(data)) {
+        return data.reduce((sum, item) => sum + n(item.value), 0);
+    }
     return Object.values(data || {}).reduce((sum, val) => sum + n(val), 0);
 };
 
