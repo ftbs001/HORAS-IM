@@ -77,7 +77,8 @@ export const getPercentage = (value, total) => {
 export const calcRealisasiTotals = (dataArray) => {
     let sumPagu = 0, sumTargetRp = 0, sumRealisasiRp = 0;
 
-    const rows = (dataArray || []).map(d => {
+    const arr = Array.isArray(dataArray) ? dataArray : [];
+    const rows = arr.map(d => {
         const pagu = Number(d.pagu) || 0;
         const targetRp = Number(d.target_rp) || 0;
         const realisasiRp = Number(d.realisasi_rp) || 0;
@@ -110,8 +111,8 @@ export const calcRealisasiTotals = (dataArray) => {
 };
 
 export const calcGabungan = (rmData, pnpData) => {
-    const rm = calcRealisasiTotals(rmData || {}).rows;
-    const pnp = calcRealisasiTotals(pnpData || {}).rows;
+    const rm = calcRealisasiTotals(rmData).rows;
+    const pnp = calcRealisasiTotals(pnpData).rows;
 
     const gabunganData = rm.map((r, i) => {
         const pObj = pnp[i] || {};
@@ -131,7 +132,8 @@ export const calcGabungan = (rmData, pnpData) => {
 export const calcBendaharaTotals = (dataArray) => {
     let sumTarget = 0, sumSimponi = 0, sumSpan = 0;
 
-    const rows = (dataArray || []).map(d => {
+    const arr = Array.isArray(dataArray) ? dataArray : [];
+    const rows = arr.map(d => {
         const target = Number(d.target) || 0;
         const simponi = Number(d.realisasi_simponi) || 0;
         const span = Number(d.realisasi_span) || 0;

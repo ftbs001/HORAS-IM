@@ -71,7 +71,7 @@ const InputRp = ({ value, onChange, disabled }) => {
 
 // ─── COMPONENT: Realisasi Anggaran ───────────────────────────────────────────
 function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading }) {
-    const { rows, total } = readOnly ? { rows: data, total: calcRealisasiTotals(data).total } : calcRealisasiTotals(data);
+    const { rows, total } = readOnly ? data : calcRealisasiTotals(data);
 
     const handleAdd = () => onChange([...(data || []), { id: `rm_${Date.now()}`, label: '', pagu: 0, target_rp: 0, realisasi_rp: 0, keterangan: '' }]);
     const handleRemove = (idx) => { const n = [...data]; n.splice(idx, 1); onChange(n); };
