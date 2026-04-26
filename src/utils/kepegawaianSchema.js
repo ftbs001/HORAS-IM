@@ -206,20 +206,73 @@ export const TATA_USAHA_ROWS = [
     { id: 'tu_2', nama: 'Surat Keluar', jumlah: 0 }
 ];
 
-export const getDefaultKepegawaianData = () => ({
-    detail: [...DEFAULT_PEGAWAI_DATA],
-    pppk: [...DEFAULT_PPPK_DATA],
-    non_asn: [...DEFAULT_NON_ASN_DATA],
-    rekap_pegawai: [...REKAPITULASI_PEGAWAI_ROWS],
-    cuti: [...CUTI_ROWS],
-    pembinaan: [...PEMBINAAN_ROWS],
-    tata_usaha: [...TATA_USAHA_ROWS],
-    golongan: generateDefaultNumeric(GOLONGAN_ROWS),
-    jabatan: generateDefaultNumeric(JABATAN_ROWS),
-    pendidikan: generateDefaultNumeric(PENDIDIKAN_ROWS),
-    gender: generateDefaultNumeric(GENDER_ROWS),
-    status: generateDefaultNumeric(STATUS_ROWS)
-});
+export const getDefaultKepegawaianData = () => {
+    const detail = [...DEFAULT_PEGAWAI_DATA];
+    const pppk = [...DEFAULT_PPPK_DATA];
+    const non_asn = [...DEFAULT_NON_ASN_DATA];
+
+    const golData = generateDefaultNumeric(GOLONGAN_ROWS);
+    const jabData = generateDefaultNumeric(JABATAN_ROWS);
+    const pendData = generateDefaultNumeric(PENDIDIKAN_ROWS);
+    const genData = generateDefaultNumeric(GENDER_ROWS);
+    const statData = generateDefaultNumeric(STATUS_ROWS);
+
+    statData.pns = detail.length;
+    statData.pppk = pppk.length;
+    statData.honor = non_asn.length;
+
+    const countAll = (row, isPns) => {
+        // Gender
+        const g = (row.jk || row.jenis_kelamin || '').toUpperCase();
+        if (g === 'L' || g === 'LK' || g === 'LAKI-LAKI') genData.l++;
+        else if (g === 'P' || g === 'PR' || g === 'PEREMPUAN') genData.p++;
+
+        // Pendidikan
+        const p = (row.pendidikan || row.pend_nama || '').toLowerCase();
+        if (p.includes('sd')) pendData.sd++;
+        else if (p.includes('smp')) pendData.smp++;
+        else if (p.includes('sma') || p.includes('smk') || p.includes('slta')) pendData.sma++;
+        else if (p.includes('d iii') || p.includes('d3') || p.includes('akademi')) pendData.d3++;
+        else if (p.includes('sarjana') || p.includes('s1') || p.includes('strata') || p.includes('s.tr')) pendData.s1++;
+        else if (p.includes('magister') || p.includes('s2')) pendData.s2++;
+        else if (p.includes('doktor') || p.includes('s3')) pendData.s3++;
+
+        // Jabatan
+        const j = (row.jabatan || row.jab_nama || '').toLowerCase();
+        if (j.includes('kepala kantor')) jabData.kakan++;
+        else if (j.includes('kasi') || (j.includes('kepala seksi') && !j.includes('sub'))) jabData.kasi++;
+        else if (j.includes('kasub') || j.includes('kepala sub') || j.includes('urusan') || j.includes('kaur')) jabData.kasubsi++;
+        else jabData.staf++;
+
+        // Golongan (only for PNS)
+        if (isPns) {
+            const gol = row.pangkat_gol || '';
+            if (gol.includes('I/') && !gol.includes('II/') && !gol.includes('III/') && !gol.includes('IV/')) golData.gol_1++;
+            else if (gol.includes('II/')) golData.gol_2++;
+            else if (gol.includes('III/')) golData.gol_3++;
+            else if (gol.includes('IV/')) golData.gol_4++;
+        }
+    };
+
+    detail.forEach(r => countAll(r, true));
+    pppk.forEach(r => countAll(r, false));
+    non_asn.forEach(r => countAll(r, false));
+
+    return {
+        detail,
+        pppk,
+        non_asn,
+        rekap_pegawai: [...REKAPITULASI_PEGAWAI_ROWS],
+        cuti: [...CUTI_ROWS],
+        pembinaan: [...PEMBINAAN_ROWS],
+        tata_usaha: [...TATA_USAHA_ROWS],
+        golongan: golData,
+        jabatan: jabData,
+        pendidikan: pendData,
+        gender: genData,
+        status: statData
+    };
+};
 
 // Helper to parse numeric
 const n = (val) => Number(val) || 0;
