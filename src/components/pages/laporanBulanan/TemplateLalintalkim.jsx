@@ -591,13 +591,20 @@ const TABS = [
     { id: 'izin', label: '🪪 Izin Tinggal' },
 ];
 
-export default function TemplateLalintalkim({ embedded = false, defaultTab = 'paspor', defaultSubSection = null }) {
+export default function TemplateLalintalkim({ embedded = false, defaultTab = 'paspor', defaultSubSection = null, forcePreview = false, propBulan = null, propTahun = null }) {
     const { user } = useAuth();
     const [msg, showMsg] = useMsg();
 
-    const [bulan, setBulan] = useState(new Date().getMonth() + 1);
-    const [tahun, setTahun] = useState(new Date().getFullYear());
-    const [isPreview, setIsPreview] = useState(false);
+    const [bulan, setBulan] = useState(propBulan || new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState(propTahun || new Date().getFullYear());
+    const [isPreview, setIsPreview] = useState(forcePreview);
+    
+    // Sync external props if they change
+    useEffect(() => {
+        if (propBulan) setBulan(propBulan);
+        if (propTahun) setTahun(propTahun);
+    }, [propBulan, propTahun]);
+
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
@@ -779,26 +786,64 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
     return (
         <div style={{ fontFamily: FONT, padding: embedded ? '0' : '24px', maxWidth: '1200px', margin: '0 auto' }}>
             {/* ── TOOLBAR ─────────────────────────────────────────────────────── */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '12px', padding: '12px 16px', background: '#1e293b', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <select value={bulan} onChange={e => setBulan(parseInt(e.target.value))}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
-                        {BULAN_NAMES.slice(1).map((n, i) => <option key={i + 1} value={i + 1}>{n}</option>)}
-                    </select>
-                    <select value={tahun} onChange={e => setTahun(parseInt(e.target.value))}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
-                        {TAHUN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>📋 BAB II — {BULAN_NAMES[bulan]} {tahun}</span>
+            {!forcePreview && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '12px', padding: '12px 16px', background: '#1e293b', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <select value={bulan} onChange={e => setBulan(parseInt(e.target.value))}
+                            style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
+                            {BULAN_NAMES.slice(1).map((n, i) => <option key={i + 1} value={i + 1}>{n}</option>)}
+                        </select>
+                        <select value={tahun} onChange={e => setTahun(parseInt(e.target.value))}
+                            style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
+                            {TAHUN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <span style={{ color: '#94a3b8', fontSize: '12px' }}>📋 BAB II — {BULAN_NAMES[bulan]} {tahun}</span>
+                    </div>
+                    <div style={{ flex: 1 }} />
+                    <button onClick={() => setIsPreview(false)} style={toolBtn('edit')}>✏️ Edit</button>
+                    <button onClick={() => setIsPreview(true)} style={toolBtn('preview')}>👁 Preview</button>
+                    <button onClick={handleSave} disabled={saving || loading}
+                        style={{ ...toolBtn('primary'), opacity: (saving || loading) ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
+                        {saving ? '💾 Menyimpan...' : '💾 Simpan'}
+                    </button>
+                    <button
+                        onClick={async () => {
+                            showMsg('info', 'Memproses ekspor Word...');
+                            try {
+                                const { exportStandaloneTemplateDocx, getLalintalKimDocxElements } = await import('../../../utils/templateDocxExporter.js');
+                                const bName = BULAN_NAMES[bulan] || '';
+                                
+                                const currentData = {
+                                    tabel_a: tabelA, tabel_b: tabelB, tabel_c: tabelC,
+                                    tabel_d: tabelD, tabel_e: tabelE, tabel_f: tabelF,
+                                    tabel_g: tabelG, tabel_h: tabelH,
+                                    tabel_itk: tabelItk, tabel_itas: tabelItas, tabel_itap: tabelItap, tabel_lain: tabelLain,
+                                    tabel_udara: tabelUdara, tabel_laut: tabelLaut, tabel_darat: tabelDarat,
+                                };
+
+                                const elems = getLalintalKimDocxElements(null, currentData); // Extract all sections at once
+                                
+                                await exportStandaloneTemplateDocx({
+                                    title: 'A. BIDANG SUBSTANTIF\n1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA',
+                                    filename: 'Template_Lalintalkim',
+                                    bulanName: bName,
+                                    tahun,
+                                    elements: elems,
+                                    isLandscape: true
+                                });
+                                showMsg('success', '✅ Ekspor berhasil!');
+                            } catch (err) {
+                                showMsg('error', '❌ Gagal ekspor Word: ' + err.message);
+                            }
+                        }}
+                        disabled={saving || loading}
+                        style={{ padding: '6px 14px', borderRadius: '6px', background: '#3b82f6', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                        title="Cetak tabel ini ke format Word (.docx)"
+                    >
+                        📄 Ekspor Word
+                    </button>
                 </div>
-                <div style={{ flex: 1 }} />
-                <button onClick={() => setIsPreview(false)} style={toolBtn('edit')}>✏️ Edit</button>
-                <button onClick={() => setIsPreview(true)} style={toolBtn('preview')}>👁 Preview</button>
-                <button onClick={handleSave} disabled={saving || loading}
-                    style={{ ...toolBtn('primary'), opacity: (saving || loading) ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
-                    {saving ? '💾 Menyimpan...' : '💾 Simpan'}
-                </button>
-            </div>
+            )}
 
             {/* ── TABS ────────────────────────────────────────────────────────── */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>

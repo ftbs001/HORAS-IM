@@ -1603,7 +1603,9 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             // Collect Substantif Templates (Landscape)
             const substantifTemplateElems = [];
-            if (tmplLalin) substantifTemplateElems.push(...getLalintalkimDocxElements(tmplLalin));
+            if (tmplLalin) {
+                substantifTemplateElems.push(...getLalintalkimDocxElements('all', tmplLalin));
+            }
             if (tmplIntel) {
                 substantifTemplateElems.push(...getInteldakimDocxElements('projus', tmplIntel, bNama, tahun));
                 substantifTemplateElems.push(...getInteldakimDocxElements('tak', tmplIntel, bNama, tahun));

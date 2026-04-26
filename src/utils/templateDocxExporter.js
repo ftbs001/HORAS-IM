@@ -38,10 +38,9 @@ import {
 import {
     getEmptyPegawaiRow, getEmptyPPPKRow, getEmptyNonAsnRow, GOLONGAN_ROWS, JABATAN_ROWS,
     PENDIDIKAN_ROWS, GENDER_ROWS, STATUS_ROWS,
-    calcAllTotals
+    calcAllTotals, getDefaultKepegawaianData
 } from './kepegawaianSchema';
-
-
+import { getDefaultUmumData } from './umumSchema';
 
 /* ── Gaya Konstanta ─────────────────────────────────────────────────────────── */
 const FONT_NAME = 'Times New Roman';
@@ -695,7 +694,20 @@ export function getLalintalkimDocxElements(part, templateData) {
         tabel_udara = {}, tabel_laut = {}, tabel_darat = {}
     } = templateData || {};
 
-    if (!part) return [];
+    if (!part || part === 'all') {
+        const parts = [
+            'bab2_substantif_dokumen_paspor', 'bab2_substantif_dokumen_paspor_b', 
+            'bab2_substantif_dokumen_paspor_c', 'bab2_substantif_dokumen_paspor_d',
+            'bab2_substantif_dokumen_paspor_e', 'bab2_substantif_dokumen_paspor_f',
+            'bab2_substantif_dokumen_paspor_g', 'bab2_substantif_dokumen_paspor_h',
+            'bab2_substantif_rekapitulasi',
+            'bab2_substantif_dokumen_izintinggal_itk', 'bab2_substantif_dokumen_izintinggal_itas',
+            'bab2_substantif_dokumen_izintinggal_itap', 'bab2_substantif_dokumen_izintinggal_lain'
+        ];
+        const allElems = [];
+        parts.forEach(p => allElems.push(...getLalintalkimDocxElements(p, templateData)));
+        return allElems;
+    }
 
     switch (part) {
         case 'bab2_substantif_dokumen_paspor':
@@ -944,16 +956,37 @@ export function getKeuanganDocxElements(part, templateData, bulanName, tahun) {
     const kData = templateData?.keuangan || {};
 
     if (part === 'rm') {
-        return [buildRealisasiDocx(kData.rm || {}), spacer()];
+        return [
+            subHeading('1) URUSAN KEUANGAN'),
+            subHeading('1. LAPORAN REALISASI PENYERAPAN ANGGARAN (BERDASARKAN JENIS BELANJA)'),
+            spacer(),
+            subHeading('a. Rupiah Murni (RM)'),
+            buildRealisasiDocx(kData.rm || {}),
+            spacer()
+        ];
     }
     if (part === 'pnp') {
-        return [buildRealisasiDocx(kData.pnp || {}), spacer()];
+        return [
+            subHeading('b. Penerimaan Non Pajak (PNBP)'),
+            buildRealisasiDocx(kData.pnp || {}),
+            spacer()
+        ];
     }
     if (part === 'gabungan') {
-        return [buildGabunganDocx(kData.rm || {}, kData.pnp || {}), spacer()];
+        return [
+            subHeading('c. Rupiah Murni + PNBP'),
+            buildGabunganDocx(kData.rm || {}, kData.pnp || {}),
+            spacer()
+        ];
     }
     if (part === 'bendahara') {
-        return [buildBendaharaDocx(kData.bendahara || {}), spacer()];
+        return [
+            subHeading('2. PENERIMAAN NEGARA BUKAN PAJAK (PNBP)'),
+            subHeading('LAPORAN BENDAHARA PENERIMA'),
+            spacer(),
+            buildBendaharaDocx(kData.bendahara || {}),
+            spacer()
+        ];
     }
     return [];
 }
@@ -1147,11 +1180,16 @@ function buildRekapitulasiPegawaiDocx(data) {
         ...Array(8).fill(null).map((_, i) => cell(i % 2 === 0 ? 'LK' : 'PR', { bold: true, center: true, bg: HEADER_BG, w: 600 }))
     ], tableHeader: true });
 
-    const rows = data.map((r, i) => new TableRow({ children: [
-        cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
-        cell(r.name, { center: true }),
-        ...tblKeys.map(k => cell(r[k] || 0, { center: true }))
-    ]}));
+    const rows = data.length === 0
+        ? [new TableRow({ children: [
+            cell('01.', { center: true }),
+            cell('Nihil', { center: true, colSpan: 13 })
+        ]})]
+        : data.map((r, i) => new TableRow({ children: [
+            cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
+            cell(r.name, { center: true }),
+            ...tblKeys.map(k => cell(r[k] || 0, { center: true }))
+        ]}));
 
     const sumRow = new TableRow({ children: [
         cell('JUMLAH', { bold: true, center: true, colSpan: 2, bg: '#f1f5f9' }),
@@ -1173,12 +1211,19 @@ function buildDataCutiDocx(data, totalCuti) {
         cell('KETERANGAN', { bold: true, center: true, bg: HEADER_BG, w: 4000 })
     ], tableHeader: true });
 
-    const rows = data.map((r, i) => new TableRow({ children: [
-        cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
-        cell(r.nama, {}),
-        cell(r.jumlah || 0, { center: true }),
-        cell(r.ket || '', {})
-    ]}));
+    const rows = data.length === 0
+        ? [new TableRow({ children: [
+            cell('01.', { center: true }),
+            cell('Nihil', { center: true }),
+            cell('', {}),
+            cell('', {})
+        ]})]
+        : data.map((r, i) => new TableRow({ children: [
+            cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
+            cell(r.nama, {}),
+            cell(r.jumlah || 0, { center: true }),
+            cell(r.ket || '', {})
+        ]}));
 
     const sumRow = new TableRow({ children: [
         cell('JUMLAH', { bold: true, center: true, colSpan: 2, bg: '#f1f5f9' }),
@@ -1200,11 +1245,17 @@ function buildPembinaanDocx(data) {
         cell('KETERANGAN', { bold: true, center: true, bg: HEADER_BG, w: 3000 })
     ], tableHeader: true });
 
-    const rows = data.map((r, i) => new TableRow({ children: [
-        cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
-        cell(r.nama, {}),
-        cell(r.ket || '', { center: true })
-    ]}));
+    const rows = data.length === 0
+        ? [new TableRow({ children: [
+            cell('01.', { center: true }),
+            cell('Nihil', { center: true }),
+            cell('', {})
+        ]})]
+        : data.map((r, i) => new TableRow({ children: [
+            cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
+            cell(r.nama, {}),
+            cell(r.ket || '', { center: true })
+        ]}));
 
     return [
         subHeading('4. Pembinaan Pegawai'),
@@ -1220,11 +1271,17 @@ function buildTataUsahaDocx(data) {
         cell('JUMLAH', { bold: true, center: true, bg: HEADER_BG, w: 3000 })
     ], tableHeader: true });
 
-    const rows = data.map((r, i) => new TableRow({ children: [
-        cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
-        cell(r.nama, {}),
-        cell(r.jumlah || 0, { center: true })
-    ]}));
+    const rows = data.length === 0
+        ? [new TableRow({ children: [
+            cell('01.', { center: true }),
+            cell('Nihil', { center: true }),
+            cell('', {})
+        ]})]
+        : data.map((r, i) => new TableRow({ children: [
+            cell(String(i + 1).padStart(2, '0') + '.', { center: true }),
+            cell(r.nama, {}),
+            cell(r.jumlah || 0, { center: true })
+        ]}));
 
     return [
         subHeading('5. Tata Usaha (Persuratan)'),
@@ -1234,11 +1291,31 @@ function buildTataUsahaDocx(data) {
 }
 
 export function getKepegawaianDocxElements(part, templateData, bulanName, tahun) {
-    const kData = templateData?.kepegawaian || {};
+    // Inject default schema if DB is completely empty for Kepegawaian
+    let kData = templateData?.kepegawaian;
+    if (!kData || Object.keys(kData).length === 0) {
+        const defs = getDefaultKepegawaianData();
+        kData = {
+            detail: defs.detail,
+            pppk: defs.pppk,
+            non_asn: defs.non_asn,
+            golongan: defs.golongan,
+            jabatan: defs.jabatan,
+            pendidikan: defs.pendidikan,
+            gender: defs.gender,
+            status: defs.status,
+            rekap_pegawai: defs.rekap_pegawai,
+            cuti: defs.cuti,
+            pembinaan: defs.pembinaan,
+            tata_usaha: defs.tata_usaha
+        };
+    }
+    
+    const t = calcAllTotals(kData);
+
     if (part === 'bezetting') {
-        const t = calcAllTotals(kData);
-        // We will output the detail table first
         return [
+            subHeading('2) URUSAN KEPEGAWAIAN'),
             subHeading('1. LAPORAN BEZETTING PEGAWAI'),
             buildPegawaiDetailDocx(kData.detail),
             spacer(),
@@ -1260,21 +1337,36 @@ export function getKepegawaianDocxElements(part, templateData, bulanName, tahun)
             buildSummaryDocx('d. Berdasarkan Jenis Kelamin', GENDER_ROWS, kData.gender || {}, t.gender),
             spacer(),
             buildSummaryDocx('e. Berdasarkan Status', STATUS_ROWS, kData.status || {}, t.status),
-            spacer(),
+            spacer()
+        ];
+    } else if (part === 'rekap') {
+        return [
+            subHeading('2. Rekapitulasi Pegawai'),
             spacer(),
             ...buildRekapitulasiPegawaiDocx(kData.rekap_pegawai || []),
-            spacer(),
+            spacer()
+        ];
+    } else if (part === 'cuti') {
+        return [
+            subHeading('3. Data Cuti Pegawai'),
             spacer(),
             ...buildDataCutiDocx(kData.cuti || [], t.cuti),
-            spacer(),
+            spacer()
+        ];
+    } else if (part === 'pembinaan') {
+        return [
+            subHeading('4. Pembinaan Pegawai'),
             spacer(),
             ...buildPembinaanDocx(kData.pembinaan || []),
-            spacer(),
-            spacer(),
+            spacer()
+        ];
+    } else if (part === 'persuratan') {
+        return [
             ...buildTataUsahaDocx(kData.tata_usaha || []),
             spacer()
         ];
     }
+    
     return [];
 }
 
@@ -1317,37 +1409,39 @@ function buildKendaraanDocx(data) {
         ]
     });
 
-    const mkGroup = (title, items, num) => {
+    const mkGroupRows = (title, items, num) => {
+        const headerRow = new TableRow({ children: [
+            cell(num, { center: true, bold: true, bg: '#f1f5f9' }),
+            cell(title, { bold: true, colSpan: 4, bg: '#f1f5f9' })
+        ]});
+
         if (!items || items.length === 0) {
-            return new TableRow({ children: [
-                cell(num, { center: true, bold: true }),
-                cell(title, { bold: true }),
-                cell('Nihil', { center: true }),
-                cell('', { center: true }),
-                cell('', { center: true })
-            ]});
+            return [headerRow, new TableRow({ children: [
+                cell('', {}),
+                cell('— Nihil —', { center: true, fontStyle: 'italic', colSpan: 4, bg: '#f8fafc' })
+            ]})];
         }
         
-        const titleLines = [title];
-        const valLines = items.map((r, i) => `${i + 1}. ${r.jenis || ''}`);
-        
-        return new TableRow({ children: [
-            cell(num, { center: true, bold: true }),
-            multiLineCell([...titleLines, ...valLines], { bold: false }),
-            multiLineCell(items.map(r => r.nopol || ''), { center: true }),
-            multiLineCell(items.map(r => r.tahun || ''), { center: true }),
-            multiLineCell(items.map(r => r.kondisi || ''), { center: true }),
-        ]});
+        const dataRows = items.map((r, i) => new TableRow({ children: [
+            cell(i + 1, { center: true }),
+            cell(r.jenis || ''),
+            cell(r.nopol || '', { center: true }),
+            cell(r.tahun || '', { center: true }),
+            cell(r.kondisi || '', { center: true })
+        ]}));
+
+        return [headerRow, ...dataRows];
     };
 
     const rows = [
-        mkGroup('Kendaraan Roda 2', data.roda2, '01.'),
-        mkGroup('Kendaraan Roda 4', data.roda4, '02.'),
-        mkGroup('Kendaraan Roda 6', data.roda6, '03.'),
-        mkGroup('Kapal Patroli', data.kapal, '04.')
+        ...mkGroupRows('Kendaraan Roda 2', data.roda2, '01.'),
+        ...mkGroupRows('Kendaraan Roda 4', data.roda4, '02.'),
+        ...mkGroupRows('Kendaraan Roda 6', data.roda6, '03.'),
+        ...mkGroupRows('Kapal Patroli', data.kapal, '04.')
     ];
 
     return [
+        subHeading('3) URUSAN UMUM'),
         subHeading('a. Kendaraan Operasional'),
         spacer(),
         new Table({ width: { size: PAGE_W, type: WidthType.DXA }, rows: [hr, ...rows] })
@@ -1385,14 +1479,18 @@ function buildSaranaDocx(data) {
 }
 
 export function getUmumDocxElements(part, templateData, bulanName, tahun) {
-    if (!templateData || !templateData.umum) return [];
+    // Inject default schema if DB is completely empty for Umum
+    let umumData = templateData?.umum;
+    if (!umumData || Object.keys(umumData).length === 0) {
+        umumData = getDefaultUmumData();
+    }
     
     if (part === 'kendaraan') {
-        return buildKendaraanDocx(templateData.umum);
+        return buildKendaraanDocx(umumData);
     } else if (part === 'sarana') {
-        return buildSaranaDocx(templateData.umum);
+        return buildSaranaDocx(umumData);
     } else if (part === 'gedung') {
-        return buildGedungDocx(templateData.umum);
+        return buildGedungDocx(umumData);
     }
     
     return [];
@@ -1433,24 +1531,18 @@ function buildGedungDocx(data) {
 
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   TEST EXPORTER (STANDALONE) -> only used in browser console for testing
+   STANDALONE TEMPLATE EXPORTER (PER SEKSI)
 ══════════════════════════════════════════════════════════════════════════════ */
-export async function exportTemplateToDOCX(bulan, tahun, templateData) {
-    const {
-        tabel_a = {}, tabel_b = {}, tabel_c = {}, tabel_d = {},
-        tabel_e = {}, tabel_f = {}, tabel_g = {}, tabel_h = {},
-        tabel_itk = {}, tabel_itas = {}, tabel_itap = {}, tabel_lain = {},
-        tabel_udara = {}, tabel_laut = {}, tabel_darat = {}
-    } = templateData;
-    const bulanName = BULAN_NAMES[bulan] || '';
+export async function exportStandaloneTemplateDocx({ title, filename, bulanName, tahun, elements, isLandscape = true }) {
+    const docSize = isLandscape ? { width: 16838, height: 11906 } : { width: 11906, height: 16838 };
+    const docMargin = isLandscape 
+        ? { top: 1134, bottom: 1134, left: 1701, right: 1134 } 
+        : { top: 1701, bottom: 1134, left: 1134, right: 1134 };
 
     const doc = new Document({
         sections: [{
             properties: {
-                page: {
-                    size: { width: 16838, height: 11906 }, // Landscape A4
-                    margin: { top: 1134, bottom: 1134, left: 1701, right: 1134 },
-                },
+                page: { size: docSize, margin: docMargin },
             },
             children: [
                 new Paragraph({
@@ -1466,8 +1558,8 @@ export async function exportTemplateToDOCX(bulan, tahun, templateData) {
                     })],
                     spacing: { after: 240 },
                 }),
-                heading('A. BIDANG SUBSTANTIF'),
-                ...getLalintalkimDocxElements(templateData),
+                heading(title),
+                ...elements,
             ],
         }],
     });
@@ -1476,14 +1568,13 @@ export async function exportTemplateToDOCX(bulan, tahun, templateData) {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `Template_Lalintalkim_${bulanName}_${tahun}.docx`;
+    a.download = `${filename}_${bulanName}_${tahun}.docx`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 /**
  * Alias with correct casing so TemplateLalintalkim.jsx can import it.
- * Exact same function as getLalintalkimDocxElements, just exported under the name
- * used in the dynamic import.
+ * Exact same function as getLalintalkimDocxElements
  */
 export const getLalintalKimDocxElements = getLalintalkimDocxElements;

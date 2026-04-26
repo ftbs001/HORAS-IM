@@ -757,91 +757,58 @@ const buildContentBlock = async (block, { Paragraph, ImageRun, AlignmentType }) 
     return [];
 };
 
-const buildChapter = async (title, sections, isFirst = false) => {
+const buildChapter = async (title, sections, isFirst = false, coverPageData = {}) => {
     const elems = [];
     elems.push(buildBabHeader(title, isFirst));
 
     for (const section of (sections || [])) {
         if (section.level === 3) {
             elems.push(buildSubSubBabHeader(section.title));
-        } else if (section.title && !section.isLalintalkimTemplate) {
+        } else if (section.title && !section.isLalintalkimTemplate && !section.isInteldakimTemplate && !section.isInfokimTemplate && !section.isPengaduanTemplate && !section.isKeuanganTemplate && !section.isKepegawaianTemplate && !section.isUmumTemplate) {
             // For templates, the template generator already provides heading
             elems.push(buildSubBabHeader(section.title));
         }
 
         if (section.isLalintalkimTemplate) {
-            if (section.templateData) {
-                // Import the template builder and generate native DOCX tables
-                const { getLalintalkimDocxElements } = await import('./templateDocxExporter.js');
-                const templateElems = getLalintalkimDocxElements(section.lalintalkimPart || null, section.templateData);
-                if (templateElems.length > 0) elems.push(...templateElems);
-            } else {
-                elems.push(para('[Data Template belum terisi pada bulan ini]', { alignment: AlignmentType.CENTER, italics: true }));
-            }
+            const { getLalintalkimDocxElements } = await import('./templateDocxExporter.js');
+            const templateElems = getLalintalkimDocxElements(section.lalintalkimPart || null, section.templateData || {});
+            if (templateElems.length > 0) elems.push(...templateElems);
             continue;
         }
 
         if (section.isInteldakimTemplate) {
-            if (section.templateData) {
-                const { getInteldakimDocxElements } = await import('./templateDocxExporter.js');
-                const intElems = getInteldakimDocxElements(
-                    section.inteldakimPart,
-                    section.templateData,
-                    section.bulanName || '',
-                    section.tahun || new Date().getFullYear()
-                );
-                if (intElems.length > 0) elems.push(...intElems);
-            } else {
-                elems.push(para('[Data Inteldakim belum terisi pada bulan ini]', { alignment: AlignmentType.CENTER, italics: true }));
-            }
+            const { getInteldakimDocxElements } = await import('./templateDocxExporter.js');
+            const templateElems = getInteldakimDocxElements(section.inteldakimPart || null, section.templateData || {}, coverPageData?.month || '', coverPageData?.year || '');
+            if (templateElems.length > 0) elems.push(...templateElems);
             continue;
         }
 
-        if (section.isInfokimTemplate) {
+        if (section.isInfokimTemplate || section.isPengaduanTemplate) {
             const { getInfokimDocxElements } = await import('./templateDocxExporter.js');
-            const ikElems = getInfokimDocxElements(
-                section.infokimPart,
-                section.templateData,
-                section.bulanName || '',
-                section.tahun || new Date().getFullYear()
-            );
-            if (ikElems.length > 0) elems.push(...ikElems);
+            const part = section.isInfokimTemplate ? 'infokim' : 'pengaduan';
+            const templateElems = getInfokimDocxElements(part, section.templateData || {}, coverPageData?.month || '', coverPageData?.year || '');
+            if (templateElems.length > 0) elems.push(...templateElems);
             continue;
         }
 
         if (section.isKeuanganTemplate) {
             const { getKeuanganDocxElements } = await import('./templateDocxExporter.js');
-            const kElems = getKeuanganDocxElements(
-                section.keuanganPart,
-                section.templateData,
-                section.bulanName || '',
-                section.tahun || new Date().getFullYear()
-            );
-            if (kElems.length > 0) elems.push(...kElems);
+            const templateElems = getKeuanganDocxElements(section.keuanganPart || null, section.templateData || {});
+            if (templateElems.length > 0) elems.push(...templateElems);
             continue;
         }
 
         if (section.isKepegawaianTemplate) {
             const { getKepegawaianDocxElements } = await import('./templateDocxExporter.js');
-            const kpElems = getKepegawaianDocxElements(
-                section.kepegawaianPart,
-                section.templateData,
-                section.bulanName || '',
-                section.tahun || new Date().getFullYear()
-            );
-            if (kpElems.length > 0) elems.push(...kpElems);
+            const templateElems = getKepegawaianDocxElements(section.kepegawaianPart || null, section.templateData || {}, coverPageData?.month || '', coverPageData?.year || '');
+            if (templateElems.length > 0) elems.push(...templateElems);
             continue;
         }
 
         if (section.isUmumTemplate) {
             const { getUmumDocxElements } = await import('./templateDocxExporter.js');
-            const umElems = getUmumDocxElements(
-                section.umumPart,
-                section.templateData,
-                section.bulanName || '',
-                section.tahun || new Date().getFullYear()
-            );
-            if (umElems.length > 0) elems.push(...umElems);
+            const templateElems = getUmumDocxElements(section.umumPart || null, section.templateData || {}, coverPageData?.month || '', coverPageData?.year || '');
+            if (templateElems.length > 0) elems.push(...templateElems);
             continue;
         }
 

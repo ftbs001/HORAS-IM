@@ -351,13 +351,20 @@ function TabelTimpora({ data, onChange, isPreview, loading, bulan, tahun }) {
 }
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded = false, defaultSubSection = null }) {
+export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded = false, defaultSubSection = null, forcePreview = false, propBulan = null, propTahun = null }) {
     const { user } = useAuth();
     const [msg, showMsg] = useMsg();
 
-    const [bulan, setBulan] = useState(new Date().getMonth() + 1);
-    const [tahun, setTahun] = useState(new Date().getFullYear());
-    const [isPreview, setIsPreview] = useState(false);
+    const [bulan, setBulan] = useState(propBulan || new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState(propTahun || new Date().getFullYear());
+    const [isPreview, setIsPreview] = useState(forcePreview);
+    
+    // Sync external props if they change
+    useEffect(() => {
+        if (propBulan) setBulan(propBulan);
+        if (propTahun) setTahun(propTahun);
+    }, [propBulan, propTahun]);
+
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
@@ -450,32 +457,66 @@ export default function TemplateInteldakim({ seksiAlias = 'inteldakim', embedded
     return (
         <div style={{ fontFamily: FONT, padding: embedded ? '0' : '24px', maxWidth: '1200px', margin: '0 auto' }}>
             {/* Toolbar */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '16px', padding: '12px 16px', background: '#1e293b', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <select value={bulan} onChange={e => setBulan(parseInt(e.target.value))}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
-                        {BULAN_NAMES.slice(1).map((n, i) => <option key={i + 1} value={i + 1}>{n}</option>)}
-                    </select>
-                    <select value={tahun} onChange={e => setTahun(parseInt(e.target.value))}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
-                        {TAHUN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>📋 BAB II — {BULAN_NAMES[bulan]} {tahun}</span>
+            {!forcePreview && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '16px', padding: '12px 16px', background: '#1e293b', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <select value={bulan} onChange={e => setBulan(parseInt(e.target.value))}
+                            style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
+                            {BULAN_NAMES.slice(1).map((n, i) => <option key={i + 1} value={i + 1}>{n}</option>)}
+                        </select>
+                        <select value={tahun} onChange={e => setTahun(parseInt(e.target.value))}
+                            style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', background: '#fff', cursor: 'pointer' }}>
+                            {TAHUN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <span style={{ color: '#94a3b8', fontSize: '13px' }}>📋 BAB II — {BULAN_NAMES[bulan]} {tahun}</span>
+                    </div>
+                    <div style={{ flex: 1 }} />
+                    <button onClick={() => setIsPreview(false)}
+                        style={{ padding: '6px 14px', borderRadius: '6px', background: !isPreview ? '#a855f7' : '#475569', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        ✏️ Edit
+                    </button>
+                    <button onClick={() => setIsPreview(true)}
+                        style={{ padding: '6px 14px', borderRadius: '6px', background: isPreview ? '#0891b2' : '#475569', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        👁 Preview
+                    </button>
+                    <button onClick={handleSave} disabled={saving || loading}
+                        style={{ padding: '6px 16px', borderRadius: '6px', background: '#16a34a', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: saving ? 'wait' : 'pointer', opacity: (saving || loading) ? 0.6 : 1 }}>
+                        {saving ? '💾 Menyimpan...' : '💾 Simpan'}
+                    </button>
+                    <button
+                        onClick={async () => {
+                            showMsg('info', 'Memproses ekspor Word...');
+                            try {
+                                const { exportStandaloneTemplateDocx, getInteldakimDocxElements } = await import('../../../utils/templateDocxExporter.js');
+                                const bName = BULAN_NAMES[bulan] || '';
+                                
+                                const currentData = { projus: dataProjus, tak: dataTAK, timpora: dataTimpora };
+                                const elems = [];
+                                elems.push(...getInteldakimDocxElements('projus', currentData, bName, tahun));
+                                elems.push(...getInteldakimDocxElements('tak', currentData, bName, tahun));
+                                elems.push(...getInteldakimDocxElements('timpora', currentData, bName, tahun));
+                                
+                                await exportStandaloneTemplateDocx({
+                                    title: '4. INTELIJEN DAN PENINDAKAN KEIMIGRASIAN',
+                                    filename: 'Template_Inteldakim',
+                                    bulanName: bName,
+                                    tahun,
+                                    elements: elems,
+                                    isLandscape: true
+                                });
+                                showMsg('success', '✅ Ekspor berhasil!');
+                            } catch (err) {
+                                showMsg('error', '❌ Gagal ekspor Word: ' + err.message);
+                            }
+                        }}
+                        disabled={saving || loading}
+                        style={{ padding: '6px 14px', borderRadius: '6px', background: '#3b82f6', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                        title="Cetak tabel ini ke format Word (.docx)"
+                    >
+                        📄 Ekspor Word
+                    </button>
                 </div>
-                <div style={{ flex: 1 }} />
-                <button onClick={() => setIsPreview(false)}
-                    style={{ padding: '6px 14px', borderRadius: '6px', background: !isPreview ? '#a855f7' : '#475569', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    ✏️ Edit
-                </button>
-                <button onClick={() => setIsPreview(true)}
-                    style={{ padding: '6px 14px', borderRadius: '6px', background: isPreview ? '#0891b2' : '#475569', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    👁 Preview
-                </button>
-                <button onClick={handleSave} disabled={saving || loading}
-                    style={{ padding: '6px 16px', borderRadius: '6px', background: '#16a34a', color: '#fff', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: saving ? 'wait' : 'pointer', opacity: (saving || loading) ? 0.6 : 1 }}>
-                    {saving ? '💾 Menyimpan...' : '💾 Simpan'}
-                </button>
-            </div>
+            )}
 
             {/* Notification */}
             {msg && (

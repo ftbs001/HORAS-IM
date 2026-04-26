@@ -977,12 +977,25 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                 } else {
                                     // Content item
                                     const htmlContent = reportData[child.id] || '';
-                                    if (child.id === 'bab2_substantif_dokumen_paspor_template') {
-                                        // Special injection for Lalintalkim Template
+                                    if (child.id === 'bab2_substantif_dokumen_paspor' || 
+                                        child.id === 'bab2_substantif_dokumen_paspor_b' ||
+                                        child.id === 'bab2_substantif_dokumen_paspor_c' ||
+                                        child.id === 'bab2_substantif_dokumen_paspor_d' ||
+                                        child.id === 'bab2_substantif_dokumen_paspor_e' ||
+                                        child.id === 'bab2_substantif_dokumen_paspor_f' ||
+                                        child.id === 'bab2_substantif_dokumen_paspor_g' ||
+                                        child.id === 'bab2_substantif_dokumen_paspor_h' ||
+                                        child.id === 'bab2_substantif_dokumen_izintinggal_itk' ||
+                                        child.id === 'bab2_substantif_dokumen_izintinggal_itas' ||
+                                        child.id === 'bab2_substantif_dokumen_izintinggal_itap' ||
+                                        child.id === 'bab2_substantif_dokumen_izintinggal_lain' ||
+                                        child.id === 'bab2_substantif_rekapitulasi') {
+                                        // Specific injection for all Lalintalkim templates
                                         chapter.sections.push({
                                             title: child.label,
                                             level: sectionLevel,
                                             isLalintalkimTemplate: true,
+                                            lalintalkimPart: child.id,
                                             templateData: templateData
                                         });
                                     } else if (child.id === 'bab2_substantif_intel_yustisia') {
@@ -1197,6 +1210,88 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         }
     };
 
+    const parsedCoverData = useMemo(() => {
+        let rawMonth = '';
+        let rawYear = new Date().getFullYear();
+        
+        try {
+            const html = reportData['cover_page'] || '';
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            const ps = tempDiv.querySelectorAll('p');
+            ps.forEach(p => {
+                const text = p.innerText || '';
+                if (text.toLowerCase().includes('bulan:')) {
+                    rawMonth = text.split(':')[1]?.trim() || '';
+                } else if (text.toLowerCase().includes('tahun:')) {
+                    rawYear = text.split(':')[1]?.trim() || '';
+                }
+            });
+        } catch(e) {}
+        
+        const BULAN_NAMES = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        const monthUpper = String(rawMonth).toUpperCase();
+        const mIndex = BULAN_NAMES.findIndex((n, i) => i > 0 && n.toUpperCase() === monthUpper);
+        const finalBulan = mIndex > 0 ? mIndex : (parseInt(rawMonth) || new Date().getMonth() + 1);
+        const tahunInt = parseInt(rawYear) || new Date().getFullYear();
+        
+        return { finalBulan, tahunInt };
+    }, [reportData]);
+
+    const renderTemplateForPreview = (nodeId) => {
+        const { finalBulan, tahunInt } = parsedCoverData;
+
+        if (nodeId === 'bab2_substantif_dokumen_paspor' || 
+            nodeId === 'bab2_substantif_dokumen_paspor_b' ||
+            nodeId === 'bab2_substantif_dokumen_paspor_c' ||
+            nodeId === 'bab2_substantif_dokumen_paspor_d' ||
+            nodeId === 'bab2_substantif_dokumen_paspor_e' ||
+            nodeId === 'bab2_substantif_dokumen_paspor_f' ||
+            nodeId === 'bab2_substantif_dokumen_paspor_g' ||
+            nodeId === 'bab2_substantif_dokumen_paspor_h' ||
+            nodeId === 'bab2_substantif_dokumen_izintinggal_itk' ||
+            nodeId === 'bab2_substantif_dokumen_izintinggal_itas' ||
+            nodeId === 'bab2_substantif_dokumen_izintinggal_itap' ||
+            nodeId === 'bab2_substantif_dokumen_izintinggal_lain') {
+            return <TemplateLalintalkim key={nodeId} embedded defaultTab="paspor" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_substantif_rekapitulasi') {
+            return <TemplateLalintalkim key={nodeId} embedded defaultTab="perlintasan" propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_substantif_intel_yustisia' || nodeId === 'bab2_substantif_intel_admin' || nodeId === 'bab2_substantif_intel_timpora') {
+            return <TemplateInteldakimEmbedded key={nodeId} embedded seksiAlias="inteldakim" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_substantif_infokim' || nodeId === 'bab2_substantif_pengaduan') {
+            return <TemplateInfokimEmbedded key={nodeId} embedded defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_keuangan_rm' || nodeId === 'bab2_fasilitatif_keuangan_pnp' || nodeId === 'bab2_fasilitatif_keuangan_gabungan') {
+            return <TemplateKeuanganEmbedded key={nodeId} embedded defaultTab="realisasi" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_keuangan_pnbp') {
+            return <TemplateKeuanganEmbedded key={nodeId} embedded defaultTab="pnbp" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_kepegawaian_bezetting') {
+            return <TemplateKepegawaianEmbedded key={nodeId} embedded defaultTab="detail" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_kepegawaian_rekap') {
+            return <TemplateKepegawaianEmbedded key={nodeId} embedded defaultTab="summary" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_kepegawaian_cuti' || nodeId === 'bab2_fasilitatif_kepegawaian_pembinaan' || nodeId === 'bab2_fasilitatif_kepegawaian_persuratan') {
+            return <TemplateKepegawaianEmbedded key={nodeId} embedded defaultTab="lainnya" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_umum_kendaraan') {
+            return <TemplateUmumEmbedded key={nodeId} embedded defaultTab="kendaraan" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_umum_sarana') {
+            return <TemplateUmumEmbedded key={nodeId} embedded defaultTab="sarana" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        if (nodeId === 'bab2_fasilitatif_umum_gedung') {
+            return <TemplateUmumEmbedded key={nodeId} embedded defaultTab="gedung" defaultSubSection={nodeId} propBulan={finalBulan} propTahun={tahunInt} forcePreview />;
+        }
+        return null;
+    };
+
     // Recursive Render for Preview
     const renderPreviewNodes = (nodes) => {
         // Safety check: return empty array if nodes is undefined or not an array
@@ -1204,30 +1299,40 @@ const MonthlyReport = ({ sectionFilter = null }) => {
             return [];
         }
 
-        return nodes.map(node => (
-            <div key={node.id} id={`preview-section-${node.id}`} className={node.type === 'folder' ? 'mt-4' : 'mb-4'}>
-                <h4 className={`font - bold ${node.type === 'folder' ? 'text-lg text-imigrasi-navy underline' : 'text-md text-gray-800'} `}>
-                    {node.label}
-                </h4>
-                {node.type === 'file' ? (
-                    <div
-                        className="preview-content text-justify leading-relaxed mt-2 text-gray-700 break-words overflow-wrap-anywhere"
-                        style={{
-                            wordBreak: 'break-word',
-                            overflowWrap: 'break-word',
-                            maxWidth: '100%'
-                        }}
-                        dangerouslySetInnerHTML={{
-                            __html: reportData[node.id] || '<span class="text-gray-300 italic">[Belum ada konten]</span>'
-                        }}
-                    />
-                ) : (
-                    <div className="pl-4 border-l border-gray-100 mt-2 space-y-4">
-                        {node.children && renderPreviewNodes(node.children)}
-                    </div>
-                )}
-            </div>
-        ));
+        return nodes.map(node => {
+            const templateView = node.type === 'file' ? renderTemplateForPreview(node.id) : null;
+            
+            return (
+                <div key={node.id} id={`preview-section-${node.id}`} className={node.type === 'folder' ? 'mt-4' : 'mb-4'}>
+                    <h4 className={`font-bold ${node.type === 'folder' ? 'text-lg text-imigrasi-navy underline' : 'text-md text-gray-800'}`}>
+                        {node.label}
+                    </h4>
+                    {node.type === 'file' ? (
+                        templateView ? (
+                            <div className="mt-2 preview-template-container border border-gray-200 rounded-md overflow-hidden bg-white">
+                                {templateView}
+                            </div>
+                        ) : (
+                            <div
+                                className="preview-content text-justify leading-relaxed mt-2 text-gray-700 break-words overflow-wrap-anywhere"
+                                style={{
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word',
+                                    maxWidth: '100%'
+                                }}
+                                dangerouslySetInnerHTML={{
+                                    __html: reportData[node.id] || '<span class="text-gray-300 italic">[Belum ada konten]</span>'
+                                }}
+                            />
+                        )
+                    ) : (
+                        <div className="pl-4 border-l border-gray-100 mt-2 space-y-4">
+                            {node.children && renderPreviewNodes(node.children)}
+                        </div>
+                    )}
+                </div>
+            );
+        });
     };
 
     // Components
@@ -1653,8 +1758,11 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                         )
                     ) : (
                         // PREVIEW MODE — sidebar stays visible on scroll
-                        <div id="preview-container" className="p-8 bg-gray-200 min-h-full print:bg-white print:p-0">
-                            <div className="max-w-[210mm] mx-auto bg-white shadow-2xl p-[30mm] min-h-[297mm] font-serif print:p-0 print:shadow-none">
+                        // PREVIEW MODE — sidebar stays visible on scroll
+                        <div id="preview-container" className="p-8 bg-gray-200 min-h-full print:bg-white print:p-0 flex flex-col gap-8 items-center">
+                            
+                            {/* ── PORTRAIT PAGES (Bab 1, 3, 4) ── */}
+                            <div className="w-[210mm] shadow-2xl bg-white p-[25mm] min-h-[297mm] font-serif print:p-0 print:shadow-none shrink-0 border border-gray-300">
                                 {/* Cover Letter Preview */}
                                 <div id="preview-section-cover_letter">
                                     <CoverLetterPreview />
@@ -1675,7 +1783,8 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                     <TableOfContentsPreview />
                                 </div>
 
-                                {filteredToc && filteredToc.filter(chapter => chapter.id !== 'cover_letter' && chapter.id !== 'cover_page' && chapter.id !== 'foreword' && chapter.id !== 'toc').map(chapter => (
+                                {/* Bab 1, Bab 3, Bab 4 */}
+                                {filteredToc && filteredToc.filter(c => ['bab1', 'bab3', 'bab4'].includes(c.id)).map(chapter => (
                                     <div key={chapter.id} id={`preview-section-${chapter.id}`} className="mb-12">
                                         <h3 className="text-2xl font-bold uppercase text-center mb-8 bg-gray-100 py-2 border-y border-black">{chapter.label}</h3>
                                         <div className="space-y-6">
@@ -1684,6 +1793,24 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                     </div>
                                 ))}
                             </div>
+
+                            {/* ── LANDSCAPE PAGES (Bab 2, 5) ── */}
+                            {filteredToc && filteredToc.filter(c => ['bab2', 'bab5'].includes(c.id)).length > 0 && (
+                                <div className="w-[297mm] shadow-2xl bg-white p-[20mm] min-h-[210mm] font-serif print:p-0 print:shadow-none shrink-0 border border-gray-300 overflow-x-auto">
+                                    <div className="text-center italic mb-6 font-bold text-gray-500 bg-amber-50 p-2 rounded-md outline-dashed outline-1 outline-amber-300">
+                                        💡 Mode Landscape untuk menampung resolusi tabel yang lebar
+                                    </div>
+                                    
+                                    {filteredToc.filter(c => ['bab2', 'bab5'].includes(c.id)).map(chapter => (
+                                        <div key={chapter.id} id={`preview-section-${chapter.id}`} className="mb-12">
+                                            <h3 className="text-2xl font-bold uppercase text-center mb-8 bg-gray-100 py-2 border-y border-black">{chapter.label}</h3>
+                                            <div className="space-y-6">
+                                                {renderPreviewNodes(chapter.children)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

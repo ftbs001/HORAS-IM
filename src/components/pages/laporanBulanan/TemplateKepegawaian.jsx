@@ -239,12 +239,17 @@ function AdminTableGeneric({ data, columns, keys, types, onChange, disabled }) {
         </table>
     );
 }
-
-export default function TemplateKepegawaian({ embedded = false, defaultTab = 'detail', defaultSubSection = null }) {
+export default function TemplateKepegawaian({ embedded = false, defaultTab = 'detail', defaultSubSection = null, forcePreview = false, propBulan = null, propTahun = null }) {
     const [msg, showMsg] = useMsg();
-    const [bulan, setBulan] = useState(new Date().getMonth() + 1);
-    const [tahun, setTahun] = useState(new Date().getFullYear());
-    const [isPreview, setIsPreview] = useState(false);
+    const [bulan, setBulan] = useState(propBulan || new Date().getMonth() + 1);
+    const [tahun, setTahun] = useState(propTahun || new Date().getFullYear());
+    const [isPreview, setIsPreview] = useState(forcePreview);
+    
+    // Sync external props if they change
+    useEffect(() => {
+        if (propBulan) setBulan(propBulan);
+        if (propTahun) setTahun(propTahun);
+    }, [propBulan, propTahun]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
@@ -334,30 +339,93 @@ export default function TemplateKepegawaian({ embedded = false, defaultTab = 'de
         <div style={{ fontFamily: FONT, padding: embedded ? '0' : '24px' }}>
 
             {/* ── Toolbar ──────────────────────────────────────────────── */}
-            <div style={{
-                display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
-                padding: '10px 14px', background: '#1e293b', borderRadius: '8px', marginBottom: '12px'
-            }}>
-                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Bulan:</span>
-                <select value={bulan} onChange={e => setBulan(parseInt(e.target.value))}
-                    style={{ padding: '4px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: FONT }}>
-                    {BULAN_NAMES.slice(1).map((n, i) => <option key={i+1} value={i+1}>{n}</option>)}
-                </select>
-                <select value={tahun} onChange={e => setTahun(parseInt(e.target.value))}
-                    style={{ padding: '4px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: FONT }}>
-                    {TAHUN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <button onClick={() => setIsPreview(!isPreview)} style={toolBtn()}>
-                        {isPreview ? '✏️ Edit' : '👁 Preview'}
-                    </button>
-                    <button onClick={handleSave} disabled={saving || loading}
-                        style={toolBtn(hasChanges ? 'warning' : 'success')}>
-                        {saving ? 'Menyimpan...' : '💾 Simpan'}
-                    </button>
-                    {loading && <span style={{ color: '#94a3b8', fontSize: '11px' }}>Memuat...</span>}
+            {!forcePreview && (
+                <div style={{
+                    display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
+                    padding: '10px 14px', background: '#1e293b', borderRadius: '8px', marginBottom: '12px'
+                }}>
+                    <span style={{ color: '#94a3b8', fontSize: '11px' }}>Bulan:</span>
+                    <select value={bulan} onChange={e => setBulan(parseInt(e.target.value))}
+                        style={{ padding: '4px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: FONT }}>
+                        {BULAN_NAMES.slice(1).map((n, i) => <option key={i+1} value={i+1}>{n}</option>)}
+                    </select>
+                    <select value={tahun} onChange={e => setTahun(parseInt(e.target.value))}
+                        style={{ padding: '4px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: FONT }}>
+                        {TAHUN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <button onClick={() => setIsPreview(!isPreview)} style={toolBtn()}>
+                            {isPreview ? '✏️ Edit' : '👁 Preview'}
+                        </button>
+                        <button onClick={handleSave} disabled={saving || loading}
+                            style={toolBtn(hasChanges ? 'warning' : 'success')}>
+                            {saving ? 'Menyimpan...' : '💾 Simpan'}
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (hasChanges) {
+                                    showMsg('error', '⚠️ Harap simpan perubahan terlebih dahulu (klik tombol Simpan) sebelum mengekspor!');
+                                    return;
+                                }
+                                showMsg('info', 'Mengambil data seluruh Tata Usaha...');
+                                try {
+                                    const { data, error } = await supabase
+                                        .from('laporan_template')
+                                        .select('template_data')
+                                        .eq('seksi_id', SEKSI_ID_TU)
+                                        .eq('bulan', bulan)
+                                        .eq('tahun', tahun)
+                                        .maybeSingle();
+                                    
+                                    if (error) throw error;
+                                    const td = data?.template_data || {};
+                                    
+                                    const bName = BULAN_NAMES[bulan] || '';
+                                    const { exportStandaloneTemplateDocx, getKeuanganDocxElements, getKepegawaianDocxElements, getUmumDocxElements } = await import('../../../utils/templateDocxExporter.js');
+                                    
+                                    const elems = [];
+                                    
+                                    // 1. Keuangan
+                                    elems.push(...getKeuanganDocxElements('rm', td, bName, tahun));
+                                    elems.push(...getKeuanganDocxElements('pnp', td, bName, tahun));
+                                    elems.push(...getKeuanganDocxElements('gabungan', td, bName, tahun));
+                                    elems.push(...getKeuanganDocxElements('bendahara', td, bName, tahun));
+                                    
+                                    // 2. Kepegawaian
+                                    elems.push(...getKepegawaianDocxElements('bezetting', td, bName, tahun));
+                                    elems.push(...getKepegawaianDocxElements('rekap', td, bName, tahun));
+                                    elems.push(...getKepegawaianDocxElements('cuti', td, bName, tahun));
+                                    elems.push(...getKepegawaianDocxElements('pembinaan', td, bName, tahun));
+                                    elems.push(...getKepegawaianDocxElements('persuratan', td, bName, tahun));
+                                    
+                                    // 3. Umum
+                                    elems.push(...getUmumDocxElements('kendaraan', td, bName, tahun));
+                                    elems.push(...getUmumDocxElements('sarana', td, bName, tahun));
+                                    elems.push(...getUmumDocxElements('gedung', td, bName, tahun));
+                                    
+                                    await exportStandaloneTemplateDocx({
+                                        title: 'B. BIDANG FASILITATIF',
+                                        filename: 'Template_TataUsaha_Gabungan',
+                                        bulanName: bName,
+                                        tahun,
+                                        elements: elems,
+                                        isLandscape: true
+                                    });
+                                    showMsg('success', '✅ Ekspor Tata Usaha Gabungan berhasil!');
+                                } catch (err) {
+                                    showMsg('error', '❌ Gagal ekspor Word: ' + err.message);
+                                }
+                            }}
+                            disabled={saving || loading}
+                            style={toolBtn('primary')}
+                            title="Cetak seluruh template Tata Usaha (Keuangan, Kepegawaian, Umum)"
+                        >
+                            📄 Ekspor Tata Usaha
+                        </button>
+                        {loading && <span style={{ color: '#94a3b8', fontSize: '11px' }}>Memuat...</span>}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── Notification ── */}
             {msg && (
