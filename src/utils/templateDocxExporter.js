@@ -33,6 +33,7 @@ import {
 } from './infokimSchema';
 import {
     REALISASI_ROWS, BENDAHARA_ROWS,
+    getDefaultRealisasiData, getDefaultBendaharaData,
     calcRealisasiTotals, calcGabungan, calcBendaharaTotals
 } from './keuanganSchema';
 import {
