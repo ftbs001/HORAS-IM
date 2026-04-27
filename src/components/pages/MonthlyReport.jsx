@@ -423,6 +423,13 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     const [paperSettings, setPaperSettings] = useState({});
     const [showPaperSettings, setShowPaperSettings] = useState(false);
 
+    // ── Local Quill state (avoids scroll-reset on every keystroke) ─────────────
+    // `quillLocalContent` holds the editor value locally so typing does NOT
+    // trigger a reportData state update (and thus a full re-render) on every key.
+    // Context is updated via a debounced timer (quillSaveTimerRef) only.
+    const [quillLocalContent, setQuillLocalContent] = useState('');
+    const quillSaveTimerRef = useRef(null);
+
     const PAPER_SIZES = {
         A4:     { w: 210, h: 297 },
         A3:     { w: 297, h: 420 },
@@ -586,6 +593,22 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
         return () => clearTimeout(timer);
     }, [reportData, updateSection]); // Added proper dependencies
+
+    // Sync local Quill content when the active section changes
+    useEffect(() => {
+        setQuillLocalContent(reportData[activeSection] || '');
+        // Cancel any pending debounced save from the previous section
+        if (quillSaveTimerRef.current) clearTimeout(quillSaveTimerRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeSection]);
+
+    // Also sync if the section data arrives from DB while the local state is still empty
+    // (handles the case where reportData loads asynchronously after mount).
+    useEffect(() => {
+        const serverContent = reportData[activeSection] || '';
+        setQuillLocalContent(prev => (prev === '' && serverContent !== '') ? serverContent : prev);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reportData]);
 
     // Set initial active section based on filtered TOC
     useEffect(() => {
@@ -1700,10 +1723,23 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                 </div>
                             )}
                             <div className="quill-editor-container" style={{ minHeight: `calc(${pz.h}mm - 2cm)` }}>
-                                <ReactQuill ref={quillRef} theme="snow"
-                                    value={hasImportedContent ? '' : content}
-                                    onChange={(newContent) => { if (!hasImportedContent && newContent !== content) updateSection(activeSection, newContent); }}
-                                    modules={modules} formats={formats}
+                                <ReactQuill
+                                    key={activeSection}
+                                    ref={quillRef}
+                                    theme="snow"
+                                    value={hasImportedContent ? '' : quillLocalContent}
+                                    onChange={(newContent) => {
+                                        if (hasImportedContent) return;
+                                        // 1. Update local state immediately (no context re-render)
+                                        setQuillLocalContent(newContent);
+                                        // 2. Debounce the context update (triggers re-render only after 500ms idle)
+                                        if (quillSaveTimerRef.current) clearTimeout(quillSaveTimerRef.current);
+                                        quillSaveTimerRef.current = setTimeout(() => {
+                                            updateSection(activeSection, newContent);
+                                        }, 500);
+                                    }}
+                                    modules={modules}
+                                    formats={formats}
                                     placeholder={hasImportedContent ? 'Konten dari file sudah ada — gunakan tab Lihat Dokumen.' : 'Ketik konten laporan di sini...'}
                                     readOnly={hasImportedContent}
                                 />
