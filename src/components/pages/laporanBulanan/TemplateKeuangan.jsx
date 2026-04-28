@@ -6,7 +6,7 @@
  * - 1. Laporan Realisasi Penyerapan Anggaran (RM, PNBP, RM+PNBP)
  * - 2. Penerimaan Negara Bukan Pajak (Bendahara Penerima)
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import {
     REALISASI_ROWS, BENDAHARA_ROWS,
@@ -49,9 +49,14 @@ const td = (extra = {}) => ({
 });
 
 const InputRp = ({ value, onChange, disabled }) => {
-    // Basic local state to handle typing "1000", formats on blur
     const [val, setVal] = useState(value === 0 ? '' : value);
-    useEffect(() => { setVal(value === 0 ? '' : value); }, [value]);
+    const isFocused = useRef(false);
+    // Hanya sync dari luar jika input TIDAK sedang dalam fokus (user tidak sedang mengetik)
+    useEffect(() => {
+        if (!isFocused.current) {
+            setVal(value === 0 ? '' : value);
+        }
+    }, [value]);
 
     return (
         <input
@@ -60,6 +65,12 @@ const InputRp = ({ value, onChange, disabled }) => {
             value={val}
             disabled={disabled}
             placeholder="-"
+            onFocus={() => { isFocused.current = true; }}
+            onBlur={() => {
+                isFocused.current = false;
+                // Sinkron nilai setelah blur
+                setVal(value === 0 ? '' : value);
+            }}
             onChange={e => {
                 setVal(e.target.value);
                 onChange(Number(e.target.value) || 0);
@@ -326,18 +337,19 @@ export default function TemplateKeuangan({ defaultTab = 'realisasi', embedded = 
         }
     };
 
-    const handleRmChange = (rowId, key, val) => {
-        setRmData(prev => ({ ...prev, [rowId]: { ...prev[rowId], [key]: val }}));
+    // Handler menerima array baru langsung dari child component
+    const handleRmChange = (newArray) => {
+        setRmData(newArray);
         setHasChanges(true);
     };
 
-    const handlePnpChange = (rowId, key, val) => {
-        setPnpData(prev => ({ ...prev, [rowId]: { ...prev[rowId], [key]: val }}));
+    const handlePnpChange = (newArray) => {
+        setPnpData(newArray);
         setHasChanges(true);
     };
 
-    const handleBendaharaChange = (rowId, key, val) => {
-        setBendaharaData(prev => ({ ...prev, [rowId]: { ...prev[rowId], [key]: val }}));
+    const handleBendaharaChange = (newArray) => {
+        setBendaharaData(newArray);
         setHasChanges(true);
     };
 
