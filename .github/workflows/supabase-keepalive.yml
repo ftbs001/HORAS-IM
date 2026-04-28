@@ -3,10 +3,12 @@ name: Supabase Keepalive
 # ============================================================
 # OTOMATIS: Berjalan SETIAP HARI pukul 08:00 WIB (01:00 UTC)
 # Menjaga Supabase project tetap aktif - tidak ada aksi manual!
+# Bisa juga dijalankan manual dari tab Actions di GitHub.
 # ============================================================
 on:
   schedule:
     - cron: '0 1 * * *'   # Setiap hari 01:00 UTC = 08:00 WIB
+  workflow_dispatch:       # Bisa dijalankan manual dari GitHub Actions
 
 jobs:
   keepalive:
@@ -24,7 +26,7 @@ jobs:
         shell: bash
         run: |
           echo "================================================"
-          echo "  Supabase Daily Keepalive"
+          echo "  🔄 Supabase Daily Keepalive - HORAS-IM"
           echo "  Tanggal: $(date '+%Y-%m-%d %H:%M UTC')"
           echo "================================================"
 
@@ -64,6 +66,7 @@ jobs:
           }
 
           # --- Coba table satu per satu sampai ada yang berhasil ---
+          # Urutan: prioritaskan table yang paling sering ada data
           TABLES=("monthly_reports" "sections" "members" "report_types" "users")
           SUKSES=0
 
@@ -79,7 +82,8 @@ jobs:
           if [[ "$SUKSES" == "1" ]]; then
             echo "✅  KEEPALIVE SUKSES!"
             echo "    Database Supabase tetap aktif."
-            echo "    Project tidak akan di-pause."
+            echo "    Project HORAS-IM tidak akan di-pause."
+            echo "    Waktu: $(date '+%Y-%m-%d %H:%M:%S UTC')"
             exit 0
           else
             echo "⚠️  Semua table gagal di-ping."
@@ -91,6 +95,5 @@ jobs:
             echo ""
             echo "Cek dashboard: https://app.supabase.com"
             # Exit 0 agar tidak dianggap error fatal - data tetap aman
-            # Workflow dianggap "warning" bukan "failure"
             exit 0
           fi
