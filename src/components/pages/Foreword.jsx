@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useReport } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -16,11 +16,15 @@ Laporan ini diharapkan dapat memberikan informasi yang berguna kepada para pemak
     // Local state for editing
     const [content, setContent] = useState(defaultContent);
     const [isSaving, setIsSaving] = useState(false);
+    // Prevent context sync from overwriting in-progress user edits
+    const hasLoadedRef = useRef(false);
 
-    // Load data from context when component mounts
+    // Load data from context ONCE when it first becomes available
     useEffect(() => {
+        if (hasLoadedRef.current) return;
         if (forewordData && forewordData.content) {
             setContent(forewordData.content);
+            hasLoadedRef.current = true;
         }
     }, [forewordData]);
 

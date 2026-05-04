@@ -494,9 +494,13 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     }, [toc, sectionFilter]);
 
     // Initialize special sections content if empty (TOC and BAB III)
+    // Use a ref so this runs ONCE only — prevents re-running on every keystroke
+    const initDoneRef = useRef(false);
     useEffect(() => {
         // Only run if reportData and updateSection are available
         if (!reportData || !updateSection) return;
+        // Guard: only initialize once to avoid cascade re-renders during typing
+        if (initDoneRef.current) return;
 
         const initializeSpecialSections = async () => {
             // DAFTAR ISI (Table of Contents) content - compact format to fit on 1 page
@@ -588,27 +592,33 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
         // Run initialization after a short delay to ensure reportData is loaded
         const timer = setTimeout(() => {
+            initDoneRef.current = true; // mark done BEFORE async work to prevent double-runs
             initializeSpecialSections();
-        }, 1000); // Increased to 1 second
+        }, 1200);
 
         return () => clearTimeout(timer);
-    }, [reportData, updateSection]); // Added proper dependencies
-
-    // Sync local Quill content when the active section changes
-    useEffect(() => {
-        setQuillLocalContent(reportData[activeSection] || '');
-        // Cancel any pending debounced save from the previous section
-        if (quillSaveTimerRef.current) clearTimeout(quillSaveTimerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeSection]);
+    }, []); // Run ONCE on mount — reportData is accessed via closure
 
-    // Also sync if the section data arrives from DB while the local state is still empty
-    // (handles the case where reportData loads asynchronously after mount).
+    // Sync local Quill content when the active section changes OR when
+    // server data first arrives (reportData[activeSection] changes from empty to value).
+    // We use a single effect keyed on activeSection to avoid firing on every keystroke.
+    const prevActiveSectionRef = useRef(null);
     useEffect(() => {
+        const sectionChanged = prevActiveSectionRef.current !== activeSection;
+        prevActiveSectionRef.current = activeSection;
+
         const serverContent = reportData[activeSection] || '';
-        setQuillLocalContent(prev => (prev === '' && serverContent !== '') ? serverContent : prev);
+        if (sectionChanged) {
+            // Switching sections: always load from server
+            setQuillLocalContent(serverContent);
+            if (quillSaveTimerRef.current) clearTimeout(quillSaveTimerRef.current);
+        } else {
+            // Same section: only sync if local is still empty (first DB load)
+            setQuillLocalContent(prev => (prev === '' && serverContent !== '') ? serverContent : prev);
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [reportData]);
+    }, [activeSection, reportData[activeSection]]);
 
     // Set initial active section based on filtered TOC
     useEffect(() => {
@@ -854,7 +864,10 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         imageDrop: true
     }), []);
 
-    const formats = [
+    // IMPORTANT: memoize formats so the array reference never changes between renders.
+    // ReactQuill re-mounts its editor DOM whenever modules or formats prop changes by
+    // reference — that causes focus/cursor loss every time the parent re-renders.
+    const formats = useMemo(() => [
         'font', 'size', 'header',
         'bold', 'italic', 'underline', 'strike',
         'script',
@@ -863,7 +876,7 @@ const MonthlyReport = ({ sectionFilter = null }) => {
         'list', 'indent',
         'blockquote', 'code-block',
         'link', 'image', 'video'
-    ];
+    ], []);
 
     const handleClear = async (id) => {
         if (window.confirm('Kosongkan konten bagian ini?')) {

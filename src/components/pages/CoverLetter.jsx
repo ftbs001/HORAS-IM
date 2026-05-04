@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useReport } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import KopSurat from '../common/KopSurat';
+import BsreBadge from '../common/BsreBadge';
 
 const CoverLetter = () => {
     const { coverLetterData, updateCoverLetter } = useReport();
@@ -29,11 +30,17 @@ const CoverLetter = () => {
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    // Track whether we have already loaded data from context (on mount).
+    // This prevents the context sync from overwriting local edits after the user
+    // starts typing (e.g. when updateCoverLetter triggers an optimistic state update).
+    const hasLoadedRef = useRef(false);
 
-    // Load data from context when component mounts
+    // Load data from context ONCE when it first becomes available
     useEffect(() => {
+        if (hasLoadedRef.current) return; // already loaded
         if (coverLetterData && Object.keys(coverLetterData).length > 0) {
             setFormData(coverLetterData);
+            hasLoadedRef.current = true;
         }
     }, [coverLetterData]);
 
@@ -169,25 +176,19 @@ const CoverLetter = () => {
                         </div>
 
                         {/* Signer section right */}
-                        <div className="text-center w-[350px]">
-                            <div className="mb-2">Kepala Kantor,</div>
-                            
-                            {/* BSrE Badge Mimic */}
-                            <div className="flex items-center justify-center gap-3 my-2 px-3 py-2 w-max mx-auto translate-x-[-12px]">
-                                <img src="/logo_kemenimipas.png" alt="Kemenimipas" className="w-[38px] h-[38px] object-contain" />
-                                <div className="text-left leading-tight">
-                                    <div className="font-bold text-[15px] tracking-wide text-gray-900 mb-[2px]">KEMENIMIPAS</div>
-                                    <div className="text-[10px] text-gray-400 font-medium">Ditandatangani secara elektronik oleh:</div>
-                                </div>
+                        <div className="text-center" style={{ width: '340px' }}>
+                            <div className="mb-3" style={{ fontFamily: 'Times New Roman, serif', fontSize: '13px' }}>Kepala Kantor,</div>
+                            {/* BSrE Badge — inline SVG, zero image deps */}
+                            <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
+                                <BsreBadge width={230} />
                             </div>
-
-                            <div className="font-bold pt-2">
+                            <div className="font-bold mt-3">
                                 <input
                                     type="text"
                                     value={formData.penandatangan}
                                     onChange={(e) => handleChange('penandatangan', e.target.value)}
                                     className="text-center px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-imigrasi-blue/20 focus:outline-none"
-                                    style={{ width: '100%' }}
+                                    style={{ width: '100%', fontFamily: 'Times New Roman, serif', fontWeight: 'bold', fontSize: '13px' }}
                                 />
                             </div>
                         </div>

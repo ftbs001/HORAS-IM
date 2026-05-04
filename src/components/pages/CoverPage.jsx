@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useReport } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -14,11 +14,15 @@ const CoverPage = () => {
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    // Prevent context sync from overwriting in-progress local edits
+    const hasLoadedRef = useRef(false);
 
-    // Load data from context when component mounts
+    // Load data from context ONCE when it first becomes available
     useEffect(() => {
+        if (hasLoadedRef.current) return;
         if (coverPageData && Object.keys(coverPageData).length > 0) {
             setFormData(coverPageData);
+            hasLoadedRef.current = true;
         }
     }, [coverPageData]);
 
