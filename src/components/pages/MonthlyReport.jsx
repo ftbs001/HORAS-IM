@@ -423,11 +423,19 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     const [paperSettings, setPaperSettings] = useState({});
     const [showPaperSettings, setShowPaperSettings] = useState(false);
 
-    // ── Local Quill state (avoids scroll-reset on every keystroke) ─────────────
-    // `quillLocalContent` holds the editor value locally so typing does NOT
-    // trigger a reportData state update (and thus a full re-render) on every key.
-    // Context is updated via a debounced timer (quillSaveTimerRef) only.
-    const [quillLocalContent, setQuillLocalContent] = useState('');
+    // ── Quill content management ──────────────────────────────────────────────
+    // TWO-TIER APPROACH to prevent cursor/focus loss:
+    //
+    // 1. quillLiveContentRef — plain ref updated on every onChange keystroke.
+    //    Does NOT trigger React re-renders, so the value prop to ReactQuill
+    //    never changes during typing → cursor stays put.
+    //
+    // 2. quillInitialContent — state used for the ReactQuill value prop.
+    //    Only updated when: (a) the active section switches, or
+    //    (b) the first DB load arrives for the current section.
+    //    Never updated while the user is actively typing.
+    const quillLiveContentRef = useRef('');
+    const [quillInitialContent, setQuillInitialContent] = useState('');
     const quillSaveTimerRef = useRef(null);
 
     const PAPER_SIZES = {
@@ -600,9 +608,10 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Run ONCE on mount — reportData is accessed via closure
 
-    // Sync local Quill content when the active section changes OR when
-    // server data first arrives (reportData[activeSection] changes from empty to value).
-    // We use a single effect keyed on activeSection to avoid firing on every keystroke.
+    // Load content into Quill when the active section changes, or when the DB
+    // delivers the initial content for a section asynchronously.
+    // quillInitialContent is the ONLY thing passed as value= to ReactQuill.
+    // It must NOT change while the user is typing — only on section switch.
     const prevActiveSectionRef = useRef(null);
     useEffect(() => {
         const sectionChanged = prevActiveSectionRef.current !== activeSection;
@@ -610,12 +619,14 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 
         const serverContent = reportData[activeSection] || '';
         if (sectionChanged) {
-            // Switching sections: always load from server
-            setQuillLocalContent(serverContent);
+            // Section changed: reset live ref and set initial content
+            quillLiveContentRef.current = serverContent;
+            setQuillInitialContent(serverContent);
             if (quillSaveTimerRef.current) clearTimeout(quillSaveTimerRef.current);
-        } else {
-            // Same section: only sync if local is still empty (first DB load)
-            setQuillLocalContent(prev => (prev === '' && serverContent !== '') ? serverContent : prev);
+        } else if (serverContent && !quillLiveContentRef.current) {
+            // Same section but DB just delivered first content (async load)
+            quillLiveContentRef.current = serverContent;
+            setQuillInitialContent(serverContent);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeSection, reportData[activeSection]]);
@@ -1740,16 +1751,17 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                                     key={activeSection}
                                     ref={quillRef}
                                     theme="snow"
-                                    value={hasImportedContent ? '' : quillLocalContent}
+                                    value={hasImportedContent ? '' : quillInitialContent}
                                     onChange={(newContent) => {
                                         if (hasImportedContent) return;
-                                        // 1. Update local state immediately (no context re-render)
-                                        setQuillLocalContent(newContent);
-                                        // 2. Debounce the context update (triggers re-render only after 500ms idle)
+                                        // Update the ref only — ZERO state update, ZERO re-render
+                                        // This keeps Quill's cursor exactly where it is.
+                                        quillLiveContentRef.current = newContent;
+                                        // Debounce the DB save (uses the ref value, not state)
                                         if (quillSaveTimerRef.current) clearTimeout(quillSaveTimerRef.current);
                                         quillSaveTimerRef.current = setTimeout(() => {
-                                            updateSection(activeSection, newContent);
-                                        }, 500);
+                                            updateSection(activeSection, quillLiveContentRef.current);
+                                        }, 800);
                                     }}
                                     modules={modules}
                                     formats={formats}
