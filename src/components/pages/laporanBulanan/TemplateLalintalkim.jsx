@@ -55,7 +55,7 @@ const InputCell = ({ value, onChange, disabled, isPreview }) => {
         );
     }
     return (
-        <td style={{ border: '1px solid #aaa', padding: '2px', textAlign: 'center' }}>
+        <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>
             <input
                 type="number" min={0}
                 value={value === 0 ? '' : value}
@@ -66,7 +66,7 @@ const InputCell = ({ value, onChange, disabled, isPreview }) => {
                     width: '100%', minWidth: '36px',
                     border: 'none', outline: 'none',
                     textAlign: 'center', fontSize: '11px',
-                    background: disabled ? '#f1f5f9' : '#fff',
+                    background: '#fff',
                     fontFamily: FONT, padding: '2px 0',
                 }}
             />
@@ -78,9 +78,9 @@ const TotalCell = ({ value, isPreview, grand }) => {
     const n = Number(value) || 0;
     return (
         <td style={{
-            border: isPreview ? '1px solid #000' : '1px solid #aaa',
+            border: '1px solid #000',
             padding: '3px 6px', textAlign: 'center', fontWeight: 'bold',
-            background: grand ? '#c6efce' : '#e8f5e9',
+            background: '#fff',
             fontFamily: FONT, fontSize: isPreview ? '10pt' : '11px',
             minWidth: '36px',
         }}>
@@ -97,7 +97,7 @@ function TabelA({ data, onChange, isPreview, loading }) {
     const set = (rowId, field, value) => onChange({ ...data, [rowId]: { ...data[rowId], [field]: value } });
     const getVal = (rowId, field) => totals[rowId]?.[field] ?? 0;
 
-    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#bdd7ee', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
+    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#fff', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
     const tdLabel = (txt, bold, bg) => (
         <td style={{ border: isPreview ? '1px solid #000' : '1px solid #aaa', padding: '3px 6px', fontFamily: FONT, fontSize: isPreview ? '10pt' : '11px', fontWeight: bold ? 'bold' : 'normal', background: bg || '#fff', whiteSpace: 'nowrap' }}>
             {txt}
@@ -120,7 +120,7 @@ function TabelA({ data, onChange, isPreview, loading }) {
                     {TABEL_A_ROWS.map((row) => {
                         const isTotal = row.isTotalRow;
                         const isGrand = row.isGrandTotal;
-                        const bg = isGrand ? '#c6efce' : isTotal ? '#e8f5e9' : (row.isGroupStart ? '#dce6f1' : '#fff');
+                        const bg = isGrand ? '#f0f0f0' : isTotal ? '#f8f8f8' : (row.isGroupStart ? '#fff' : '#fff');
                         if (isTotal) {
                             return (
                                 <tr key={row.id}>
@@ -155,7 +155,7 @@ function TabelB({ data, onChange, isPreview, loading }) {
     const totals = calculateTotals('b', data, TABEL_B_ROWS);
     const set = (rowId, field, value) => onChange({ ...data, [rowId]: { ...data[rowId], [field]: value } });
 
-    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#bdd7ee', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
+    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#fff', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
     const tdLabel = (txt, bold, bg) => (
         <td style={{ border: isPreview ? '1px solid #000' : '1px solid #aaa', padding: '3px 6px', fontFamily: FONT, fontSize: isPreview ? '10pt' : '11px', fontWeight: bold ? 'bold' : 'normal', background: bg || '#fff', whiteSpace: 'nowrap' }}>
             {txt}
@@ -178,7 +178,7 @@ function TabelB({ data, onChange, isPreview, loading }) {
                     {TABEL_B_ROWS.map((row) => {
                         const isTotal = row.isTotalRow;
                         const isGrand = row.isGrandTotal;
-                        const bg = isGrand ? '#c6efce' : isTotal ? '#e8f5e9' : (row.isGroupStart ? '#dce6f1' : '#fff');
+                        const bg = isGrand ? '#f0f0f0' : isTotal ? '#f8f8f8' : (row.isGroupStart ? '#fff' : '#fff');
                         const val = (field) => totals[row.id]?.[field] ?? 0;
                         if (isTotal) {
                             return (
@@ -214,7 +214,7 @@ function TabelC({ data, onChange, isPreview, loading }) {
     const totals = calculateTotals('c', data, TABEL_C_ROWS);
     const set = (rowId, field, value) => onChange({ ...data, [rowId]: { ...data[rowId], [field]: value } });
 
-    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#bdd7ee', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
+    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#fff', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
     const tdLabel = (txt, bold, bg) => (
         <td style={{ border: isPreview ? '1px solid #000' : '1px solid #aaa', padding: '3px 6px', fontFamily: FONT, fontSize: isPreview ? '10pt' : '11px', fontWeight: bold ? 'bold' : 'normal', background: bg || '#fff' }}>
             {txt}
@@ -235,7 +235,7 @@ function TabelC({ data, onChange, isPreview, loading }) {
                 <tbody>
                     {TABEL_C_ROWS.map((row) => {
                         const isTotal = row.isTotalRow;
-                        const bg = isTotal ? '#c6efce' : '#fff';
+                        const bg = isTotal ? '#f0f0f0' : '#fff';
                         const val = (f) => totals[row.id]?.[f] ?? 0;
                         if (isTotal) {
                             return (
@@ -273,7 +273,7 @@ function TabelMultiHeader({ data, onChange, isPreview, loading, tableName, schem
     };
     const val = (rowId, col, f) => totals[rowId]?.[col]?.[f] ?? 0;
 
-    const thStyle = { border: '1px solid #000', padding: '3px 5px', background: '#bdd7ee', fontFamily: FONT, fontSize: isPreview ? '9pt' : '10px', fontWeight: 'bold', textAlign: 'center' };
+    const thStyle = { border: '1px solid #000', padding: '3px 5px', background: '#fff', fontFamily: FONT, fontSize: isPreview ? '9pt' : '10px', fontWeight: 'bold', textAlign: 'center' };
     const tdLabel = (txt, bold, bg) => (
         <td style={{ border: isPreview ? '1px solid #000' : '1px solid #aaa', padding: '3px 6px', fontFamily: FONT, fontSize: isPreview ? '9pt' : '10px', fontWeight: bold ? 'bold' : 'normal', background: bg || '#fff', whiteSpace: 'nowrap' }}>
             {txt}
@@ -288,12 +288,12 @@ function TabelMultiHeader({ data, onChange, isPreview, loading, tableName, schem
             );
         }
         return (
-            <td style={{ border: '1px solid #aaa', padding: '1px', textAlign: 'center', minWidth: '28px' }}>
+            <td style={{ border: '1px solid #000', padding: '1px', textAlign: 'center', minWidth: '28px' }}>
                 <input
                     type="number" min={0} value={v === 0 ? '' : v}
                     onChange={e => set(rowId, col, f, Math.max(0, parseInt(e.target.value) || 0))}
                     disabled={disabled} placeholder="0"
-                    style={{ width: '100%', border: 'none', outline: 'none', textAlign: 'center', fontSize: '10px', fontFamily: FONT, padding: '2px 0', background: disabled ? '#f1f5f9' : '#fff' }}
+                    style={{ width: '100%', border: 'none', outline: 'none', textAlign: 'center', fontSize: '10px', fontFamily: FONT, padding: '2px 0', background: '#fff' }}
                 />
             </td>
         );
@@ -302,7 +302,7 @@ function TabelMultiHeader({ data, onChange, isPreview, loading, tableName, schem
     const totalSubCell = (rowId, col, grand) => {
         const lv = val(rowId, col, 'l');
         const pv = val(rowId, col, 'p');
-        const bg = grand ? '#c6efce' : '#e8f5e9';
+        const bg = grand ? '#f0f0f0' : '#f8f8f8';
         if (isPreview) {
             return (
                 <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
@@ -313,8 +313,8 @@ function TabelMultiHeader({ data, onChange, isPreview, loading, tableName, schem
         }
         return (
             <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
-                <td style={{ border: '1px solid #aaa', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', background: bg }}>{lv}</td>
-                <td style={{ border: '1px solid #aaa', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', background: bg }}>{pv}</td>
+                <td style={{ border: '1px solid #000', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', background: '#fff' }}>{lv}</td>
+                <td style={{ border: '1px solid #000', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', background: '#fff' }}>{pv}</td>
             </React.Fragment>
         );
     };
@@ -335,7 +335,7 @@ function TabelMultiHeader({ data, onChange, isPreview, loading, tableName, schem
                 <tbody>
                     {schemaRows.map((row) => {
                         const isTotal = row.isTotalRow;
-                        const bg = isTotal ? '#c6efce' : '#fff';
+                        const bg = isTotal ? '#f0f0f0' : '#fff';
                         if (isTotal) {
                             return (
                                 <tr key={row.id} style={{ background: bg }}>
@@ -371,7 +371,7 @@ function TabelSimple({ data, onChange, isPreview, loading, tableName, schemaRows
     };
     const val = (rowId, col, f) => totals[rowId]?.[col]?.[f] ?? 0;
 
-    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#bdd7ee', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
+    const thStyle = { border: '1px solid #000', padding: '4px 6px', background: '#fff', fontFamily: FONT, fontSize: '10pt', fontWeight: 'bold', textAlign: 'center' };
     const tdLabel = (txt, bold, bg) => (
         <td style={{ border: isPreview ? '1px solid #000' : '1px solid #aaa', padding: '3px 6px', fontFamily: FONT, fontSize: isPreview ? '10pt' : '11px', fontWeight: bold ? 'bold' : 'normal', background: bg || '#fff' }}>
             {txt}
@@ -382,12 +382,12 @@ function TabelSimple({ data, onChange, isPreview, loading, tableName, schemaRows
         const v = data[rowId]?.[col]?.[f] ?? 0;
         if (isPreview) return <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontFamily: FONT, fontSize: '10pt' }}>{v === 0 ? '-' : v}</td>;
         return (
-            <td style={{ border: '1px solid #aaa', padding: '2px', textAlign: 'center' }}>
+            <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>
                 <input
                     type="number" min={0} value={v === 0 ? '' : v}
                     onChange={e => set(rowId, col, f, Math.max(0, parseInt(e.target.value) || 0))}
                     disabled={disabled} placeholder="0"
-                    style={{ width: '100%', minWidth: '40px', border: 'none', outline: 'none', textAlign: 'center', fontSize: '11px', fontFamily: FONT, padding: '2px 0', background: disabled ? '#f1f5f9' : '#fff' }}
+                    style={{ width: '100%', minWidth: '40px', border: 'none', outline: 'none', textAlign: 'center', fontSize: '11px', fontFamily: FONT, padding: '2px 0', background: '#fff' }}
                 />
             </td>
         );
@@ -396,7 +396,7 @@ function TabelSimple({ data, onChange, isPreview, loading, tableName, schemaRows
     const totalSubCell = (rowId, col, grand) => {
         const lv = val(rowId, col, 'l');
         const pv = val(rowId, col, 'p');
-        const bg = grand ? '#c6efce' : '#e8f5e9';
+        const bg = grand ? '#f0f0f0' : '#f8f8f8';
         if (isPreview) {
             return (
                 <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
@@ -407,17 +407,16 @@ function TabelSimple({ data, onChange, isPreview, loading, tableName, schemaRows
         }
         return (
             <React.Fragment key={`${rowId}-${col}-${grand ? 'grand' : 'total'}`}>
-                <td style={{ border: '1px solid #aaa', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: bg }}>{lv === 0 ? '0' : lv}</td>
-                <td style={{ border: '1px solid #aaa', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: bg }}>{pv === 0 ? '0' : pv}</td>
+                <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: '#fff' }}>{lv === 0 ? '0' : lv}</td>
+                <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: '#fff' }}>{pv === 0 ? '0' : pv}</td>
             </React.Fragment>
         );
     };
 
     const overallTotalCell = (rowId, grand) => {
         const sumAll = TABEL_SIMPLE_COLS.reduce((acc, c) => acc + val(rowId, c, 'l') + val(rowId, c, 'p'), 0);
-        const bg = grand ? '#c6efce' : '#e8f5e9';
-        if (isPreview) return <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontFamily: FONT, fontSize: '10pt', background: bg, fontWeight: 'bold' }}>{sumAll === 0 ? '-' : sumAll}</td>;
-        return <td style={{ border: '1px solid #aaa', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: bg }}>{sumAll}</td>;
+        if (isPreview) return <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontFamily: FONT, fontSize: '10pt', background: '#fff', fontWeight: 'bold' }}>{sumAll === 0 ? '-' : sumAll}</td>;
+        return <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: '#fff' }}>{sumAll}</td>;
     };
 
     return (
@@ -436,7 +435,7 @@ function TabelSimple({ data, onChange, isPreview, loading, tableName, schemaRows
                 <tbody>
                     {schemaRows.map((row) => {
                         const isTotal = row.isTotalRow;
-                        const bg = isTotal ? '#c6efce' : '#fff';
+                        const bg = isTotal ? '#f0f0f0' : '#fff';
                         if (isTotal) {
                             return (
                                 <tr key={row.id} style={{ background: bg }}>
@@ -474,18 +473,18 @@ function TabelPerlintasan({ data, onChange, isPreview, loading, tableName, schem
     };
     const val = (rowId, col, f) => totals[rowId]?.[col]?.[f] ?? 0;
 
-    const thStyle = { border: '1px solid #000', padding: '3px 5px', background: '#bdd7ee', fontFamily: FONT, fontSize: isPreview ? '8pt' : '9px', fontWeight: 'bold', textAlign: 'center' };
+    const thStyle = { border: '1px solid #000', padding: '3px 5px', background: '#fff', fontFamily: FONT, fontSize: isPreview ? '8pt' : '9px', fontWeight: 'bold', textAlign: 'center' };
 
     const miniInput = (rowId, col, f, disabled) => {
         const v = data[rowId]?.[col]?.[f] ?? 0;
         if (isPreview) return <td style={{ border: '1px solid #000', padding: '1px 2px', textAlign: 'center', fontFamily: FONT, fontSize: '8pt' }}>{v === 0 ? '-' : v}</td>;
         return (
-            <td style={{ border: '1px solid #aaa', padding: '1px', textAlign: 'center' }}>
+            <td style={{ border: '1px solid #000', padding: '1px', textAlign: 'center' }}>
                 <input
                     type="number" min={0} value={v === 0 ? '' : v}
                     onChange={e => set(rowId, col, f, Math.max(0, parseInt(e.target.value) || 0))}
                     disabled={disabled} placeholder="0"
-                    style={{ width: '100%', minWidth: '20px', border: 'none', outline: 'none', textAlign: 'center', fontSize: '9px', fontFamily: FONT, padding: '1px 0', background: disabled ? '#f1f5f9' : '#fff' }}
+                    style={{ width: '100%', minWidth: '20px', border: 'none', outline: 'none', textAlign: 'center', fontSize: '9px', fontFamily: FONT, padding: '1px 0', background: '#fff' }}
                 />
             </td>
         );
@@ -494,7 +493,7 @@ function TabelPerlintasan({ data, onChange, isPreview, loading, tableName, schem
     const totalSubCell = (rowId, col, grand) => {
         const lv = val(rowId, col, 'l');
         const pv = val(rowId, col, 'p');
-        const bg = grand ? '#c6efce' : '#e8f5e9';
+        const bg = grand ? '#f0f0f0' : '#f8f8f8';
         if (isPreview) {
             return (
                 <>
@@ -505,23 +504,22 @@ function TabelPerlintasan({ data, onChange, isPreview, loading, tableName, schem
         }
         return (
             <>
-                <td style={{ border: '1px solid #aaa', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: bg }}>{lv === 0 ? '0' : lv}</td>
-                <td style={{ border: '1px solid #aaa', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: bg }}>{pv === 0 ? '0' : pv}</td>
+                <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: '#fff' }}>{lv === 0 ? '0' : lv}</td>
+                <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: '#fff' }}>{pv === 0 ? '0' : pv}</td>
             </>
         );
     };
 
     const overallTotalCell = (rowId, grand) => {
         const sumAll = TABEL_PERLINTASAN_COLS.reduce((acc, c) => acc + val(rowId, c, 'l') + val(rowId, c, 'p'), 0);
-        const bg = grand ? '#c6efce' : '#e8f5e9';
-        if (isPreview) return <td style={{ border: '1px solid #000', padding: '1px 2px', textAlign: 'center', fontFamily: FONT, fontSize: '8pt', background: bg, fontWeight: 'bold' }}>{sumAll === 0 ? '-' : sumAll}</td>;
-        return <td style={{ border: '1px solid #aaa', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: bg }}>{sumAll}</td>;
+        if (isPreview) return <td style={{ border: '1px solid #000', padding: '1px 2px', textAlign: 'center', fontFamily: FONT, fontSize: '8pt', background: '#fff', fontWeight: 'bold' }}>{sumAll === 0 ? '-' : sumAll}</td>;
+        return <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: '#fff' }}>{sumAll}</td>;
     };
 
     const subTotalCell = (rowId, cols, bg) => {
         const sum = cols.reduce((acc, c) => acc + val(rowId, c, 'l') + val(rowId, c, 'p'), 0);
-        if (isPreview) return <td style={{ border: '1px solid #000', padding: '1px 2px', textAlign: 'center', fontFamily: FONT, fontSize: '8pt', background: bg, fontWeight: 'bold' }}>{sum === 0 ? '-' : sum}</td>;
-        return <td style={{ border: '1px solid #aaa', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: bg }}>{sum}</td>;
+        if (isPreview) return <td style={{ border: '1px solid #000', padding: '1px 2px', textAlign: 'center', fontFamily: FONT, fontSize: '8pt', background: '#fff', fontWeight: 'bold' }}>{sum === 0 ? '-' : sum}</td>;
+        return <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', background: '#fff' }}>{sum}</td>;
     };
 
     return (
@@ -552,7 +550,7 @@ function TabelPerlintasan({ data, onChange, isPreview, loading, tableName, schem
                     {schemaRows.map((row) => {
                         const isTotal = row.isTotalRow;
                         const disabled = loading || isPreview;
-                        const bg = isTotal ? '#c6efce' : '#fff';
+                        const bg = isTotal ? '#f0f0f0' : '#fff';
                         const t = (c) => isTotal ? totalSubCell(row.id, c, true) : <>{miniInput(row.id, c, 'l', disabled)}{miniInput(row.id, c, 'p', disabled)}</>;
                         return (
                             <tr key={row.id}>

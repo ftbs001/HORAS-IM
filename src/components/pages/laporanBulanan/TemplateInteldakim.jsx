@@ -33,7 +33,7 @@ const useMsg = () => {
 
 const thStyle = (extra = {}) => ({
     border: '1px solid #000', padding: '4px 5px',
-    background: '#bdd7ee', fontFamily: FONT, fontSize: '9pt',
+    background: '#fff', fontFamily: FONT, fontSize: '9pt',
     fontWeight: 'bold', textAlign: 'center', verticalAlign: 'middle',
     ...extra
 });
@@ -45,18 +45,18 @@ const tdStyle = (extra = {}) => ({
 
 const InputCellLP = ({ l, p, onChange, disabled }) => (
     <>
-        <td style={{ border: '1px solid #aaa', padding: '1px', textAlign: 'center', width: '28px' }}>
+        <td style={{ border: '1px solid #000', padding: '1px', textAlign: 'center', width: '28px' }}>
             <input type="number" min={0} value={l === 0 ? '' : l} disabled={disabled}
                 onChange={e => onChange({ l: Math.max(0, parseInt(e.target.value) || 0), p })}
                 placeholder="0"
-                style={{ width: '100%', border: 'none', outline: 'none', textAlign: 'center', fontSize: '9pt', fontFamily: FONT, background: disabled ? '#f1f5f9' : '#fff' }}
+                style={{ width: '100%', border: 'none', outline: 'none', textAlign: 'center', fontSize: '9pt', fontFamily: FONT, background: '#fff' }}
             />
         </td>
-        <td style={{ border: '1px solid #aaa', padding: '1px', textAlign: 'center', width: '28px' }}>
+        <td style={{ border: '1px solid #000', padding: '1px', textAlign: 'center', width: '28px' }}>
             <input type="number" min={0} value={p === 0 ? '' : p} disabled={disabled}
                 onChange={e => onChange({ l, p: Math.max(0, parseInt(e.target.value) || 0) })}
                 placeholder="0"
-                style={{ width: '100%', border: 'none', outline: 'none', textAlign: 'center', fontSize: '9pt', fontFamily: FONT, background: disabled ? '#f1f5f9' : '#fff' }}
+                style={{ width: '100%', border: 'none', outline: 'none', textAlign: 'center', fontSize: '9pt', fontFamily: FONT, background: '#fff' }}
             />
         </td>
     </>
@@ -154,15 +154,15 @@ function TabelProjus({ data, onChange, isPreview, loading }) {
                         })
                     )}
                     {/* Total Row */}
-                    <tr style={{ background: '#c6efce' }}>
+                    <tr>
                         <td colSpan={2} style={tdStyle({ textAlign: 'center', fontWeight: 'bold' })}>JUMLAH</td>
                         {PROJUS_COLS.map(col => (
                             <React.Fragment key={col}>
-                                <NumTD v={totals.total?.[col]?.l} bold bg="#c6efce" />
-                                <NumTD v={totals.total?.[col]?.p} bold bg="#c6efce" />
+                                <NumTD v={totals.total?.[col]?.l} bold />
+                                <NumTD v={totals.total?.[col]?.p} bold />
                             </React.Fragment>
                         ))}
-                        <NumTD v={totals.total?.jumlah} bold bg="#c6efce" />
+                        <NumTD v={totals.total?.jumlah} bold />
                     </tr>
                 </tbody>
             </table>
@@ -246,15 +246,15 @@ function TabelTAK({ data, onChange, isPreview, loading }) {
                             );
                         })
                     )}
-                    <tr style={{ background: '#c6efce' }}>
-                        <td colSpan={2} style={tdStyle({ textAlign: 'center', fontWeight: 'bold', fontSize: '8pt', background: '#c6efce' })}>JUMLAH</td>
+                    <tr>
+                        <td colSpan={2} style={tdStyle({ textAlign: 'center', fontWeight: 'bold', fontSize: '8pt' })}>JUMLAH</td>
                         {TAK_COLS.map(col => (
                             <React.Fragment key={col}>
-                                <NumTD v={totals.total?.[col]?.l} bold bg="#c6efce" />
-                                <NumTD v={totals.total?.[col]?.p} bold bg="#c6efce" />
+                                <NumTD v={totals.total?.[col]?.l} bold />
+                                <NumTD v={totals.total?.[col]?.p} bold />
                             </React.Fragment>
                         ))}
-                        <NumTD v={totals.total?.jumlah} bold bg="#c6efce" />
+                        <NumTD v={totals.total?.jumlah} bold />
                     </tr>
                 </tbody>
             </table>
@@ -277,10 +277,10 @@ function TabelTimpora({ data, onChange, isPreview, loading, bulan, tahun }) {
             return <td style={tdStyle({ textAlign: 'center' })}>{val || '-'}</td>;
         }
         return (
-            <td style={{ border: '1px solid #aaa', padding: '2px' }}>
+            <td style={{ border: '1px solid #000', padding: '2px' }}>
                 <textarea value={val} onChange={e => setField(rowId, field, e.target.value)}
                     disabled={loading} rows={1}
-                    style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', fontFamily: FONT, fontSize: '9pt', background: loading ? '#f1f5f9' : '#fff', minHeight: '28px' }} />
+                    style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', fontFamily: FONT, fontSize: '9pt', background: '#fff', minHeight: '28px' }} />
             </td>
         );
     };
@@ -315,7 +315,7 @@ function TabelTimpora({ data, onChange, isPreview, loading, bulan, tahun }) {
                         </tr>
                     ) : (
                         TIMPORA_ROWS.map(row => (
-                            <tr key={row.id} style={{ background: row.isHeader ? '#dce6f1' : '#fff' }}>
+                            <tr key={row.id} style={{ background: '#fff' }}>
                                 <td style={tdStyle({ textAlign: 'center', fontWeight: row.isHeader ? 'bold' : 'normal', paddingLeft: row.indent ? `${row.indent * 16 + 4}px` : '4px' })}>
                                     {row.no}
                                 </td>

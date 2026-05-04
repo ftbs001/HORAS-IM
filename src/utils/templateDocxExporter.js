@@ -48,9 +48,9 @@ const FONT_NAME = 'Times New Roman';
 const FONT_SIZE = 20;   // half-points → 10pt
 const FONT_SM   = 18;   // 9pt
 const FONT_XS   = 16;   // 8pt
-const HEADER_BG = 'bdd7ee';
-const TOTAL_BG  = 'e8f5e9';
-const GRAND_BG  = 'c6efce';
+const HEADER_BG = null;  // Black & white — no fill
+const TOTAL_BG  = null;  // Black & white — no fill
+const GRAND_BG  = null;  // Black & white — no fill
 const BORDER    = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
 const ALL_BORDERS = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
 
@@ -131,16 +131,15 @@ function buildTabelA(data) {
     const rows = TABEL_A_ROWS.map(row => {
         const isGrand = row.isGrandTotal;
         const isTotal = row.isTotalRow;
-        const bg = isGrand ? GRAND_BG : isTotal ? TOTAL_BG : (row.isGroupStart ? 'dce6f1' : null);
         const l = getV(row.id, 'l');
         const p = getV(row.id, 'p');
         return new TableRow({
             children: [
-                cell(row.jenisPaspor    || '', { bold: row.isGroupStart, bg, w: W[0] }),
-                cell(row.jenisPermohonan|| '', { bold: isTotal, bg, w: W[1] }),
-                numCell(l, { bg, w: W[2] }),
-                numCell(p, { bg, w: W[3] }),
-                numCell(l + p, { bg, bold: isTotal, w: W[4] }),
+                cell(row.jenisPaspor    || '', { bold: row.isGroupStart, w: W[0] }),
+                cell(row.jenisPermohonan|| '', { bold: isTotal, w: W[1] }),
+                numCell(l, { w: W[2] }),
+                numCell(p, { w: W[3] }),
+                numCell(l + p, { bold: isTotal, w: W[4] }),
             ],
         });
     });
@@ -170,16 +169,15 @@ function buildTabelB(data) {
     const rows = TABEL_B_ROWS.map(row => {
         const isGrand = row.isGrandTotal;
         const isTotal = row.isTotalRow;
-        const bg = isGrand ? GRAND_BG : isTotal ? TOTAL_BG : (row.isGroupStart ? 'dce6f1' : null);
         const l = getV(row.id, 'l');
         const p = getV(row.id, 'p');
         return new TableRow({
             children: [
-                cell(row.jenisPaspor    || '', { bold: row.isGroupStart, bg, w: W[0] }),
-                cell(row.jenisPermohonan|| '', { bold: isTotal, bg, w: W[1] }),
-                numCell(l, { bg, w: W[2] }),
-                numCell(p, { bg, w: W[3] }),
-                numCell(l + p, { bg, bold: isTotal, w: W[4] }),
+                cell(row.jenisPaspor    || '', { bold: row.isGroupStart, w: W[0] }),
+                cell(row.jenisPermohonan|| '', { bold: isTotal, w: W[1] }),
+                numCell(l, { w: W[2] }),
+                numCell(p, { w: W[3] }),
+                numCell(l + p, { bold: isTotal, w: W[4] }),
             ],
         });
     });
@@ -208,15 +206,14 @@ function buildTabelC(data) {
 
     const rows = TABEL_C_ROWS.map(row => {
         const isGrand = row.isGrandTotal;
-        const bg = isGrand ? GRAND_BG : null;
         const l = getV(row.id, 'l');
         const p = getV(row.id, 'p');
         return new TableRow({
             children: [
-                cell(row.keterangan || '', { bold: isGrand, bg, w: W[0] }),
-                numCell(l, { bg, w: W[1] }),
-                numCell(p, { bg, w: W[2] }),
-                numCell(l + p, { bg, bold: isGrand, w: W[3] }),
+                cell(row.keterangan || '', { bold: isGrand, w: W[0] }),
+                numCell(l, { w: W[1] }),
+                numCell(p, { w: W[2] }),
+                numCell(l + p, { bold: isGrand, w: W[3] }),
             ],
         });
     });
@@ -261,15 +258,14 @@ function buildTabelMultiHeader(tableName, data, schemaRows) {
     const dataRows = schemaRows.map(row => {
         const isGrand = row.isGrandTotal;
         const isTotal = row.isTotalRow;
-        const bg = isGrand ? GRAND_BG : isTotal ? TOTAL_BG : null;
 
         return new TableRow({
             children: [
-                cell(row.no    || '', { center: true, bg, sz: FONT_SM, w: fixedW[0] }),
-                cell(row.label || '', { bold: isTotal, bg, sz: FONT_SM, w: fixedW[1] }),
+                cell(row.no    || '', { center: true, sz: FONT_SM, w: fixedW[0] }),
+                cell(row.label || '', { bold: isTotal || isGrand, sz: FONT_SM, w: fixedW[1] }),
                 ...TABEL_D_COLS.flatMap(col => [
-                    numCell(getV(row.id, col, 'l'), { bg, sz: FONT_SM, bold: isTotal, w: dataColW }),
-                    numCell(getV(row.id, col, 'p'), { bg, sz: FONT_SM, bold: isTotal, w: dataColW }),
+                    numCell(getV(row.id, col, 'l'), { sz: FONT_SM, bold: isTotal || isGrand, w: dataColW }),
+                    numCell(getV(row.id, col, 'p'), { sz: FONT_SM, bold: isTotal || isGrand, w: dataColW }),
                 ]),
             ],
         });
@@ -315,7 +311,6 @@ function buildTabelSimple(tableName, data, schemaRows) {
     const dataRows = schemaRows.map(row => {
         const isGrand = row.isGrandTotal;
         const isTotal = row.isTotalRow;
-        const bg = isGrand ? GRAND_BG : isTotal ? TOTAL_BG : null;
 
         let sumTotal = 0;
         const inputs = TABEL_SIMPLE_COLS.flatMap(col => {
@@ -323,17 +318,17 @@ function buildTabelSimple(tableName, data, schemaRows) {
             const p = getV(row.id, col, 'p');
             sumTotal += l + p;
             return [
-                numCell(l, { bg, sz: FONT_SM, bold: isTotal, w: dataColW }),
-                numCell(p, { bg, sz: FONT_SM, bold: isTotal, w: dataColW }),
+                numCell(l, { sz: FONT_SM, bold: isTotal || isGrand, w: dataColW }),
+                numCell(p, { sz: FONT_SM, bold: isTotal || isGrand, w: dataColW }),
             ];
         });
 
         return new TableRow({
             children: [
-                cell(row.no    || '', { center: true, bg, sz: FONT_SM, w: fixedW[0] }),
-                cell(row.label || '', { bold: isTotal, bg, sz: FONT_SM, w: fixedW[1] }),
+                cell(row.no    || '', { center: true, sz: FONT_SM, w: fixedW[0] }),
+                cell(row.label || '', { bold: isTotal || isGrand, sz: FONT_SM, w: fixedW[1] }),
                 ...inputs,
-                numCell(sumTotal, { bg, sz: FONT_SM, bold: true, w: jumlahW }),
+                numCell(sumTotal, { sz: FONT_SM, bold: true, w: jumlahW }),
             ],
         });
     });
@@ -405,7 +400,6 @@ function buildTabelPerlintasan(tableName, data, schemaRows, customHeader) {
 
     const dataRows = schemaRows.map(row => {
         const isTotal = row.isTotalRow;
-        const bg = isTotal ? GRAND_BG : null;
 
         let total = 0;
         const dataCells = colGroups.flatMap(g =>
@@ -414,17 +408,17 @@ function buildTabelPerlintasan(tableName, data, schemaRows, customHeader) {
                 const p = getV(row.id, subKey, 'p');
                 total += l + p;
                 return [
-                    numCell(l, { bg, sz: FONT_XS, bold: isTotal, w: dataW }),
-                    numCell(p, { bg, sz: FONT_XS, bold: isTotal, w: dataW }),
+                    numCell(l, { sz: FONT_XS, bold: isTotal, w: dataW }),
+                    numCell(p, { sz: FONT_XS, bold: isTotal, w: dataW }),
                 ];
             })
         );
 
         return new TableRow({
             children: [
-                cell(row.label || '', { bold: isTotal, bg, sz: FONT_XS, w: nameW }),
+                cell(row.label || '', { bold: isTotal, sz: FONT_XS, w: nameW }),
                 ...dataCells,
-                numCell(total, { bg, sz: FONT_XS, bold: true, w: jumlahW }),
+                numCell(total, { sz: FONT_XS, bold: true, w: jumlahW }),
             ],
         });
     });
@@ -480,12 +474,12 @@ function buildProjusDocx(projusData) {
             ]});
         });
     const totalRow = new TableRow({ children: [
-        cell('JUMLAH', { bold: true, center: true, bg: GRAND_BG, colSpan: 2, sz: FONT_SM }),
+        cell('JUMLAH', { bold: true, center: true, colSpan: 2, sz: FONT_SM }),
         ...PROJUS_COLS.flatMap(col => [
-            numCell(totals.total?.[col]?.l, { bg: GRAND_BG, bold: true, sz: FONT_SM }),
-            numCell(totals.total?.[col]?.p, { bg: GRAND_BG, bold: true, sz: FONT_SM }),
+            numCell(totals.total?.[col]?.l, { bold: true, sz: FONT_SM }),
+            numCell(totals.total?.[col]?.p, { bold: true, sz: FONT_SM }),
         ]),
-        numCell(totals.total?.jumlah, { bg: GRAND_BG, bold: true, sz: FONT_SM }),
+        numCell(totals.total?.jumlah, { bold: true, sz: FONT_SM }),
     ]});
     return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, hr3, hr4, ...dataRows, totalRow] });
 }
@@ -534,12 +528,12 @@ function buildTAKDocx(takData) {
             ]});
         });
     const totalRow = new TableRow({ children: [
-        cell('JUMLAH', { bold: true, center: true, bg: GRAND_BG, colSpan: 2, sz: FONT_XS }),
+        cell('JUMLAH', { bold: true, center: true, colSpan: 2, sz: FONT_XS }),
         ...TAK_COLS.flatMap(col => [
-            numCell(totals.total?.[col]?.l, { bg: GRAND_BG, bold: true, sz: FONT_XS }),
-            numCell(totals.total?.[col]?.p, { bg: GRAND_BG, bold: true, sz: FONT_XS }),
+            numCell(totals.total?.[col]?.l, { bold: true, sz: FONT_XS }),
+            numCell(totals.total?.[col]?.p, { bold: true, sz: FONT_XS }),
         ]),
-        numCell(totals.total?.jumlah, { bg: GRAND_BG, bold: true, sz: FONT_XS }),
+        numCell(totals.total?.jumlah, { bold: true, sz: FONT_XS }),
     ]});
     return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, hr3, hr4, ...dataRows, totalRow] });
 }
@@ -575,21 +569,20 @@ function buildTimporaDocx(timporaData, bulanName, tahun) {
         ? [new TableRow({ children: [cell('NIHIL', { center: true, colSpan: 6, sz: FONT_SM })] })]
         : TIMPORA_ROWS.map(row => {
             const d = timporaData?.[row.id] || {};
-            const bg = row.isHeader ? 'dce6f1' : null;
             if (row.isHeader) {
                 return new TableRow({ children: [
-                    cell(row.no,    { center: true, bold: true, bg, sz: FONT_SM, w: noW }),
-                    cell(row.label, { bold: true,   bg,         sz: FONT_SM, w: namW }),
-                    cell('', { bg, colSpan: 4, sz: FONT_SM }),
+                    cell(row.no,    { center: true, bold: true, sz: FONT_SM, w: noW }),
+                    cell(row.label, { bold: true,               sz: FONT_SM, w: namW }),
+                    cell('', { colSpan: 4, sz: FONT_SM }),
                 ]});
             }
             return new TableRow({ children: [
-                cell(row.no,               { center: true, bg, sz: FONT_SM, w: noW }),
-                cell(d.label || row.label, { bg, sz: FONT_SM, w: namW }),
-                cell(d.rapat_waktu || '-', { center: true, bg, sz: FONT_SM, w: colW }),
-                cell(d.rapat_ket   || '-', { center: true, bg, sz: FONT_SM, w: colW }),
-                cell(d.ops_waktu   || '-', { center: true, bg, sz: FONT_SM, w: colW }),
-                cell(d.ops_ket     || '-', { center: true, bg, sz: FONT_SM, w: colW }),
+                cell(row.no,               { center: true, sz: FONT_SM, w: noW }),
+                cell(d.label || row.label, { sz: FONT_SM, w: namW }),
+                cell(d.rapat_waktu || '-', { center: true, sz: FONT_SM, w: colW }),
+                cell(d.rapat_ket   || '-', { center: true, sz: FONT_SM, w: colW }),
+                cell(d.ops_waktu   || '-', { center: true, sz: FONT_SM, w: colW }),
+                cell(d.ops_ket     || '-', { center: true, sz: FONT_SM, w: colW }),
             ]});
         });
     return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [titleRow, hr1, hr2, hr3, ...dataRows] });
@@ -791,7 +784,6 @@ export function getLalintalkimDocxElements(part, templateData) {
             return [];
     }
 }
-
 
 /* ══════════════════════════════════════════════════════════════════════════════
    MAIN EXPORT FUNCTION (standalone from TemplateLaporan page)
@@ -1406,14 +1398,14 @@ function buildKendaraanDocx(data) {
 
     const mkGroupRows = (title, items, num) => {
         const headerRow = new TableRow({ children: [
-            cell(num, { center: true, bold: true, bg: '#f1f5f9' }),
-            cell(title, { bold: true, colSpan: 4, bg: '#f1f5f9' })
+            cell(num, { center: true, bold: true }),
+            cell(title, { bold: true, colSpan: 4 })
         ]});
 
         if (!items || items.length === 0) {
             return [headerRow, new TableRow({ children: [
                 cell('', {}),
-                cell('— Nihil —', { center: true, fontStyle: 'italic', colSpan: 4, bg: '#f8fafc' })
+                cell('— Nihil —', { center: true, fontStyle: 'italic', colSpan: 4 })
             ]})];
         }
         
