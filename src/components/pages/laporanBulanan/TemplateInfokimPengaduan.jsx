@@ -34,7 +34,7 @@ const useMsg = () => {
 
 const th = (extra = {}) => ({
     border: '1px solid #000', padding: '4px 5px',
-    background: '#bdd7ee', fontFamily: FONT, fontSize: '9pt',
+    background: '#fff', fontFamily: FONT, fontSize: '9pt',
     fontWeight: 'bold', textAlign: 'center', verticalAlign: 'middle',
     ...extra
 });
@@ -116,7 +116,7 @@ function TabelPengaduan({ rows, onChange, isPreview, loading }) {
                         {isEmpty ? (
                             <tr>
                                 <td colSpan={PENGADUAN_COLS.length + (isPreview ? 1 : 2)}
-                                    style={td({ textAlign: 'center', fontStyle: 'italic', padding: '20px', background: '#fafafa' })}>
+                                    style={td({ textAlign: 'center', fontStyle: 'italic', padding: '20px' })}>
                                     NIHIL
                                 </td>
                             </tr>

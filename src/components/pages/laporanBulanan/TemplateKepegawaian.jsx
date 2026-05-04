@@ -20,7 +20,7 @@ const useMsg = () => {
 
 const th = (extra = {}) => ({
     border: '1px solid #000', padding: '4px 5px',
-    background: '#bdd7ee', fontFamily: FONT, fontSize: '9pt',
+    background: '#fff', fontFamily: FONT, fontSize: '9pt',
     fontWeight: 'bold', textAlign: 'center', verticalAlign: 'middle',
     ...extra
 });
@@ -73,7 +73,7 @@ function TablePegawaiDetail({ data, onChange, isPreview, loading }) {
                 <thead>
                     <tr>
                         <th style={th()}>NO</th><th style={th()}>NAMA</th><th style={th()}>NIP</th><th style={th()}>JK</th><th style={th()}>JABATAN</th><th style={th()}>ESELON</th><th style={th()}>GOL</th><th style={th()}>TMT</th><th style={th()}>PEND</th><th style={th()}>DIKLAT</th><th style={th()}>LAIN</th><th style={th()}>KET</th>
-                        {!isPreview && <th style={th({ background: '#f87171' })}>Aksi</th>}
+                        {!isPreview && <th style={th()}>Aksi</th>}
                     </tr>
                 </thead>
                 <tbody>
@@ -181,7 +181,7 @@ function TableSummary({ titleValue, titleKey, data, totalKey, onChange, isPrevie
                 )}
             </div>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                <thead><tr><th style={th()}>NO</th><th style={th()}>URAIAN</th><th style={th()}>JUMLAH</th>{!isPreview && <th style={th({ background: '#f87171' })}>Aksi</th>}</tr></thead>
+                <thead><tr><th style={th()}>NO</th><th style={th()}>URAIAN</th><th style={th()}>JUMLAH</th>{!isPreview && <th style={th()}>Aksi</th>}</tr></thead>
                 <tbody>
                     {(data || []).map((r, idx) => (
                         <tr key={r.id}>

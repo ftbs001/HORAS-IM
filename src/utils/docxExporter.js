@@ -265,7 +265,7 @@ export const htmlTableToDocxTable = (tableEl) => {
                 children: paragraphs,
                 columnSpan: colspan > 1 ? colspan : undefined,
                 rowSpan: rowspan > 1 ? rowspan : undefined,
-                shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                shading: undefined,
                 width: { size: Math.max(1, Math.round(cellWidthPct)), type: WidthType.AUTO }, // Changed from PERCENTAGE to AUTO for autofitting
                 borders: CELL_BORDER,
             }));
@@ -289,8 +289,8 @@ export const htmlTableToDocxTable = (tableEl) => {
             bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
             left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
             right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
-            insideH: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
-            insideV: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            insideH: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+            insideV: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
         },
         rows,
     });
@@ -583,7 +583,7 @@ const buildCoverLetter = async (data, logoPath) => {
         rows: [
             new TableRow({
                 children: [
-                    // Left: Placeholder ttd_pengirim
+                    // Left: ttd_pengirim placeholder
                     new TableCell({
                         width: { size: 50, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.BOTTOM,
@@ -591,7 +591,7 @@ const buildCoverLetter = async (data, logoPath) => {
                         children: [
                             new Paragraph({
                                 style: STYLE_ID.NORMAL,
-                                children: [tr('')], // Empty block to preserve structure
+                                children: [tr('${ttd_pengirim}')],
                             })
                         ]
                     }),

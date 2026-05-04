@@ -688,23 +688,107 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
                 EMPTY(400),
 
-                // Tanda tangan
-                new Paragraph({
-                    children: [TR('Kepala Kantor,')],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 60, line: 240, lineRule: 'auto' },
-                }),
-                EMPTY(1400),
-                new Paragraph({
-                    children: [TR(clPenandatangan || '_________________________', { bold: true, underline: { type: 'single' } })],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 60, line: 240, lineRule: 'auto' },
-                }),
-                new Paragraph({
-                    children: [TR(coverLetterData?.nip ? `NIP. ${cleanXml(coverLetterData.nip)}` : '')],
-                    alignment: AlignmentType.RIGHT,
-                    spacing: { after: 400, line: 240, lineRule: 'auto' },
-                }),
+                // Tanda tangan — 2-kolom: kiri placeholder, kanan e-sign badge + nama
+                (() => {
+                    const NO_BORDER_TTD = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+                    const tdBordersTTD = {
+                        top: NO_BORDER_TTD, bottom: NO_BORDER_TTD,
+                        left: NO_BORDER_TTD, right: NO_BORDER_TTD
+                    };
+
+                    // Right cell: jabatan → e-sign (logo + teks) → nama
+                    const rightCellKids = [
+                        new Paragraph({
+                            children: [TR('Kepala Kantor,')],
+                            spacing: { after: 120, line: 240, lineRule: 'auto' },
+                        }),
+                    ];
+
+                    if (logoKemenBuf) {
+                        // E-sign badge: 2-kolom dalam cell kanan
+                        // Kiri: logo kemenimipas kecil; Kanan: teks KEMENIMIPAS + subtitle
+                        const eSignInner = new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            layout: TableLayoutType.FIXED,
+                            borders: {
+                                top: NO_BORDER_TTD, bottom: NO_BORDER_TTD,
+                                left: NO_BORDER_TTD, right: NO_BORDER_TTD,
+                                insideV: NO_BORDER_TTD, insideH: NO_BORDER_TTD,
+                            },
+                            rows: [new TableRow({
+                                children: [
+                                    // Logo (shield KEMENIMIPAS)
+                                    new TableCell({
+                                        width: { size: 18, type: WidthType.PERCENTAGE },
+                                        borders: tdBordersTTD,
+                                        verticalAlign: VerticalAlign.CENTER,
+                                        children: [new Paragraph({
+                                            children: [new ImageRun({
+                                                data: logoKemenBuf,
+                                                transformation: { width: 44, height: 44 },
+                                                type: 'png',
+                                            })],
+                                            spacing: { after: 0 },
+                                        })],
+                                    }),
+                                    // KEMENIMIPAS + subtitle
+                                    new TableCell({
+                                        width: { size: 82, type: WidthType.PERCENTAGE },
+                                        borders: tdBordersTTD,
+                                        verticalAlign: VerticalAlign.CENTER,
+                                        children: [
+                                            new Paragraph({
+                                                children: [new TextRun({ text: 'KEMENIMIPAS', font: 'Arial Black', size: 26, bold: true })],
+                                                spacing: { after: 0 },
+                                            }),
+                                            new Paragraph({
+                                                children: [new TextRun({ text: 'Ditandatangani secara elektronik oleh:', font: 'Arial', size: 16, color: '555555' })],
+                                                spacing: { after: 0 },
+                                            }),
+                                        ],
+                                    }),
+                                ],
+                            })],
+                        });
+                        rightCellKids.push(eSignInner);
+                        rightCellKids.push(new Paragraph({ spacing: { before: 100, after: 0 } }));
+                    } else {
+                        // Fallback: spasi untuk TTD fisik
+                        rightCellKids.push(new Paragraph({ spacing: { before: 700, after: 0 } }));
+                    }
+
+                    rightCellKids.push(new Paragraph({
+                        children: [TR(clPenandatangan, { bold: true })],
+                        spacing: { after: 0, line: 240, lineRule: 'auto' },
+                    }));
+
+                    return new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        layout: TableLayoutType.FIXED,
+                        borders: {
+                            top: NO_BORDER_TTD, bottom: NO_BORDER_TTD,
+                            left: NO_BORDER_TTD, right: NO_BORDER_TTD,
+                            insideV: NO_BORDER_TTD, insideH: NO_BORDER_TTD,
+                        },
+                        rows: [new TableRow({
+                            children: [
+                                new TableCell({
+                                    children: [new Paragraph({
+                                        children: [TR('${ttd_pengirim}', { size: F_SMALL })],
+                                        spacing: { before: 700, after: 0, line: 240, lineRule: 'auto' },
+                                    })],
+                                    width: { size: 50, type: WidthType.PERCENTAGE },
+                                    borders: tdBordersTTD,
+                                }),
+                                new TableCell({
+                                    children: rightCellKids,
+                                    width: { size: 50, type: WidthType.PERCENTAGE },
+                                    borders: tdBordersTTD,
+                                }),
+                            ],
+                        })],
+                    });
+                })(),
 
                 // Tembusan
                 new Paragraph({
@@ -1128,7 +1212,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             columnSpan: colSpan > 1 ? colSpan : undefined,
                             rowSpan: rowSpan > 1 ? rowSpan : undefined,
                             width: { size: Math.max(1, Math.round(colPct * colSpan)), type: WidthType.AUTO }, // Changed from PERCENTAGE to AUTO for autofitting
-                            shading: isHeader ? { fill: 'F5F5F5' } : undefined,
+                            shading: undefined,
                             borders: {
                                 top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                                 bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
@@ -1160,12 +1244,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     width: { size: 100, type: WidthType.AUTO },
                     layout: TableLayoutType.AUTOFIT, // Changed to AUTOFIT for slimmer tables
                     borders: {
-                        top: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                        bottom: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                        left: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                        right: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                        insideH: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
-                        insideV: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                        top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                        insideH: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                        insideV: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                     },
                     rows: docxRows,
                 });
@@ -1409,9 +1493,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                         : isHeaderRow ? AlignmentType.CENTER
                                             : AlignmentType.LEFT;
 
-                                // Professional header shading: blue-gray for row 0
-                                const shadeFill = isHeaderRow ? 'DDE8F4'
-                                    : (ri % 2 === 0 ? undefined : 'F8FBFF'); // subtle alternating rows
+                                // Plain header — white cell, bold text; no alternating row fill
+                                const shadeFill = undefined;
 
                                 docxCells.push(new TableCell({
                                     columnSpan: colSpan > 1 ? colSpan : undefined,
@@ -1419,10 +1502,10 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                     width: { size: Math.max(1, Math.round(cellWidthPct)), type: WidthType.PERCENTAGE },
                                     shading: shadeFill ? { fill: shadeFill, color: 'auto' } : undefined,
                                     borders: {
-                                        top: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
-                                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
-                                        left: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
-                                        right: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                        top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                        right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                                     },
                                     children: [new Paragraph({
                                         children: buildCellRuns(cell, isHeaderRow),
@@ -1448,12 +1531,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 width: { size: 100, type: WidthType.PERCENTAGE },
                                 layout: TableLayoutType.FIXED,
                                 borders: {
-                                    top: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                                    bottom: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                                    left: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                                    right: { style: BorderStyle.SINGLE, size: 6, color: '2F5496' },
-                                    insideH: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
-                                    insideV: { style: BorderStyle.SINGLE, size: 4, color: '4472C4' },
+                                    top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                                    bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                                    left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                                    right: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+                                    insideH: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+                                    insideV: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
                                 },
                                 rows: docxRows,
                             }),

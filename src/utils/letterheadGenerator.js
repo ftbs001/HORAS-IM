@@ -165,18 +165,14 @@ export const generateLetterhead = async (logoPath, data = {}) => {
         ],
     });
 
-    // Create letterhead table with bottom border
+    // Create letterhead table — no bottom border (handled by separate line paragraphs below)
     const letterheadTable = new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         layout: TableLayoutType.FIXED,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         borders: {
             top: { style: BorderStyle.NIL },
-            bottom: { 
-                style: BorderStyle.SINGLE, 
-                size: 2, // Ultra thin line identical to user reference
-                color: LETTERHEAD_BORDER.COLOR 
-            },
+            bottom: { style: BorderStyle.NIL },
             left: { style: BorderStyle.NIL },
             right: { style: BorderStyle.NIL },
             insideH: { style: BorderStyle.NIL },
@@ -190,6 +186,21 @@ export const generateLetterhead = async (logoPath, data = {}) => {
     });
 
     elements.push(letterheadTable);
+
+    // Garis tipis rapat di bawah kop
+    elements.push(new Paragraph({
+        children: [],
+        border: {
+            top: { style: BorderStyle.SINGLE, size: 6, color: '000000' }, // ~0.75pt thin line
+        },
+        spacing: { before: 40, after: 0, line: 240 },
+    }));
+
+    // Spasi setelah kop sebelum nomor surat
+    elements.push(new Paragraph({
+        children: [],
+        spacing: { before: 0, after: 160, line: 240 },
+    }));
 
     return elements;
 };

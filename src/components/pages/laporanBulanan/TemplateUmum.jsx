@@ -17,7 +17,7 @@ const BULAN_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const TAHUN_OPTIONS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i);
 const FONT = '"Times New Roman", Georgia, serif';
-const HEADER_BG = '#bdd7ee';
+const HEADER_BG = '#fff'; // Black & white — no fill
 
 /* ── Style helpers (same as TemplateKeuangan) ─────────────────────────────── */
 const th = (extra = {}) => ({
@@ -114,9 +114,9 @@ function KendaraanGroup({ numFormat, title, data, onChange, isPreview }) {
     return (
         <>
             {/* Group header row */}
-            <tr style={{ background: '#f1f5f9' }}>
-                <td style={{ ...td(), fontWeight: 'bold', color: '#1e40af' }}>{numFormat}</td>
-                <td style={{ ...td(), fontWeight: 'bold', color: '#1e40af' }} colSpan={4}>
+            <tr>
+                <td style={{ ...td(), fontWeight: 'bold' }}>{numFormat}</td>
+                <td style={{ ...td(), fontWeight: 'bold' }} colSpan={4}>
                     {title}
                     <button onClick={addRow} style={{
                         marginLeft: '12px', fontSize: '11px', background: '#3b82f6',

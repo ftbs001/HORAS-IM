@@ -107,8 +107,10 @@ const KopSurat = ({ data = {}, editable = false, onChange }) => {
                 </div>
             </div>
 
-            {/* Garis tunggal tipis rapat — persis seperti gambar referensi pengguna */}
-            <div style={{ borderTop: '0.5px solid #000', margin: '1px 0 0 0', padding: 0, height: 0, lineHeight: 0 }} />
+            {/* Garis tipis rapat di bawah kop */}
+            <div style={{ borderTop: '0.5px solid #000', margin: '2px 0 0 0', padding: 0, height: 0, lineHeight: 0 }} />
+            {/* Jarak antara garis kop dan nomor surat */}
+            <div style={{ height: '16px' }} />
         </div>
     );
 };

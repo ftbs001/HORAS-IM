@@ -7,12 +7,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabaseClient';
 import { getDefaultPenutupData, EMPTY_SARAN } from '../../../utils/penutupSchema';
+import BsreBadge from '../../common/BsreBadge';
 
 const BULAN_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const TAHUN_OPTIONS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i);
 const FONT = '"Times New Roman", Georgia, serif';
-const HEADER_BG = '#bdd7ee';
+const HEADER_BG = '#fff'; // Black & white — no fill
 
 /* ── Style helpers ───────────────────────────────────────────────────────── */
 const th = (extra = {}) => ({
@@ -140,19 +141,15 @@ function PenutupEditor({ data, onChange, isPreview, bulan, tahun }) {
                         </div>
                     </div>
                     <div style={{ width: '45%' }}>
-                        <div>{safeTtd.jabatan}</div>
+                        <div style={{ marginBottom: 8 }}>{safeTtd.jabatan}</div>
                         {safeTtd.showEsign ? (
-                            <div style={{ margin: '10px 0', padding: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                                <img src="/logo_kemenimipas.png" alt="Logo Kemenimipas" style={{ width: '40px', height: 'auto' }} />
-                                <div style={{ fontSize: '10pt', fontFamily: 'Arial, sans-serif' }}>
-                                    <div style={{ fontWeight: 'bold', letterSpacing: '1px' }}>KEMENIMIPAS</div>
-                                    <div style={{ fontSize: '8pt', color: '#555' }}>Ditandatangani secara elektronik oleh:</div>
-                                </div>
+                            <div style={{ margin: '6px 0 10px 0' }}>
+                                <BsreBadge width={220} />
                             </div>
                         ) : (
-                            <div style={{ height: '80px' }}></div>
+                            <div style={{ height: '70px' }}></div>
                         )}
-                        <div style={{ fontWeight: 'bold' }}>{safeTtd.nama}</div>
+                        <div style={{ fontWeight: 'bold', marginTop: 4 }}>{safeTtd.nama}</div>
                     </div>
                 </div>
 

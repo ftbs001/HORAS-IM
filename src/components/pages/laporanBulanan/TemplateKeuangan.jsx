@@ -38,7 +38,7 @@ const formatPct = (num) => {
 
 const th = (extra = {}) => ({
     border: '1px solid #000', padding: '4px 5px',
-    background: '#bdd7ee', fontFamily: FONT, fontSize: '9pt',
+    background: '#fff', fontFamily: FONT, fontSize: '9pt',
     fontWeight: 'bold', textAlign: 'center', verticalAlign: 'middle',
     ...extra
 });
@@ -115,7 +115,7 @@ function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading })
                         <th colSpan={2} style={th()}>REALISASI</th>
                         <th rowSpan={2} style={th()}>SISA DANA</th>
                         <th rowSpan={2} style={th()}>KETERANGAN</th>
-                        {!isPreview && !readOnly && <th rowSpan={2} style={th({ background: '#f87171' })}>Aksi</th>}
+                        {!isPreview && !readOnly && <th rowSpan={2} style={th()}>Aksi</th>}
                     </tr>
                     <tr>
                         <th style={th({ width: '100px' })}>Rp.</th>
@@ -130,12 +130,12 @@ function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading })
                         return (
                             <tr key={r.id}>
                                 <td style={td()}>{LblCol(idx)}</td>
-                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{PaguCol(idx)}</td>
-                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{pt ? '-' : TargRpCol(idx)}</td>
-                                <td style={td({ textAlign: 'center', background: '#f8fafc' })}>{pt ? '-' : formatPct(r.target_pct)}</td>
-                                <td style={td({ textAlign: 'right', background: pt && !readOnly ? '#fafafa' : '#fff' })}>{pt ? '-' : RealRpCol(idx)}</td>
-                                <td style={td({ textAlign: 'center', background: '#f8fafc' })}>{pt ? '-' : formatPct(r.realisasi_pct)}</td>
-                                <td style={td({ textAlign: 'right', background: '#f8fafc' })}>{pt ? '-' : formatRp(r.sisa_dana)}</td>
+                                <td style={td({ textAlign: 'right', background: '#fff' })}>{PaguCol(idx)}</td>
+                                <td style={td({ textAlign: 'right', background: '#fff' })}>{pt ? '-' : TargRpCol(idx)}</td>
+                                <td style={td({ textAlign: 'center', background: '#fff' })}>{pt ? '-' : formatPct(r.target_pct)}</td>
+                                <td style={td({ textAlign: 'right', background: '#fff' })}>{pt ? '-' : RealRpCol(idx)}</td>
+                                <td style={td({ textAlign: 'center', background: '#fff' })}>{pt ? '-' : formatPct(r.realisasi_pct)}</td>
+                                <td style={td({ textAlign: 'right', background: '#fff' })}>{pt ? '-' : formatRp(r.sisa_dana)}</td>
                                 <td style={td({ background: '#fff' })}>{KetCol(idx)}</td>
                                 {!isPreview && !readOnly && <td style={td({ textAlign: 'center' })}><button onClick={() => handleRemove(idx)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>x</button></td>}
                             </tr>
@@ -144,13 +144,13 @@ function TableRealisasi({ title, data, onChange, isPreview, readOnly, loading })
                     {/* Total Row */}
                     <tr>
                         <td style={td({ textAlign: 'center', fontWeight: 'bold' })}>JUMLAH</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.pagu)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.target_rp)}</td>
-                        <td style={td({ textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' })}>{formatPct(total?.target_pct)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.realisasi_rp)}</td>
-                        <td style={td({ textAlign: 'center', fontWeight: 'bold', background: '#f8fafc' })}>{formatPct(total?.realisasi_pct)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.sisa_dana)}</td>
-                        <td style={td({ background: '#f8fafc' })}></td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.pagu)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.target_rp)}</td>
+                        <td style={td({ textAlign: 'center', fontWeight: 'bold' })}>{formatPct(total?.target_pct)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.realisasi_rp)}</td>
+                        <td style={td({ textAlign: 'center', fontWeight: 'bold' })}>{formatPct(total?.realisasi_pct)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.sisa_dana)}</td>
+                        <td style={td()}></td>
                         {!isPreview && !readOnly && <td style={td()}></td>}
                     </tr>
                 </tbody>
@@ -190,7 +190,7 @@ function TableBendahara({ data, onChange, isPreview, loading }) {
                         <th style={th({ width: '130px' })}>TARGET</th>
                         <th style={th({ width: '130px' })}>REALISASI SIMPONI</th>
                         <th style={th({ width: '130px' })}>REALISASI SPAN</th>
-                        {!isPreview && <th style={th({ background: '#f87171' })}>Aksi</th>}
+                        {!isPreview && <th style={th()}>Aksi</th>}
                     </tr>
                 </thead>
                 <tbody>
@@ -207,9 +207,9 @@ function TableBendahara({ data, onChange, isPreview, loading }) {
                     ))}
                     <tr>
                         <td colSpan={3} style={td({ textAlign: 'center', fontWeight: 'bold' })}>TOTAL</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.target)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.realisasi_simponi)}</td>
-                        <td style={td({ textAlign: 'right', fontWeight: 'bold', background: '#f8fafc' })}>{formatRp(total?.realisasi_span)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.target)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.realisasi_simponi)}</td>
+                        <td style={td({ textAlign: 'right', fontWeight: 'bold' })}>{formatRp(total?.realisasi_span)}</td>
                         {!isPreview && <td style={td()}></td>}
                     </tr>
                 </tbody>
