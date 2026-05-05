@@ -65,7 +65,7 @@ const TdInput = ({ value, onChange, disabled, multiline, rows = 3 }) => {
 /* ═══════════════════════════════════════════════════════════════════════════
    KOMPONEN SARAN & KESIMPULAN
 ═══════════════════════════════════════════════════════════════════════════ */
-function PenutupEditor({ data, onChange, isPreview, bulan, tahun }) {
+function PenutupEditor({ data, onChange, isPreview, bulan, tahun, esignLogoUrl = null }) {
     const { saran, kesimpulan } = data;
 
     const safeTtd = {
@@ -554,6 +554,7 @@ export default function TemplatePenutup({
                     isPreview={isPreview}
                     bulan={bulan}
                     tahun={tahun}
+                    esignLogoUrl={esignLogoUrl}
                 />
             </div>
 
