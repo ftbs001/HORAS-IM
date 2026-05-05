@@ -1,204 +1,249 @@
 /**
  * BsreBadge.jsx – Badge e-TTD KEMENIMIPAS
- * Pure inline SVG – zero image loading dependency.
- * Pixel-perfect rendition matching the official BSrE reference image.
+ * Pixel-perfect SVG based on zoomed reference image.
  *
- * Props:
- *   width  – total rendered width in px (default 300)
+ * Shield anatomy (from zoomed image):
+ *  - Top: gently arched center, shoulders curve outward
+ *  - Sides: straight/slightly tapered
+ *  - Bottom: sharp point
+ *  - Gold border: thick (~6px in viewbox)
+ *  - Interior: deep navy #1A2040
+ *
+ * Padlock:
+ *  - CLOSED U-arch shackle, thick strokes
+ *  - Large rounded-rect body (gold)
+ *  - Keyhole: circle + wide stem
+ *
+ * Garuda seal:
+ *  - Bottom-center of padlock body
+ *  - Double concentric gold rings
+ *  - Garuda emblem inside
  */
 import React from 'react';
 
 export default function BsreBadge({ width = 300 }) {
-    // ViewBox: 340 wide × 100 tall
-    // Shield occupies left ~100px, text on right
-    const h = Math.round(width * 100 / 340);
+    // Viewbox: 300 × 95. Shield is ~90px wide on the left.
+    const h = Math.round(width * 95 / 300);
     return (
         <svg
             width={width}
             height={h}
-            viewBox="0 0 340 100"
+            viewBox="0 0 300 95"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             style={{ display: 'block' }}
         >
-            {/* ════════════════════════════════
-                SHIELD SHAPE
-                Matches: wide top shoulders, narrowing to pointed bottom
-            ════════════════════════════════ */}
+            {/* ══════════════════════════════════════════
+                SHIELD
+                Reference: arched top, straight sides, sharp bottom point
+                Gold outer → navy inner (thick border effect)
+            ══════════════════════════════════════════ */}
 
-            {/* Gold outer shield (border effect via slightly larger path) */}
+            {/* Gold outer shield */}
             <path
-                d="M50 4
-                   C 50 4 20 11 8 20
-                   L 8 48
-                   C 8 70 28 85 50 95
-                   C 72 85 92 70 92 48
-                   L 92 20
-                   C 80 11 50 4 50 4 Z"
-                fill="#C9992A"
-            />
-            {/* Dark navy inner fill */}
-            <path
-                d="M50 10
-                   C 50 10 22 17 12 25
-                   L 12 48
-                   C 12 68 30 82 50 91
-                   C 70 82 88 68 88 48
-                   L 88 25
-                   C 78 17 50 10 50 10 Z"
-                fill="#1B2A4A"
+                d="M45 2
+                   C 52 2 67 6 77 14
+                   L 82 22
+                   L 82 55
+                   C 82 72 65 84 45 93
+                   C 25 84 8 72 8 55
+                   L 8 22
+                   L 13 14
+                   C 23 6 38 2 45 2 Z"
+                fill="#C9A227"
             />
 
-            {/* ════════════════════════════════
-                OPEN PADLOCK
-                Left leg down, right leg raised/open
-            ════════════════════════════════ */}
-
-            {/* Left shackle leg — goes down into body */}
+            {/* Navy inner fill — inset ~6px to create gold border */}
             <path
-                d="M35 46 L35 33 Q35 21 50 21 Q60 21 64 29"
-                stroke="#C9992A"
-                strokeWidth="5"
+                d="M45 9
+                   C 52 9 65 13 73 19
+                   L 76 26
+                   L 76 54
+                   C 76 69 62 80 45 88
+                   C 28 80 14 69 14 54
+                   L 14 26
+                   L 17 19
+                   C 25 13 38 9 45 9 Z"
+                fill="#141C38"
+            />
+
+            {/* ══════════════════════════════════════════
+                PADLOCK — CLOSED
+                U-arch shackle: both legs symmetric, arch at top
+                Body: large rounded rectangle
+            ══════════════════════════════════════════ */}
+
+            {/* Shackle — thick U-arch (CLOSED) */}
+            <path
+                d="M28 46
+                   L 28 32
+                   Q 28 17 45 17
+                   Q 62 17 62 32
+                   L 62 46"
+                stroke="#C9A227"
+                strokeWidth="6"
                 strokeLinecap="round"
-                fill="none"
-            />
-            {/* Right shackle — raised / open, curves up and right */}
-            <path
-                d="M64 29 Q66 23 66 15 Q66 13 68 12"
-                stroke="#C9992A"
-                strokeWidth="5"
-                strokeLinecap="round"
+                strokeLinejoin="round"
                 fill="none"
             />
 
             {/* Padlock body */}
-            <rect x="26" y="44" width="48" height="32" rx="4" fill="#C9992A" />
+            <rect
+                x="17"
+                y="43"
+                width="56"
+                height="38"
+                rx="5"
+                ry="5"
+                fill="#C9A227"
+            />
 
-            {/* Keyhole – circle */}
-            <circle cx="50" cy="55" r="5.5" fill="#1B2A4A" />
-            {/* Keyhole – stem */}
-            <rect x="47.5" y="55" width="5" height="8" rx="2" fill="#1B2A4A" />
+            {/* Keyhole — circle */}
+            <circle cx="45" cy="55" r="6.5" fill="#141C38" />
 
-            {/* ════════════════════════════════
+            {/* Keyhole — stem (wider, rounded) */}
+            <path
+                d="M41.5 55 L41.5 65 Q41.5 67 45 67 Q48.5 67 48.5 65 L48.5 55"
+                fill="#141C38"
+            />
+
+            {/* ══════════════════════════════════════════
                 GARUDA SEAL
-                Small circular emblem at bottom of padlock body
-            ════════════════════════════════ */}
+                Bottom-center of padlock body
+                Double gold rings, Garuda inside
+            ══════════════════════════════════════════ */}
 
-            {/* Outer circle background */}
-            <circle cx="50" cy="69" r="10" fill="#1B2A4A" />
-            {/* Gold ring border */}
-            <circle cx="50" cy="69" r="9.5" fill="none" stroke="#C9992A" strokeWidth="1.2" />
+            {/* Seal dark background */}
+            <circle cx="45" cy="72" r="11" fill="#141C38" />
 
-            {/* Garuda – simplified but recognizable */}
-            {/* Wings spread */}
-            <path d="M41 70 Q44 64 50 66 Q56 64 59 70" stroke="#C9992A" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
-            {/* Body */}
-            <ellipse cx="50" cy="71" rx="2.8" ry="3.5" fill="#C9992A" />
-            {/* Head */}
-            <circle cx="50" cy="66.5" r="2.2" fill="#C9992A" />
-            {/* Left wing feathers */}
-            <path d="M44 69 Q41 65 40 62" stroke="#C9992A" strokeWidth="1.1" strokeLinecap="round" fill="none"/>
-            <path d="M43 71 Q40 68 39 65" stroke="#C9992A" strokeWidth="1" strokeLinecap="round" fill="none"/>
-            {/* Right wing feathers */}
-            <path d="M56 69 Q59 65 60 62" stroke="#C9992A" strokeWidth="1.1" strokeLinecap="round" fill="none"/>
-            <path d="M57 71 Q60 68 61 65" stroke="#C9992A" strokeWidth="1" strokeLinecap="round" fill="none"/>
-            {/* Tail */}
-            <path d="M49 74 L48 77 M50 74 L50 77 M51 74 L52 77" stroke="#C9992A" strokeWidth="0.9" strokeLinecap="round" fill="none"/>
+            {/* Outer gold ring */}
+            <circle cx="45" cy="72" r="10.5" fill="none" stroke="#C9A227" strokeWidth="1.5" />
 
-            {/* ════════════════════════════════
-                TEXT SECTION (right side)
-            ════════════════════════════════ */}
+            {/* Inner gold ring (double-ring effect, as in reference) */}
+            <circle cx="45" cy="72" r="8.2"  fill="none" stroke="#C9A227" strokeWidth="0.8" />
 
-            {/* "KEMENIMIPAS" — very bold, matching reference exactly */}
+            {/* Garuda head */}
+            <circle cx="45" cy="67.5" r="2.5" fill="#C9A227" />
+
+            {/* Garuda beak / crown */}
+            <path d="M43.5 65.5 Q45 63 46.5 65.5" stroke="#C9A227" strokeWidth="0.9" fill="none" strokeLinecap="round" />
+
+            {/* Garuda body */}
+            <ellipse cx="45" cy="74.5" rx="3.2" ry="4" fill="#C9A227" />
+
+            {/* Garuda left wing — upper + lower feathers */}
+            <path d="M42 71 Q39 68 36 65.5" stroke="#C9A227" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+            <path d="M42 73 Q38 71 35 69.5" stroke="#C9A227" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+            <path d="M41 75 Q38 74.5 36 74" stroke="#C9A227" strokeWidth="1"   strokeLinecap="round" fill="none" />
+
+            {/* Garuda right wing */}
+            <path d="M48 71 Q51 68 54 65.5" stroke="#C9A227" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+            <path d="M48 73 Q52 71 55 69.5" stroke="#C9A227" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+            <path d="M49 75 Q52 74.5 54 74" stroke="#C9A227" strokeWidth="1"   strokeLinecap="round" fill="none" />
+
+            {/* Garuda tail */}
+            <path
+                d="M43.5 78.5 L42.5 81.5
+                   M45 78.5 L45 81.5
+                   M46.5 78.5 L47.5 81.5"
+                stroke="#C9A227"
+                strokeWidth="1"
+                strokeLinecap="round"
+                fill="none"
+            />
+
+            {/* ══════════════════════════════════════════
+                TEXT SECTION
+            ══════════════════════════════════════════ */}
+
+            {/* "KEMENIMIPAS" — very heavy black, matching reference */}
             <text
-                x="108"
+                x="102"
                 y="50"
-                fontFamily="'Arial Black', 'Arial', Helvetica, sans-serif"
+                fontFamily="'Arial Black', Arial, Helvetica, sans-serif"
                 fontWeight="900"
-                fontSize="30"
-                letterSpacing="-0.5"
-                fill="#111111"
-                dominantBaseline="auto"
+                fontSize="27"
+                letterSpacing="-0.2"
+                fill="#0D0D0D"
             >
                 KEMENIMIPAS
             </text>
 
             {/* Subtitle */}
             <text
-                x="108"
-                y="67"
-                fontFamily="'Arial', Helvetica, sans-serif"
+                x="102"
+                y="66"
+                fontFamily="Arial, Helvetica, sans-serif"
                 fontWeight="400"
                 fontSize="11"
                 fill="#666666"
-                dominantBaseline="auto"
             >
                 Ditandatangani secara elektronik oleh:
             </text>
 
-            {/* Horizontal separator line — dark, matches reference */}
-            <line x1="108" y1="74" x2="336" y2="74" stroke="#AAAAAA" strokeWidth="1" />
+            {/* Horizontal separator */}
+            <line x1="102" y1="73" x2="296" y2="73" stroke="#BBBBBB" strokeWidth="1" />
         </svg>
     );
 }
 
-/**
- * Serialize this badge to an SVG string (for canvas/PNG export use)
- * @param {number} width
- * @returns {string} SVG markup string
- */
-export function getBsreBadgeSvgString(width = 340) {
-    const h = Math.round(width * 100 / 340);
-    return `<svg width="${width}" height="${h}" viewBox="0 0 340 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Shield outer gold -->
-  <path d="M50 4 C 50 4 20 11 8 20 L 8 48 C 8 70 28 85 50 95 C 72 85 92 70 92 48 L 92 20 C 80 11 50 4 50 4 Z" fill="#C9992A"/>
-  <!-- Shield inner navy -->
-  <path d="M50 10 C 50 10 22 17 12 25 L 12 48 C 12 68 30 82 50 91 C 70 82 88 68 88 48 L 88 25 C 78 17 50 10 50 10 Z" fill="#1B2A4A"/>
-  <!-- Shackle left leg -->
-  <path d="M35 46 L35 33 Q35 21 50 21 Q60 21 64 29" stroke="#C9992A" stroke-width="5" stroke-linecap="round" fill="none"/>
-  <!-- Shackle right raised -->
-  <path d="M64 29 Q66 23 66 15 Q66 13 68 12" stroke="#C9992A" stroke-width="5" stroke-linecap="round" fill="none"/>
+/* ═══════════════════════════════════════════════════
+   SVG STRING — for canvas/PNG rendering
+═══════════════════════════════════════════════════ */
+export function getBsreBadgeSvgString(width = 300) {
+    const h = Math.round(width * 95 / 300);
+    return `<svg width="${width}" height="${h}" viewBox="0 0 300 95" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield gold outer -->
+  <path d="M45 2 C 52 2 67 6 77 14 L 82 22 L 82 55 C 82 72 65 84 45 93 C 25 84 8 72 8 55 L 8 22 L 13 14 C 23 6 38 2 45 2 Z" fill="#C9A227"/>
+  <!-- Shield navy inner -->
+  <path d="M45 9 C 52 9 65 13 73 19 L 76 26 L 76 54 C 76 69 62 80 45 88 C 28 80 14 69 14 54 L 14 26 L 17 19 C 25 13 38 9 45 9 Z" fill="#141C38"/>
+  <!-- Shackle U-arch closed -->
+  <path d="M28 46 L 28 32 Q 28 17 45 17 Q 62 17 62 32 L 62 46" stroke="#C9A227" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <!-- Padlock body -->
-  <rect x="26" y="44" width="48" height="32" rx="4" fill="#C9992A"/>
+  <rect x="17" y="43" width="56" height="38" rx="5" ry="5" fill="#C9A227"/>
   <!-- Keyhole circle -->
-  <circle cx="50" cy="55" r="5.5" fill="#1B2A4A"/>
+  <circle cx="45" cy="55" r="6.5" fill="#141C38"/>
   <!-- Keyhole stem -->
-  <rect x="47.5" y="55" width="5" height="8" rx="2" fill="#1B2A4A"/>
+  <path d="M41.5 55 L41.5 65 Q41.5 67 45 67 Q48.5 67 48.5 65 L48.5 55" fill="#141C38"/>
   <!-- Garuda seal bg -->
-  <circle cx="50" cy="69" r="10" fill="#1B2A4A"/>
-  <!-- Garuda seal ring -->
-  <circle cx="50" cy="69" r="9.5" fill="none" stroke="#C9992A" stroke-width="1.2"/>
-  <!-- Garuda wings top arc -->
-  <path d="M41 70 Q44 64 50 66 Q56 64 59 70" stroke="#C9992A" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-  <!-- Garuda body -->
-  <ellipse cx="50" cy="71" rx="2.8" ry="3.5" fill="#C9992A"/>
+  <circle cx="45" cy="72" r="11" fill="#141C38"/>
+  <!-- Garuda outer ring -->
+  <circle cx="45" cy="72" r="10.5" fill="none" stroke="#C9A227" stroke-width="1.5"/>
+  <!-- Garuda inner ring -->
+  <circle cx="45" cy="72" r="8.2" fill="none" stroke="#C9A227" stroke-width="0.8"/>
   <!-- Garuda head -->
-  <circle cx="50" cy="66.5" r="2.2" fill="#C9992A"/>
-  <!-- Garuda left wing -->
-  <path d="M44 69 Q41 65 40 62" stroke="#C9992A" stroke-width="1.1" stroke-linecap="round" fill="none"/>
-  <path d="M43 71 Q40 68 39 65" stroke="#C9992A" stroke-width="1" stroke-linecap="round" fill="none"/>
-  <!-- Garuda right wing -->
-  <path d="M56 69 Q59 65 60 62" stroke="#C9992A" stroke-width="1.1" stroke-linecap="round" fill="none"/>
-  <path d="M57 71 Q60 68 61 65" stroke="#C9992A" stroke-width="1" stroke-linecap="round" fill="none"/>
+  <circle cx="45" cy="67.5" r="2.5" fill="#C9A227"/>
+  <!-- Garuda beak -->
+  <path d="M43.5 65.5 Q45 63 46.5 65.5" stroke="#C9A227" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+  <!-- Garuda body -->
+  <ellipse cx="45" cy="74.5" rx="3.2" ry="4" fill="#C9A227"/>
+  <!-- Left wings -->
+  <path d="M42 71 Q39 68 36 65.5" stroke="#C9A227" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M42 73 Q38 71 35 69.5" stroke="#C9A227" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+  <path d="M41 75 Q38 74.5 36 74" stroke="#C9A227" stroke-width="1" stroke-linecap="round" fill="none"/>
+  <!-- Right wings -->
+  <path d="M48 71 Q51 68 54 65.5" stroke="#C9A227" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M48 73 Q52 71 55 69.5" stroke="#C9A227" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+  <path d="M49 75 Q52 74.5 54 74" stroke="#C9A227" stroke-width="1" stroke-linecap="round" fill="none"/>
   <!-- Garuda tail -->
-  <path d="M49 74 L48 77 M50 74 L50 77 M51 74 L52 77" stroke="#C9992A" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+  <path d="M43.5 78.5 L42.5 81.5 M45 78.5 L45 81.5 M46.5 78.5 L47.5 81.5" stroke="#C9A227" stroke-width="1" stroke-linecap="round" fill="none"/>
   <!-- KEMENIMIPAS text -->
-  <text x="108" y="50" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="30" letter-spacing="-0.5" fill="#111111">KEMENIMIPAS</text>
-  <!-- Subtitle text -->
-  <text x="108" y="67" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="11" fill="#666666">Ditandatangani secara elektronik oleh:</text>
+  <text x="102" y="50" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="27" letter-spacing="-0.2" fill="#0D0D0D">KEMENIMIPAS</text>
+  <!-- Subtitle -->
+  <text x="102" y="66" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="11" fill="#666666">Ditandatangani secara elektronik oleh:</text>
   <!-- Separator line -->
-  <line x1="108" y1="74" x2="336" y2="74" stroke="#AAAAAA" stroke-width="1"/>
+  <line x1="102" y1="73" x2="296" y2="73" stroke="#BBBBBB" stroke-width="1"/>
 </svg>`;
 }
 
 /**
- * Convert BSrE badge SVG to a PNG ArrayBuffer (for DOCX embedding).
- * Uses an off-screen Canvas element.
- * @param {number} width – rendered width in px
+ * Render BSrE badge SVG → PNG ArrayBuffer via off-screen Canvas.
+ * Used to embed the badge as an image in DOCX/Word exports.
+ * @param {number} width
  * @returns {Promise<ArrayBuffer>}
  */
-export async function getBsreBadgePngBuffer(width = 340) {
-    const h = Math.round(width * 100 / 340);
+export async function getBsreBadgePngBuffer(width = 300) {
+    const h = Math.round(width * 95 / 300);
     const svgStr = getBsreBadgeSvgString(width);
     const blob = new Blob([svgStr], { type: 'image/svg+xml' });
     const url  = URL.createObjectURL(blob);
@@ -206,18 +251,22 @@ export async function getBsreBadgePngBuffer(width = 340) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
+            const SCALE = 3; // 3× for crisp Word rendering
             const canvas = document.createElement('canvas');
-            canvas.width  = width * 2;   // 2× for retina sharpness
-            canvas.height = h * 2;
+            canvas.width  = width  * SCALE;
+            canvas.height = h      * SCALE;
             const ctx = canvas.getContext('2d');
-            ctx.scale(2, 2);
+            ctx.scale(SCALE, SCALE);
             ctx.drawImage(img, 0, 0, width, h);
             URL.revokeObjectURL(url);
-            canvas.toBlob(blob2 => {
-                blob2.arrayBuffer().then(resolve).catch(reject);
+            canvas.toBlob((png) => {
+                png.arrayBuffer().then(resolve).catch(reject);
             }, 'image/png');
         };
-        img.onerror = reject;
+        img.onerror = (e) => {
+            URL.revokeObjectURL(url);
+            reject(e);
+        };
         img.src = url;
     });
 }
