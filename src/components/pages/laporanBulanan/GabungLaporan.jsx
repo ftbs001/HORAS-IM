@@ -380,6 +380,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             let logoKemenBuf = null;
             let logoImigrBuf = null;
             let logoCombinedBuf = null;
+            let bsreBadgePngBuf = null;
             try {
                 const [r1, r2, r3] = await Promise.all([
                     fetch('/logo_kemenimipas.png'),
@@ -392,6 +393,13 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 if (r3.ok) logoCombinedBuf = await r3.arrayBuffer();
             } catch (e) {
                 console.warn('Logo fetch gagal, lanjut tanpa logo:', e);
+            }
+            // Generate BSrE badge PNG from SVG (for pixel-perfect Word embed)
+            try {
+                const { getBsreBadgePngBuffer } = await import('../../../components/common/BsreBadge.jsx');
+                bsreBadgePngBuf = await getBsreBadgePngBuffer(340);
+            } catch (e) {
+                console.warn('BSrE badge PNG gagal dibuat, fallback ke logo:', e);
             }
 
             const now = new Date();
@@ -704,9 +712,20 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         }),
                     ];
 
-                    if (logoKemenBuf) {
-                        // E-sign badge: 2-kolom dalam cell kanan
-                        // Kiri: logo kemenimipas kecil; Kanan: teks KEMENIMIPAS + subtitle
+                    if (bsreBadgePngBuf) {
+                        // BSrE badge — PNG yang dirender dari SVG (pixel-perfect match dengan UI)
+                        // Dimensi badge: 340 × 100 px (ratio 3.4:1)
+                        // Di Word: lebar 220px, tinggi ≈ 65px
+                        rightCellKids.push(new Paragraph({
+                            children: [new ImageRun({
+                                data: bsreBadgePngBuf,
+                                transformation: { width: 220, height: 65 },
+                                type: 'png',
+                            })],
+                            spacing: { after: 80 },
+                        }));
+                    } else if (logoKemenBuf) {
+                        // Fallback: logo kemenimipas + teks KEMENIMIPAS
                         const eSignInner = new Table({
                             width: { size: 100, type: WidthType.PERCENTAGE },
                             layout: TableLayoutType.FIXED,
@@ -717,7 +736,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                             },
                             rows: [new TableRow({
                                 children: [
-                                    // Logo (shield KEMENIMIPAS)
                                     new TableCell({
                                         width: { size: 18, type: WidthType.PERCENTAGE },
                                         borders: tdBordersTTD,
@@ -731,7 +749,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                             spacing: { after: 0 },
                                         })],
                                     }),
-                                    // KEMENIMIPAS + subtitle
                                     new TableCell({
                                         width: { size: 82, type: WidthType.PERCENTAGE },
                                         borders: tdBordersTTD,

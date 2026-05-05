@@ -1640,30 +1640,16 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
     ];
 
     if (showEsign && logoKemenBuf) {
-        const eSignTable = new Table({
-             width: { size: 100, type: WidthType.PERCENTAGE },
-             layout: TableLayoutType.FIXED,
-             borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideV: NO_BORDER, insideH: NO_BORDER },
-             rows: [
-                 new TableRow({ children: [
-                    new TableCell({
-                        width: { size: 15, type: WidthType.PERCENTAGE },
-                        borders: tdBorders,
-                        children: [new Paragraph({ children: [new ImageRun({ data: logoKemenBuf, transformation: { width: 40, height: 40 }, type: 'png' })] })]
-                    }),
-                    new TableCell({
-                        width: { size: 85, type: WidthType.PERCENTAGE },
-                        borders: tdBorders,
-                        verticalAlign: VerticalAlign.CENTER,
-                        children: [
-                            new Paragraph({ children: [new TextRun({ text: 'KEMENIMIPAS', font: 'Arial', size: 24, bold: true })], spacing: { after: 0 } }),
-                            new Paragraph({ children: [new TextRun({ text: 'Ditandatangani secara elektronik oleh:', font: 'Arial', size: 16, color: '555555' })], spacing: { after: 0 } })
-                        ]
-                    })
-                 ]})
-             ]
-        });
-        rightCellChildren.push(eSignTable);
+        // BSrE badge PNG — embed as single image (pixel-perfect match with UI badge)
+        // Ratio: 340:100 = 3.4:1. At width=200px → height≈59px
+        rightCellChildren.push(new Paragraph({
+            children: [new ImageRun({
+                data: logoKemenBuf,
+                transformation: { width: 200, height: 59 },
+                type: 'png'
+            })],
+            spacing: { after: 80 }
+        }));
         rightCellChildren.push(new Paragraph({ spacing: { before: 120 } }));
     } else {
         rightCellChildren.push(new Paragraph({ spacing: { before: 600 } })); // 4 lines gap for physical signature

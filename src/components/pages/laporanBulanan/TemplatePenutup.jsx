@@ -459,15 +459,21 @@ export default function TemplatePenutup({
                                     const bName = BULAN_NAMES[bulan] || '';
                                     const { exportStandaloneTemplateDocx, getPenutupDocxElements } = await import('../../../utils/templateDocxExporter.js');
                                     
-                                    let logoKemenBuf = null;
+                                    // Generate BSrE badge PNG from SVG (pixel-perfect match with UI)
+                                    let bsrePngBuf = null;
                                     try {
-                                        const res = await fetch('/logo_kemenimipas.png');
-                                        if (res.ok) logoKemenBuf = await res.arrayBuffer();
+                                        const { getBsreBadgePngBuffer } = await import('../../common/BsreBadge.jsx');
+                                        bsrePngBuf = await getBsreBadgePngBuffer(340);
                                     } catch (e) {
-                                        console.warn('Failed to fetch logo for docx', e);
+                                        console.warn('BSrE badge PNG gagal:', e);
+                                        // fallback to logo
+                                        try {
+                                            const res = await fetch('/logo_kemenimipas.png');
+                                            if (res.ok) bsrePngBuf = await res.arrayBuffer();
+                                        } catch {}
                                     }
 
-                                    const elems = getPenutupDocxElements(td, bName, tahun, logoKemenBuf);
+                                    const elems = getPenutupDocxElements(td, bName, tahun, bsrePngBuf);
                                     
                                     await exportStandaloneTemplateDocx({
                                         title: 'BAB IV PENUTUP',
