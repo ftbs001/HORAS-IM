@@ -319,7 +319,7 @@ const CoverLetter = () => {
                             {/* BSrE Badge — logo diupload user atau default */}
                             <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
                                 <BsreBadge
-                                    width={230}
+                                    width={300}
                                     logoSrc={formData.esignLogoUrl || null}
                                 />
                             </div>

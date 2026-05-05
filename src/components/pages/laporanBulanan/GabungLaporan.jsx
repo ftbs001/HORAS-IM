@@ -397,9 +397,8 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             // Generate BSrE badge PNG — gunakan logo TTD yang diupload user
             try {
                 const { getBsreBadgePngBuffer } = await import('../../../components/common/BsreBadge.jsx');
-                // coverLetterData.esignLogoUrl = logo TTD yang diupload user
                 const esignLogoUrl = coverLetterData?.esignLogoUrl || null;
-                bsreBadgePngBuf = await getBsreBadgePngBuffer(340, esignLogoUrl);
+                bsreBadgePngBuf = await getBsreBadgePngBuffer(380, esignLogoUrl);
             } catch (e) {
                 console.warn('BSrE badge PNG gagal dibuat, fallback ke bsre_shield:', e);
                 try {
@@ -720,12 +719,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
                     if (bsreBadgePngBuf) {
                         // BSrE badge composite PNG (shield + KEMENIMIPAS text + subtitle + line)
-                        // Canvas output: totalWidth=340px, height≈100px → ratio ≈ 3.4:1
-                        // In Word: width=210px → height=62px
+                        // Canvas output: totalWidth=380px, height≈133px → ratio ≈ 2.86:1
+                        // In Word: width=230px → height=80px
                         rightCellKids.push(new Paragraph({
                             children: [new ImageRun({
                                 data: bsreBadgePngBuf,
-                                transformation: { width: 210, height: 62 },
+                                transformation: { width: 230, height: 80 },
                                 type: 'png',
                             })],
                             spacing: { after: 60 },

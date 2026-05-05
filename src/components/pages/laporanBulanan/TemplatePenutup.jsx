@@ -3,8 +3,9 @@
  * UI Component for BAB IV PENUTUP
  *
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useReport } from '../../../contexts/ReportContext';
 import { supabase } from '../../../lib/supabaseClient';
 import { getDefaultPenutupData, EMPTY_SARAN } from '../../../utils/penutupSchema';
 import BsreBadge from '../../common/BsreBadge';
@@ -144,7 +145,7 @@ function PenutupEditor({ data, onChange, isPreview, bulan, tahun, esignLogoUrl =
                         <div style={{ marginBottom: 8 }}>{safeTtd.jabatan}</div>
                         {safeTtd.showEsign ? (
                             <div style={{ margin: '6px 0 10px 0' }}>
-                                <BsreBadge width={220} logoSrc={esignLogoUrl || null} />
+                                <BsreBadge width={280} logoSrc={esignLogoUrl || null} />
                             </div>
                         ) : (
                             <div style={{ height: '70px' }}></div>
@@ -284,34 +285,64 @@ export default function TemplatePenutup({
 }) {
     const { user } = useAuth();
     const isSuperAdmin = user?.role === 'super_admin';
+    // coverLetterData adalah SUMBER TUNGGAL untuk esignLogoUrl
+    // — sama dengan yang diupload di Surat Pengantar
+    const { coverLetterData, updateCoverLetter } = useReport();
 
     const [bulan, setBulan] = useState(propBulan || new Date().getMonth() + 1);
     const [tahun, setTahun] = useState(propTahun || new Date().getFullYear());
     const [uData, setUData] = useState(getDefaultPenutupData());
-    
-    const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [isPreview, setIsPreview] = useState(forcePreview);
 
-    // Logo TTD — loaded from cover_letter data
-    const [esignLogoUrl, setEsignLogoUrl] = useState(null);
+    const [loading, setLoading]           = useState(false);
+    const [saving, setSaving]             = useState(false);
+    const [isPreview, setIsPreview]       = useState(forcePreview);
+    const [logoUploading, setLogoUploading] = useState(false);
+    const logoInputRef = useRef(null);
 
-    // Load esignLogoUrl from cover_letter section on mount
-    useEffect(() => {
-        supabase
-            .from('monthly_reports')
-            .select('content')
-            .eq('section_key', 'cover_letter')
-            .maybeSingle()
-            .then(({ data }) => {
-                try {
-                    const parsed = data?.content
-                        ? (typeof data.content === 'string' ? JSON.parse(data.content) : data.content)
-                        : null;
-                    if (parsed?.esignLogoUrl) setEsignLogoUrl(parsed.esignLogoUrl);
-                } catch { /* ignore */ }
-            });
-    }, []);
+    // esignLogoUrl — langsung dari context (sinkron dengan Surat Pengantar)
+    const esignLogoUrl = coverLetterData?.esignLogoUrl || null;
+
+    /* ── Upload logo TTD ──────────────────────────────────────── */
+    const handleLogoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showMsg('error', 'File harus berupa gambar (PNG, JPG, dll)');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            showMsg('error', 'Ukuran gambar maksimal 5MB');
+            return;
+        }
+        setLogoUploading(true);
+        try {
+            const ext      = file.name.split('.').pop();
+            const filePath = `esign-logos/logo_ttd_${Date.now()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+                .from('report-images')
+                .upload(filePath, file, { upsert: true });
+            if (upErr) throw upErr;
+            const { data: urlData } = supabase.storage
+                .from('report-images')
+                .getPublicUrl(filePath);
+            const publicUrl = urlData?.publicUrl;
+            if (!publicUrl) throw new Error('Gagal mendapat URL gambar');
+            // Simpan ke cover_letter data (sinkron dengan Surat Pengantar)
+            await updateCoverLetter({ ...coverLetterData, esignLogoUrl: publicUrl });
+            showMsg('success', '✅ Logo TTD berhasil diupload!');
+        } catch (err) {
+            console.error('Logo upload error:', err);
+            showMsg('error', '❌ Gagal upload: ' + err.message);
+        } finally {
+            setLogoUploading(false);
+            if (logoInputRef.current) logoInputRef.current.value = '';
+        }
+    };
+
+    const handleRemoveLogo = async () => {
+        await updateCoverLetter({ ...coverLetterData, esignLogoUrl: null });
+        showMsg('info', 'Logo TTD dihapus, kembali ke default');
+    };
 
     // Track original data for dirty check
     const [originalData, setOriginalData] = useState('');
@@ -484,7 +515,7 @@ export default function TemplatePenutup({
                                     try {
                                         const { getBsreBadgePngBuffer } = await import('../../common/BsreBadge.jsx');
                                         // Pass esignLogoUrl agar logo yang diupload user tampil di Word juga
-                                        bsrePngBuf = await getBsreBadgePngBuffer(340, esignLogoUrl || null);
+                                        bsrePngBuf = await getBsreBadgePngBuffer(380, esignLogoUrl || null);
                                     } catch (e) {
                                         console.warn('BSrE badge PNG gagal:', e);
                                         try {
@@ -515,6 +546,85 @@ export default function TemplatePenutup({
                             📄 Ekspor BAB IV (Standalone)
                         </button>
                         {loading && <span style={{ color: '#94a3b8', fontSize: '11px' }}>Memuat...</span>}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Panel Upload Logo TTD ── */}
+            {!embedded && (
+                <div style={{
+                    margin: '0 0 16px 0',
+                    padding: '14px 18px',
+                    border: '2px dashed #94a3b8',
+                    borderRadius: '10px',
+                    background: '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                }}>
+                    {/* Preview logo */}
+                    <div style={{
+                        width: '80px', height: '80px',
+                        border: '2px solid #e2e8f0', borderRadius: '8px',
+                        background: '#fff', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        overflow: 'hidden', flexShrink: 0,
+                    }}>
+                        <img
+                            src={esignLogoUrl || '/bsre_shield.png'}
+                            alt="Logo TTD"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        />
+                    </div>
+
+                    {/* Controls */}
+                    <div style={{ flex: 1, minWidth: '220px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '12px', color: '#1e40af', marginBottom: '3px' }}>
+                            🖼️ Logo Tanda Tangan Elektronik
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px' }}>
+                            {esignLogoUrl
+                                ? '✅ Logo kustom aktif — sinkron dengan Surat Pengantar & ekspor Word.'
+                                : 'Menggunakan logo default. Upload logo untuk tampil persis seperti referensi.'}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <label style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                padding: '6px 14px',
+                                background: logoUploading ? '#94a3b8' : '#1e40af',
+                                color: '#fff', borderRadius: '6px',
+                                fontSize: '11px', fontWeight: 600,
+                                cursor: logoUploading ? 'not-allowed' : 'pointer',
+                            }}>
+                                {logoUploading ? '⏳ Mengupload...' : '📤 Upload Logo TTD'}
+                                <input
+                                    ref={logoInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    onChange={handleLogoUpload}
+                                    disabled={logoUploading}
+                                />
+                            </label>
+                            {esignLogoUrl && (
+                                <button
+                                    onClick={handleRemoveLogo}
+                                    style={{
+                                        padding: '6px 12px',
+                                        background: '#fee2e2', color: '#dc2626',
+                                        border: '1px solid #fca5a5',
+                                        borderRadius: '6px', fontSize: '11px',
+                                        fontWeight: 600, cursor: 'pointer',
+                                    }}
+                                >
+                                    🗑️ Hapus
+                                </button>
+                            )}
+                            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                PNG/JPG • Maks 5MB • Otomatis sync ke Surat Pengantar
+                            </span>
+                        </div>
                     </div>
                 </div>
             )}
