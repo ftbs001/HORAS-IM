@@ -1640,17 +1640,18 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
     ];
 
     if (showEsign && logoKemenBuf) {
-        // BSrE badge PNG — embed as single image (pixel-perfect match with UI badge)
-        // Ratio: 340:100 = 3.4:1. At width=200px → height≈59px
+        // BSrE badge PNG (composite: shield + KEMENIMIPAS text + subtitle + line)
+        // Canvas output: totalWidth=340 px, height=badge_H≈100px → ratio ≈ 3.4:1
+        // In Word: width=210px → height≈62px
         rightCellChildren.push(new Paragraph({
             children: [new ImageRun({
                 data: logoKemenBuf,
-                transformation: { width: 200, height: 59 },
+                transformation: { width: 210, height: 62 },
                 type: 'png'
             })],
-            spacing: { after: 80 }
+            spacing: { after: 60 }
         }));
-        rightCellChildren.push(new Paragraph({ spacing: { before: 120 } }));
+        rightCellChildren.push(new Paragraph({ spacing: { before: 60 } }));
     } else {
         rightCellChildren.push(new Paragraph({ spacing: { before: 600 } })); // 4 lines gap for physical signature
     }

@@ -713,16 +713,16 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     ];
 
                     if (bsreBadgePngBuf) {
-                        // BSrE badge — PNG yang dirender dari SVG (pixel-perfect match dengan UI)
-                        // Dimensi badge: 340 × 100 px (ratio 3.4:1)
-                        // Di Word: lebar 220px, tinggi ≈ 65px
+                        // BSrE badge composite PNG (shield + KEMENIMIPAS text + subtitle + line)
+                        // Canvas output: totalWidth=340px, height≈100px → ratio ≈ 3.4:1
+                        // In Word: width=210px → height=62px
                         rightCellKids.push(new Paragraph({
                             children: [new ImageRun({
                                 data: bsreBadgePngBuf,
-                                transformation: { width: 220, height: 65 },
+                                transformation: { width: 210, height: 62 },
                                 type: 'png',
                             })],
-                            spacing: { after: 80 },
+                            spacing: { after: 60 },
                         }));
                     } else if (logoKemenBuf) {
                         // Fallback: logo kemenimipas + teks KEMENIMIPAS
