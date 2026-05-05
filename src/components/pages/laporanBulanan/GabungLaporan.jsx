@@ -394,12 +394,18 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             } catch (e) {
                 console.warn('Logo fetch gagal, lanjut tanpa logo:', e);
             }
-            // Generate BSrE badge PNG from SVG (for pixel-perfect Word embed)
+            // Generate BSrE badge PNG — gunakan logo TTD yang diupload user
             try {
                 const { getBsreBadgePngBuffer } = await import('../../../components/common/BsreBadge.jsx');
-                bsreBadgePngBuf = await getBsreBadgePngBuffer(340);
+                // coverLetterData.esignLogoUrl = logo TTD yang diupload user
+                const esignLogoUrl = coverLetterData?.esignLogoUrl || null;
+                bsreBadgePngBuf = await getBsreBadgePngBuffer(340, esignLogoUrl);
             } catch (e) {
-                console.warn('BSrE badge PNG gagal dibuat, fallback ke logo:', e);
+                console.warn('BSrE badge PNG gagal dibuat, fallback ke bsre_shield:', e);
+                try {
+                    const r = await fetch(coverLetterData?.esignLogoUrl || '/bsre_shield.png');
+                    if (r.ok) bsreBadgePngBuf = await r.arrayBuffer();
+                } catch {}
             }
 
             const now = new Date();

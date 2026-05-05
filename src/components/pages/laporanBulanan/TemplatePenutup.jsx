@@ -144,7 +144,7 @@ function PenutupEditor({ data, onChange, isPreview, bulan, tahun }) {
                         <div style={{ marginBottom: 8 }}>{safeTtd.jabatan}</div>
                         {safeTtd.showEsign ? (
                             <div style={{ margin: '6px 0 10px 0' }}>
-                                <BsreBadge width={220} />
+                                <BsreBadge width={220} logoSrc={esignLogoUrl || null} />
                             </div>
                         ) : (
                             <div style={{ height: '70px' }}></div>
@@ -292,7 +292,27 @@ export default function TemplatePenutup({
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [isPreview, setIsPreview] = useState(forcePreview);
-    
+
+    // Logo TTD — loaded from cover_letter data
+    const [esignLogoUrl, setEsignLogoUrl] = useState(null);
+
+    // Load esignLogoUrl from cover_letter section on mount
+    useEffect(() => {
+        supabase
+            .from('monthly_reports')
+            .select('content')
+            .eq('section_key', 'cover_letter')
+            .maybeSingle()
+            .then(({ data }) => {
+                try {
+                    const parsed = data?.content
+                        ? (typeof data.content === 'string' ? JSON.parse(data.content) : data.content)
+                        : null;
+                    if (parsed?.esignLogoUrl) setEsignLogoUrl(parsed.esignLogoUrl);
+                } catch { /* ignore */ }
+            });
+    }, []);
+
     // Track original data for dirty check
     const [originalData, setOriginalData] = useState('');
     const hasChanges = JSON.stringify(uData) !== originalData;
@@ -459,16 +479,16 @@ export default function TemplatePenutup({
                                     const bName = BULAN_NAMES[bulan] || '';
                                     const { exportStandaloneTemplateDocx, getPenutupDocxElements } = await import('../../../utils/templateDocxExporter.js');
                                     
-                                    // Generate BSrE badge PNG from SVG (pixel-perfect match with UI)
+                                    // Generate BSrE badge PNG — pakai logo yang diupload user (esignLogoUrl)
                                     let bsrePngBuf = null;
                                     try {
                                         const { getBsreBadgePngBuffer } = await import('../../common/BsreBadge.jsx');
-                                        bsrePngBuf = await getBsreBadgePngBuffer(340);
+                                        // Pass esignLogoUrl agar logo yang diupload user tampil di Word juga
+                                        bsrePngBuf = await getBsreBadgePngBuffer(340, esignLogoUrl || null);
                                     } catch (e) {
                                         console.warn('BSrE badge PNG gagal:', e);
-                                        // fallback to logo
                                         try {
-                                            const res = await fetch('/logo_kemenimipas.png');
+                                            const res = await fetch(esignLogoUrl || '/bsre_shield.png');
                                             if (res.ok) bsrePngBuf = await res.arrayBuffer();
                                         } catch {}
                                     }
