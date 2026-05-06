@@ -202,49 +202,24 @@ td, th { padding: 4pt 6pt; vertical-align: top; font-size: 12pt; }
             }
         });
 
-        // Tanda Tangan — dengan badge e-TTD KEMENIMIPAS persis seperti foto referensi
-        const esignBadgeSvg = `<svg width="260" height="83" viewBox="0 0 300 96" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:6px 0;">
-            <!-- Shield outer (gold) -->
-            <path d="M46 3 C 46 3 84 13 86 37 C 88 60 79 78 46 92 C 13 78 4 60 6 37 C 8 13 46 3 46 3 Z" fill="#C9992A"/>
-            <!-- Shield inner (dark navy) -->
-            <path d="M46 9 C 46 9 80 18 82 39 C 84 59 76 75 46 87 C 16 75 8 59 10 39 C 12 18 46 9 46 9 Z" fill="#1A2240"/>
-            <!-- Open padlock left shackle -->
-            <path d="M30 44 L30 29 Q30 18 46 18 Q55 18 58 25" stroke="#C9992A" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <!-- Open padlock right shackle (raised/open) -->
-            <path d="M58 25 Q62 18 63 12" stroke="#C9992A" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-            <!-- Padlock body -->
-            <rect x="22" y="42" width="48" height="33" rx="5" fill="#C9992A"/>
-            <!-- Keyhole circle -->
-            <circle cx="46" cy="53" r="6" fill="#1A2240"/>
-            <!-- Keyhole stem -->
-            <rect x="43" y="53" width="6" height="9" rx="2" fill="#1A2240"/>
-            <!-- Garuda seal background -->
-            <circle cx="46" cy="67" r="9" fill="#1A2240"/>
-            <!-- Garuda outer ring -->
-            <circle cx="46" cy="67" r="8" fill="none" stroke="#C9992A" stroke-width="1"/>
-            <!-- Garuda body -->
-            <ellipse cx="46" cy="69" rx="3" ry="4" fill="#C9992A"/>
-            <!-- Garuda head -->
-            <circle cx="46" cy="64" r="2.3" fill="#C9992A"/>
-            <!-- Left wings -->
-            <path d="M43 68 Q38 62 36 58" stroke="#C9992A" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            <path d="M43 70 Q38 66 36 63" stroke="#C9992A" stroke-width="1.2" stroke-linecap="round" fill="none"/>
-            <!-- Right wings -->
-            <path d="M49 68 Q54 62 56 58" stroke="#C9992A" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            <path d="M49 70 Q54 66 56 63" stroke="#C9992A" stroke-width="1.2" stroke-linecap="round" fill="none"/>
-            <!-- Tail -->
-            <path d="M46 73 L44 77 M46 73 L46 77 M46 73 L48 77" stroke="#C9992A" stroke-width="1" stroke-linecap="round" fill="none"/>
-            <!-- KEMENIMIPAS text -->
-            <text x="100" y="46" font-family="Arial Black,Arial,Helvetica Neue,Helvetica,sans-serif" font-weight="900" font-size="29" fill="#111111">KEMENIMIPAS</text>
-            <!-- Subtitle -->
-            <text x="100" y="64" font-family="Arial,Helvetica Neue,Helvetica,sans-serif" font-weight="400" font-size="11" fill="#555555">Ditandatangani secara elektronik oleh:</text>
-            <!-- Separator line -->
-            <line x1="100" y1="71" x2="298" y2="71" stroke="#BBBBBB" stroke-width="1"/>
-        </svg>`;
+        // Tanda Tangan — embed logo TTD yang diupload user (atau default shield)
+        const esignSrc = coverLetterData.esignLogoUrl || '/bsre_shield.png';
+        const esignBase64 = await getBase64(esignSrc);
+        const esignImgHtml = esignBase64
+            ? `<img src="${esignBase64}" style="width:80px;height:84px;object-fit:contain;vertical-align:middle;" alt="Logo TTD" />`
+            : '';
+        const badgeHtml = `<table style="border:none;border-collapse:collapse;margin:6px 0;"><tr>
+            <td style="padding:0;border:none;vertical-align:middle;width:84px;">${esignImgHtml}</td>
+            <td style="padding:0 0 0 10px;border:none;vertical-align:middle;">
+                <div style="font-family:Arial Black,Arial,sans-serif;font-weight:900;font-size:22pt;color:#0D0D0D;line-height:1;white-space:nowrap;">KEMENIMIPAS</div>
+                <div style="font-family:Arial,sans-serif;font-size:9pt;color:#555;margin-top:5px;white-space:nowrap;">Ditandatangani secara elektronik oleh:</div>
+                <div style="border-top:1px solid #bbb;margin-top:5px;"></div>
+            </td>
+        </tr></table>`;
 
         content += `<div style="margin-top:30pt; font-size:11pt;">
             <div style="font-size:12pt; margin-bottom:4pt;">Kepala Kantor,</div>
-            ${esignBadgeSvg}
+            ${badgeHtml}
             <div style="font-weight:bold; font-size:12pt; margin-top:6pt;">${coverLetterData.penandatangan || ''}</div>
         </div>`;
 

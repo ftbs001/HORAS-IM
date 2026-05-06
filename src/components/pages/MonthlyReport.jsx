@@ -10,6 +10,7 @@ import CoverLetter from './CoverLetter';
 import CoverPage from './CoverPage';
 import Foreword from './Foreword';
 import KopSurat from '../common/KopSurat';
+import BsreBadge from '../common/BsreBadge';
 import TableOfContents from './TableOfContents';
 import { supabase } from '../../lib/supabaseClient';
 import html2pdf from 'html2pdf.js';
@@ -229,13 +230,12 @@ const CoverLetterPreview = () => {
                 <div className="text-center w-[350px]">
                     <div className="mb-2">Kepala Kantor,</div>
                     
-                    {/* BSrE Badge Mimic */}
-                    <div className="flex items-center justify-center gap-3 my-2 px-3 py-2 w-max mx-auto translate-x-[-12px]">
-                        <img src="/logo_kemenimipas.png" alt="Kemenimipas" className="w-[38px] h-[38px] object-contain" />
-                        <div className="text-left leading-tight">
-                            <div className="font-bold text-[15px] tracking-wide text-gray-900 mb-[2px]" style={{ fontFamily: 'Arial, sans-serif' }}>KEMENIMIPAS</div>
-                            <div className="text-[10px] text-gray-400 font-medium" style={{ fontFamily: 'Arial, sans-serif' }}>Ditandatangani secara elektronik oleh:</div>
-                        </div>
+                    {/* BSrE Badge — pakai logo yang diupload user, atau default shield */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', margin: '10px 0' }}>
+                        <BsreBadge
+                            width={300}
+                            logoSrc={data.esignLogoUrl || null}
+                        />
                     </div>
 
                     <div className="font-bold pt-2 underline">
