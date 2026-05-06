@@ -73,7 +73,6 @@ const SuperAdminDash = ({ nav, user }) => {
 
   const actions = [
     { icon:'📋', label:'Semua Laporan', desc:'Lihat master laporan', color:'bg-[#0D1B3E]', to:'monthly-report' },
-    { icon:'📎', label:'Gabung & Ekspor', desc:'Susun laporan Word', color:'bg-amber-500', to:'gabung-laporan' },
     { icon:'✅', label:'Status Template', desc:'Progres pengisian seksi', color:'bg-emerald-600', to:'template-status' },
     { icon:'👥', label:'Anggota', desc:'Manajemen pengguna', color:'bg-purple-600', to:'members' },
     { icon:'🗄️', label:'Arsip & Dokumen', desc:'File & dokumen lama', color:'bg-rose-500', to:'archive' },
@@ -98,8 +97,7 @@ const SuperAdminDash = ({ nav, user }) => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={()=>nav('monthly-report')} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-all">📋 Semua Laporan</button>
-            <button onClick={()=>nav('gabung-laporan')} className="flex items-center gap-2 bg-[#C9992A] hover:bg-yellow-400 text-[#0D1B3E] font-black px-4 py-2 rounded-xl text-sm transition-all shadow-lg">📎 Gabung &amp; Ekspor</button>
+            <button onClick={()=>nav('monthly-report')} className="flex items-center gap-2 bg-[#C9992A] hover:bg-yellow-400 text-[#0D1B3E] font-black px-4 py-2 rounded-xl text-sm transition-all shadow-lg">📋 Semua Laporan</button>
           </div>
         </div>
       </div>
