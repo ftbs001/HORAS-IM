@@ -1639,19 +1639,46 @@ export function getPenutupDocxElements(data, bulanName, tahun, logoKemenBuf = nu
         new Paragraph({ children: [new TextRun({ text: jabatan, font: FONT_NAME, size: 24 })], spacing: { after: 120 } })
     ];
 
-    if (showEsign && logoKemenBuf) {
-        // BSrE badge PNG (composite: shield + KEMENIMIPAS text + subtitle + line)
-        // Canvas output: totalWidth=340 px, height=badge_H≈100px → ratio ≈ 3.4:1
-        // In Word: width=210px → height≈62px
-        rightCellChildren.push(new Paragraph({
-            children: [new ImageRun({
-                data: logoKemenBuf,
-                transformation: { width: 210, height: 62 },
-                type: 'png'
+    if (showEsign) {
+        // BSrE badge as docx TABLE — matches BsreBadge.jsx preview exactly
+        const NB_B = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+        const bdBord = { top: NB_B, bottom: NB_B, left: NB_B, right: NB_B };
+        const badgeImgRun = logoKemenBuf
+            ? new ImageRun({ data: logoKemenBuf, transformation: { width: 70, height: 74 }, type: 'png' })
+            : new TextRun({ text: '', font: FONT_NAME });
+        const badgeDocxTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            layout: TableLayoutType.FIXED,
+            borders: { top: NB_B, bottom: NB_B, left: NB_B, right: NB_B, insideV: NB_B, insideH: NB_B },
+            rows: [new TableRow({
+                children: [
+                    new TableCell({
+                        width: { size: 22, type: WidthType.PERCENTAGE },
+                        borders: bdBord,
+                        verticalAlign: VerticalAlign.CENTER,
+                        children: [new Paragraph({ children: [badgeImgRun], spacing: { after: 0, before: 0 } })],
+                    }),
+                    new TableCell({
+                        width: { size: 78, type: WidthType.PERCENTAGE },
+                        borders: bdBord,
+                        verticalAlign: VerticalAlign.CENTER,
+                        children: [
+                            new Paragraph({
+                                children: [new TextRun({ text: 'KEMENIMIPAS', font: 'Arial Black', size: 26, bold: true, color: '0D0D0D' })],
+                                spacing: { after: 50, before: 0 },
+                            }),
+                            new Paragraph({
+                                children: [new TextRun({ text: 'Ditandatangani secara elektronik oleh:', font: FONT_NAME, size: 16, color: '555555' })],
+                                spacing: { after: 0, before: 0 },
+                                border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'BBBBBB', space: 4 } },
+                            }),
+                        ],
+                    }),
+                ],
             })],
-            spacing: { after: 60 }
-        }));
-        rightCellChildren.push(new Paragraph({ spacing: { before: 60 } }));
+        });
+        rightCellChildren.push(badgeDocxTable);
+        rightCellChildren.push(new Paragraph({ spacing: { before: 60, after: 0 } }));
     } else {
         rightCellChildren.push(new Paragraph({ spacing: { before: 600 } })); // 4 lines gap for physical signature
     }

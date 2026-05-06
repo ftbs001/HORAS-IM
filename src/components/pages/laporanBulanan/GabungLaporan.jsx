@@ -394,16 +394,16 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             } catch (e) {
                 console.warn('Logo fetch gagal, lanjut tanpa logo:', e);
             }
-            // Generate BSrE badge PNG — gunakan logo TTD yang diupload user
+            // Fetch TTD logo langsung (user-uploaded atau default shield)
+            let esignLogoBuf = null;
             try {
-                const { getBsreBadgePngBuffer } = await import('../../../components/common/BsreBadge.jsx');
-                const esignLogoUrl = coverLetterData?.esignLogoUrl || null;
-                bsreBadgePngBuf = await getBsreBadgePngBuffer(380, esignLogoUrl);
+                const esignUrl = coverLetterData?.esignLogoUrl || '/bsre_shield.png';
+                const re = await fetch(esignUrl);
+                if (re.ok) esignLogoBuf = await re.arrayBuffer();
             } catch (e) {
-                console.warn('BSrE badge PNG gagal dibuat, fallback ke bsre_shield:', e);
                 try {
-                    const r = await fetch(coverLetterData?.esignLogoUrl || '/bsre_shield.png');
-                    if (r.ok) bsreBadgePngBuf = await r.arrayBuffer();
+                    const re2 = await fetch('/bsre_shield.png');
+                    if (re2.ok) esignLogoBuf = await re2.arrayBuffer();
                 } catch {}
             }
 
@@ -597,11 +597,11 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                     new TableCell({
                         width: { size: 14, type: WidthType.PERCENTAGE },
                         borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
-                        verticalAlign: VerticalAlign.CENTER,
+                         verticalAlign: VerticalAlign.BOTTOM,
                         children: [new Paragraph({
-                            children: [mkLogo(logoKemenBuf, 'png', 80, 80)],
+                            children: [mkLogo(logoKemenBuf, 'png', 110, 110)],
                             alignment: AlignmentType.CENTER,
-                            spacing: { after: 0 },
+                            spacing: { after: 0, before: 0 },
                         })],
                     }),
                     // Col 2: Teks kop — centered. Uses coverLetterData or exact defaults from CoverLetter.jsx
@@ -610,12 +610,12 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         borders: { top: NOB, bottom: NOB, left: NOB, right: NOB },
                         verticalAlign: VerticalAlign.CENTER,
                         children: [
-                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead1 || 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', font: 'Arial', size: 20, bold: false })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead2 || 'DIREKTORAT JENDERAL IMIGRASI', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead3 || 'KANTOR WILAYAH SUMATERA UTARA', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead4 || 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR', font: 'Arial', size: 24, bold: true })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead5 || 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun', font: 'Arial', size: 18 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
-                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead6 || 'Laman: pematangsiantar.imigrasi.go.id, Pos-el: kanim_pematangsiantar@imigrasi.go.id', font: 'Arial', size: 16 })], alignment: AlignmentType.CENTER, spacing: { after: 0, line: 220, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead1 || 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA', font: 'Arial', size: 20, bold: false })], alignment: AlignmentType.CENTER, spacing: { after: 0, before: 0, line: 200, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead2 || 'DIREKTORAT JENDERAL IMIGRASI', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, before: 0, line: 200, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead3 || 'KANTOR WILAYAH SUMATERA UTARA', font: 'Arial', size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 0, before: 0, line: 200, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead4 || 'KANTOR IMIGRASI KELAS II TPI PEMATANG SIANTAR', font: 'Arial', size: 24, bold: true })], alignment: AlignmentType.CENTER, spacing: { after: 0, before: 0, line: 200, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead5 || 'Jl. Raya Medan Km. 11,5, Purbasari, Tapian Dolok, Simalungun', font: 'Arial', size: 18 })], alignment: AlignmentType.CENTER, spacing: { after: 0, before: 0, line: 200, lineRule: 'auto' } }),
+                            new Paragraph({ children: [new TextRun({ text: coverLetterData?.letterhead6 || 'Laman: pematangsiantar.imigrasi.go.id, Pos-el: kanim_pematangsiantar@imigrasi.go.id', font: 'Arial', size: 16 })], alignment: AlignmentType.CENTER, spacing: { after: 0, before: 0, line: 200, lineRule: 'auto' } }),
                         ],
                     }),
                 ],
@@ -717,67 +717,48 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         }),
                     ];
 
-                    if (bsreBadgePngBuf) {
-                        // BSrE badge composite PNG (shield + KEMENIMIPAS text + subtitle + line)
-                        // Canvas output: totalWidth=380px, height≈133px → ratio ≈ 2.86:1
-                        // In Word: width=230px → height=80px
-                        rightCellKids.push(new Paragraph({
-                            children: [new ImageRun({
-                                data: bsreBadgePngBuf,
-                                transformation: { width: 230, height: 80 },
-                                type: 'png',
-                            })],
-                            spacing: { after: 60 },
-                        }));
-                    } else if (logoKemenBuf) {
-                        // Fallback: logo kemenimipas + teks KEMENIMIPAS
-                        const eSignInner = new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            layout: TableLayoutType.FIXED,
-                            borders: {
-                                top: NO_BORDER_TTD, bottom: NO_BORDER_TTD,
-                                left: NO_BORDER_TTD, right: NO_BORDER_TTD,
-                                insideV: NO_BORDER_TTD, insideH: NO_BORDER_TTD,
-                            },
-                            rows: [new TableRow({
-                                children: [
-                                    new TableCell({
-                                        width: { size: 18, type: WidthType.PERCENTAGE },
-                                        borders: tdBordersTTD,
-                                        verticalAlign: VerticalAlign.CENTER,
-                                        children: [new Paragraph({
-                                            children: [new ImageRun({
-                                                data: logoKemenBuf,
-                                                transformation: { width: 44, height: 44 },
-                                                type: 'png',
-                                            })],
-                                            spacing: { after: 0 },
-                                        })],
-                                    }),
-                                    new TableCell({
-                                        width: { size: 82, type: WidthType.PERCENTAGE },
-                                        borders: tdBordersTTD,
-                                        verticalAlign: VerticalAlign.CENTER,
-                                        children: [
-                                            new Paragraph({
-                                                children: [new TextRun({ text: 'KEMENIMIPAS', font: 'Arial Black', size: 26, bold: true })],
-                                                spacing: { after: 0 },
-                                            }),
-                                            new Paragraph({
-                                                children: [new TextRun({ text: 'Ditandatangani secara elektronik oleh:', font: 'Arial', size: 16, color: '555555' })],
-                                                spacing: { after: 0 },
-                                            }),
-                                        ],
-                                    }),
-                                ],
-                            })],
-                        });
-                        rightCellKids.push(eSignInner);
-                        rightCellKids.push(new Paragraph({ spacing: { before: 100, after: 0 } }));
-                    } else {
-                        // Fallback: spasi untuk TTD fisik
-                        rightCellKids.push(new Paragraph({ spacing: { before: 700, after: 0 } }));
-                    }
+                    // Build BSrE badge as docx TABLE — matches BsreBadge.jsx preview exactly:
+                    // [user logo image | KEMENIMIPAS bold + subtitle + border-bottom]
+                    const NB_BADGE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+                    const bdBorders = { top: NB_BADGE, bottom: NB_BADGE, left: NB_BADGE, right: NB_BADGE };
+
+                    const badgeLogoRun = esignLogoBuf
+                        ? new ImageRun({ data: esignLogoBuf, transformation: { width: 76, height: 80 }, type: 'png' })
+                        : new TextRun({ text: '', font: FONT });
+
+                    const badgeTable = new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        layout: TableLayoutType.FIXED,
+                        borders: { top: NB_BADGE, bottom: NB_BADGE, left: NB_BADGE, right: NB_BADGE, insideV: NB_BADGE, insideH: NB_BADGE },
+                        rows: [new TableRow({
+                            children: [
+                                new TableCell({
+                                    width: { size: 18, type: WidthType.PERCENTAGE },
+                                    borders: bdBorders,
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    children: [new Paragraph({ children: [badgeLogoRun], spacing: { after: 0, before: 0 } })],
+                                }),
+                                new TableCell({
+                                    width: { size: 82, type: WidthType.PERCENTAGE },
+                                    borders: bdBorders,
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    children: [
+                                        new Paragraph({
+                                            children: [new TextRun({ text: 'KEMENIMIPAS', font: 'Arial Black', size: pt(13), bold: true, color: '0D0D0D' })],
+                                            spacing: { after: 50, before: 0 },
+                                        }),
+                                        new Paragraph({
+                                            children: [new TextRun({ text: 'Ditandatangani secara elektronik oleh:', font: FONT, size: pt(8), color: '555555' })],
+                                            spacing: { after: 0, before: 0 },
+                                            border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'BBBBBB', space: 4 } },
+                                        }),
+                                    ],
+                                }),
+                            ],
+                        })],
+                    });
+                    rightCellKids.push(badgeTable);
+                    rightCellKids.push(new Paragraph({ spacing: { before: 80, after: 0 } }));
 
                     rightCellKids.push(new Paragraph({
                         children: [TR(clPenandatangan, { bold: true })],
@@ -2068,7 +2049,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const resolvedPenutupData = penutupTemplateData || getDefaultPenutupData();
             const bab4 = [
                 ...babTitleNoPB('IV', 'PENUTUP'),
-                ...getPenutupDocxElements(resolvedPenutupData, bNama, tahun, logoKemenBuf),
+                ...getPenutupDocxElements(resolvedPenutupData, bNama, tahun, esignLogoBuf),
                 // MS WORD BUG FIX: docx section MUST NOT end with a Table.
                 EMPTY(10)
             ];
