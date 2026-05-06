@@ -884,27 +884,15 @@ export default function TemplateLalintalkim({ embedded = false, defaultTab = 'pa
                             <TabelB data={tabelB} onChange={w(setTabelB)} isPreview={isPreview} loading={loading} />
                         </Section>
 
-                        <Section id="section_c" title="c. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul" isPreview={isPreview}>
-                            <TabelC data={tabelC} onChange={w(setTabelC)} isPreview={isPreview} loading={loading} />
-                        </Section>
-
-                        <Section id="section_d" title="d. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Tarutung" isPreview={isPreview}>
-                            <TabelMultiHeader data={tabelD} onChange={w(setTabelD)} isPreview={isPreview} loading={loading} tableName="d" schemaRows={TABEL_D_ROWS} />
-                        </Section>
-
-                        <Section id="section_e" title="e. Paspor 24 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi" isPreview={isPreview}>
+                        <Section id="section_e" title="c. Paspor 24 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi" isPreview={isPreview}>
                             <TabelMultiHeader data={tabelE} onChange={w(setTabelE)} isPreview={isPreview} loading={loading} tableName="e" schemaRows={TABEL_E_ROWS} />
                         </Section>
 
-                        <Section id="section_f" title="f. Paspor 24 Hal pada Unit Kerja Kantor (UKK) Tarutung" isPreview={isPreview}>
-                            <TabelMultiHeader data={tabelF} onChange={w(setTabelF)} isPreview={isPreview} loading={loading} tableName="f" schemaRows={TABEL_F_ROWS} />
-                        </Section>
-
-                        <Section id="section_g" title="g. Pas Lintas Batas (PLB)" isPreview={isPreview}>
+                        <Section id="section_g" title="d. Pas Lintas Batas (PLB)" isPreview={isPreview}>
                             <TabelSimple data={tabelG} onChange={w(setTabelG)} isPreview={isPreview} loading={loading} tableName="g" schemaRows={TABEL_G_ROWS} />
                         </Section>
 
-                        <Section id="section_h" title="h. Surat Perjalanan Laksana Paspor (SPLP)" isPreview={isPreview}>
+                        <Section id="section_h" title="e. Surat Perjalanan Laksana Paspor (SPLP)" isPreview={isPreview}>
                             <TabelSimple data={tabelH} onChange={w(setTabelH)} isPreview={isPreview} loading={loading} tableName="h" schemaRows={TABEL_H_ROWS} />
                         </Section>
                     </div>

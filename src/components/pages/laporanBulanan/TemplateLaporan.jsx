@@ -1089,36 +1089,18 @@ export default function TemplateLaporan({ embedded = false, seksiAlias = null })
                     <TabelB data={dataB} onChange={onChangeB} isPreview={isPreview} loading={loading} />
                 </Section>
 
-                {/* Tabel C */}
-                <Section
-                    title="c. Data Penerbitan Paspor pada UKK Dolok Sanggul"
-                    isPreview={isPreview}
-                >
-                    <TabelC data={dataC} onChange={onChangeC} isPreview={isPreview} loading={loading} />
-                </Section>
-
-                {/* Tabel D */}
-                <Section title="d. Paspor 48 Halaman pada UKK Tarutung" isPreview={isPreview}>
-                    <TabelMultiHeader data={dataD} onChange={onChangeD} isPreview={isPreview} loading={loading} tableName="d" schemaRows={TABEL_D_ROWS} />
-                </Section>
-
-                {/* Tabel E */}
-                <Section title="e. Paspor 24 Halaman Pada ULP Tebing Tinggi" isPreview={isPreview}>
+                {/* Tabel E (sekarang c) */}
+                <Section title="c. Paspor 24 Halaman pada ULP Tebing Tinggi" isPreview={isPreview}>
                     <TabelMultiHeader data={dataE} onChange={onChangeE} isPreview={isPreview} loading={loading} tableName="e" schemaRows={TABEL_E_ROWS} />
                 </Section>
 
-                {/* Tabel F */}
-                <Section title="f. Paspor 24 Halaman Pada UKK Tarutung" isPreview={isPreview}>
-                    <TabelMultiHeader data={dataF} onChange={onChangeF} isPreview={isPreview} loading={loading} tableName="f" schemaRows={TABEL_F_ROWS} />
-                </Section>
-
-                {/* Tabel G */}
-                <Section title="g. Pas Lintas Batas (PLB)" isPreview={isPreview}>
+                {/* Tabel G (sekarang d) */}
+                <Section title="d. Pas Lintas Batas (PLB)" isPreview={isPreview}>
                     <TabelSimple data={dataG} onChange={onChangeG} isPreview={isPreview} loading={loading} tableName="g" schemaRows={TABEL_G_ROWS} />
                 </Section>
 
-                {/* Tabel H */}
-                <Section title="h. Surat Perjalanan Laksana Paspor (SPLP)" isPreview={isPreview}>
+                {/* Tabel H (sekarang e) */}
+                <Section title="e. Surat Perjalanan Laksana Paspor (SPLP)" isPreview={isPreview}>
                     <TabelSimple data={dataH} onChange={onChangeH} isPreview={isPreview} loading={loading} tableName="h" schemaRows={TABEL_H_ROWS} />
                 </Section>
 

@@ -87,13 +87,10 @@ const toc = [
                     {
                         id: 'bab2_substantif_dokumen', label: '1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA', type: 'folder', children: [
                             { id: 'bab2_substantif_dokumen_paspor', label: 'a. Paspor – Kanim Pematangsiantar', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_b', label: 'b. Paspor – ULP Tebing Tinggi', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_c', label: 'c. Paspor – UKK Dolok Sanggul', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_d', label: 'd. Paspor – UKK Tarutung (48 Hal)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_e', label: 'e. Paspor – ULP Tebing Tinggi (24 Hal)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_f', label: 'f. Paspor – UKK Tarutung (24 Hal)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_g', label: 'g. Pas Lintas Batas (PLB)', type: 'file' },
-                            { id: 'bab2_substantif_dokumen_paspor_h', label: 'h. Surat Perjalanan Laksana Paspor (SPLP)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_b', label: 'b. Paspor – ULP Tebing Tinggi (48 Hal)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_e', label: 'c. Paspor – ULP Tebing Tinggi (24 Hal)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_g', label: 'd. Pas Lintas Batas (PLB)', type: 'file' },
+                            { id: 'bab2_substantif_dokumen_paspor_h', label: 'e. Surat Perjalanan Laksana Paspor (SPLP)', type: 'file' },
                         ]
                     },
                     { id: 'bab2_substantif_rekapitulasi', label: '2. REKAPITULASI DATA PERLINTASAN', type: 'file' },
@@ -525,12 +522,9 @@ const MonthlyReport = ({ sectionFilter = null }) => {
 <p class="ql-indent-2">1. PENERBITAN DOKUMEN PERJALANAN REPUBLIK INDONESIA...........................................9</p>
 <p class="ql-indent-3">a. Paspor 48 Hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar...........................................9</p>
 <p class="ql-indent-3">b. Paspor 48 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi.................................................9</p>
-<p class="ql-indent-3">c. Paspor 48 Hal pada Unit Kerja Kantor (UKK) Dolok Sanggul...................................................10</p>
-<p class="ql-indent-3">d. Paspor 24 hal pada Kantor Imigrasi Kelas II TPI Pematang Siantar.........................................10</p>
-<p class="ql-indent-3">e. Paspor 24 hal pada Unit Layanan Paspor (ULP) Tebing Tinggi...............................................11</p>
-<p class="ql-indent-3">f. Paspor 24 hal pada Unit Kerja Kantor (UKK) Dolok Sanggul....................................................11</p>
-<p class="ql-indent-3">g. Pas Lintas Batas (PLB)..............................................................................................................12</p>
-<p class="ql-indent-3">h. Surat Perjalanan Laksana Paspor (SPLP).................................................................................12</p>
+<p class="ql-indent-3">c. Paspor 24 Hal pada Unit Layanan Paspor (ULP) Tebing Tinggi...............................................10</p>
+<p class="ql-indent-3">d. Pas Lintas Batas (PLB)..............................................................................................................10</p>
+<p class="ql-indent-3">e. Surat Perjalanan Laksana Paspor (SPLP).................................................................................11</p>
 <p class="ql-indent-2">2. PENERBITAN IZIN TINGGAL......................................................................................................13</p>
 <p class="ql-indent-3">a. Izin Kunjungan (ITK)..................................................................................................................13</p>
 <p class="ql-indent-3">b. Izin Tinggal Terbatas (ITAS)......................................................................................................13</p>

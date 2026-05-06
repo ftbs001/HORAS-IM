@@ -696,11 +696,13 @@ export function getLalintalkimDocxElements(part, templateData) {
     } = templateData || {};
 
     if (!part || part === 'all') {
+        // Tabel C (UKK Dolok Sanggul), D & F (UKK Tarutung) telah dihapus
         const parts = [
-            'bab2_substantif_dokumen_paspor', 'bab2_substantif_dokumen_paspor_b', 
-            'bab2_substantif_dokumen_paspor_c', 'bab2_substantif_dokumen_paspor_d',
-            'bab2_substantif_dokumen_paspor_e', 'bab2_substantif_dokumen_paspor_f',
-            'bab2_substantif_dokumen_paspor_g', 'bab2_substantif_dokumen_paspor_h',
+            'bab2_substantif_dokumen_paspor',    // a. Kanim Pematangsiantar
+            'bab2_substantif_dokumen_paspor_b',  // b. ULP Tebing Tinggi (48H)
+            'bab2_substantif_dokumen_paspor_e',  // c. ULP Tebing Tinggi (24H)
+            'bab2_substantif_dokumen_paspor_g',  // d. PLB
+            'bab2_substantif_dokumen_paspor_h',  // e. SPLP
             'bab2_substantif_rekapitulasi',
             'bab2_substantif_dokumen_izintinggal_itk', 'bab2_substantif_dokumen_izintinggal_itas',
             'bab2_substantif_dokumen_izintinggal_itap', 'bab2_substantif_dokumen_izintinggal_lain'
@@ -721,26 +723,14 @@ export function getLalintalkimDocxElements(part, templateData) {
                 buildTabelB(tabel_b),
                 spacer()
             ];
-        case 'bab2_substantif_dokumen_paspor_c':
-            return [
-                buildTabelC(tabel_c),
-                spacer()
-            ];
-        case 'bab2_substantif_dokumen_paspor_d':
-            return [
-                buildTabelMultiHeader('d', tabel_d, TABEL_D_ROWS),
-                spacer()
-            ];
+        // case 'bab2_substantif_dokumen_paspor_c': — UKK Dolok Sanggul (DIHAPUS)
+        // case 'bab2_substantif_dokumen_paspor_d': — UKK Tarutung 48H (DIHAPUS)
         case 'bab2_substantif_dokumen_paspor_e':
             return [
                 buildTabelMultiHeader('e', tabel_e, TABEL_E_ROWS),
                 spacer()
             ];
-        case 'bab2_substantif_dokumen_paspor_f':
-            return [
-                buildTabelMultiHeader('f', tabel_f, TABEL_F_ROWS),
-                spacer()
-            ];
+        // case 'bab2_substantif_dokumen_paspor_f': — UKK Tarutung 24H (DIHAPUS)
         case 'bab2_substantif_dokumen_paspor_g':
             return [
                 buildTabelSimple('g', tabel_g, TABEL_G_ROWS),
