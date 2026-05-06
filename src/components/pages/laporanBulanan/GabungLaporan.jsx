@@ -2539,10 +2539,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 </button>
             </div>
             
-            {/* Hidden Org Chart Render Engine */}
-            <div style={{ position: 'fixed', bottom: 0, right: 0, opacity: 0.01, pointerEvents: 'none', zIndex: -9999 }}>
-                <Bab5OrgChart />
-            </div>
+            {/* Org chart image stored as base64 in monthly_reports — no hidden render needed */}
         </div>
         </div>
     );
