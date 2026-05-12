@@ -2487,7 +2487,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             </div>
 
             {/* Peringatan parsial */}
-            {!semuaDisetujui && approved.length > 0 && (
+            {!(approved.length === laporan.length && laporan.length > 0) && approved.length > 0 && (
                 <div style={{
                     padding: '12px 16px', borderRadius: '8px', marginBottom: '16px',
                     background: '#fffbeb', border: '1px solid #fde68a', fontSize: '14px', color: '#92400e',
