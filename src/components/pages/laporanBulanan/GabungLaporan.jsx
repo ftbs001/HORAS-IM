@@ -2529,7 +2529,7 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         ? '⏳ Membuat Dokumen...'
                         : approved.length === 0
                             ? '⚠️ Belum Ada Laporan Disetujui'
-                            : semuaDisetujui
+                            : (approved.length === laporan.length && laporan.length > 0)
                                 ? `⬇️ Download Word (${approved.length} Seksi)`
                                 : `⬇️ Download Word (${approved.length}/${laporan.length} Seksi)`}
                 </button>

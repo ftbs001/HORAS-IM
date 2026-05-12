@@ -554,8 +554,9 @@ const buildCoverLetter = async (data, logoPath) => {
 
     // --- BSrE Electronic Signature Layout ---
     let bsreLogoData = null;
+    const esignSrc = data.esignLogoUrl || '/logo_kemenimipas.png';
     try {
-        bsreLogoData = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
+        bsreLogoData = await fetchImageAsArrayBuffer(esignSrc);
     } catch (err) {
         console.warn('Docx electronic signature badge image failed to load:', err);
     }
@@ -1393,8 +1394,9 @@ export const generateDocx = async ({
         const { getPenutupDocxElements } = await import('./templateDocxExporter.js');
         
         let logoKemenBuf = null;
+        const esignSrc = coverLetterData?.esignLogoUrl || '/logo_kemenimipas.png';
         try {
-            logoKemenBuf = await fetchImageAsArrayBuffer('/logo_kemenimipas.png');
+            logoKemenBuf = await fetchImageAsArrayBuffer(esignSrc);
         } catch (e) {
             console.warn('Docx electronic signature badge image failed to load:', e);
         }
