@@ -116,15 +116,21 @@ function buildTabelA(data) {
     // Column widths: label1(30%), label2(40%), L(10%), P(10%), total(10%)
     const W = [PAGE_W * 0.30, PAGE_W * 0.40, PAGE_W * 0.10, PAGE_W * 0.10, PAGE_W * 0.10].map(Math.round);
 
-    const headerRow = new TableRow({
+    const hr1 = new TableRow({
         tableHeader: true,
         height: { value: 400, rule: HeightRule.ATLEAST },
         children: [
-            cell('JENIS PASPOR',     { bold: true, center: true, bg: HEADER_BG, w: W[0] }),
-            cell('JENIS PERMOHONAN', { bold: true, center: true, bg: HEADER_BG, w: W[1] }),
+            cell('JENIS PASPOR',     { bold: true, center: true, bg: HEADER_BG, w: W[0], rowSpan: 2 }),
+            cell('JENIS PERMOHONAN', { bold: true, center: true, bg: HEADER_BG, w: W[1], rowSpan: 2 }),
+            cell('JENIS KELAMIN',    { bold: true, center: true, bg: HEADER_BG, w: W[2] + W[3], colSpan: 2 }),
+            cell('GRAND TOTAL',     { bold: true, center: true, bg: HEADER_BG, w: W[4], rowSpan: 2 }),
+        ],
+    });
+    const hr2 = new TableRow({
+        tableHeader: true,
+        children: [
             cell('L',               { bold: true, center: true, bg: HEADER_BG, w: W[2] }),
             cell('P',               { bold: true, center: true, bg: HEADER_BG, w: W[3] }),
-            cell('GRAND TOTAL',     { bold: true, center: true, bg: HEADER_BG, w: W[4] }),
         ],
     });
 
@@ -144,7 +150,7 @@ function buildTabelA(data) {
         });
     });
 
-    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...rows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, ...rows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -155,14 +161,20 @@ function buildTabelB(data) {
     const getV   = (id, f) => totals[id]?.[f] ?? 0;
     const W = [PAGE_W * 0.30, PAGE_W * 0.40, PAGE_W * 0.10, PAGE_W * 0.10, PAGE_W * 0.10].map(Math.round);
 
-    const headerRow = new TableRow({
+    const hr1 = new TableRow({
         tableHeader: true,
         children: [
-            cell('JENIS PASPOR',    { bold: true, center: true, bg: HEADER_BG, w: W[0] }),
-            cell('JENIS PERMOHONAN',{ bold: true, center: true, bg: HEADER_BG, w: W[1] }),
+            cell('JENIS PASPOR',    { bold: true, center: true, bg: HEADER_BG, w: W[0], rowSpan: 2 }),
+            cell('JENIS PERMOHONAN',{ bold: true, center: true, bg: HEADER_BG, w: W[1], rowSpan: 2 }),
+            cell('JENIS KELAMIN',   { bold: true, center: true, bg: HEADER_BG, w: W[2] + W[3], colSpan: 2 }),
+            cell('TOTAL',          { bold: true, center: true, bg: HEADER_BG, w: W[4], rowSpan: 2 }),
+        ],
+    });
+    const hr2 = new TableRow({
+        tableHeader: true,
+        children: [
             cell('L',              { bold: true, center: true, bg: HEADER_BG, w: W[2] }),
             cell('P',              { bold: true, center: true, bg: HEADER_BG, w: W[3] }),
-            cell('TOTAL',          { bold: true, center: true, bg: HEADER_BG, w: W[4] }),
         ],
     });
 
@@ -182,7 +194,7 @@ function buildTabelB(data) {
         });
     });
 
-    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...rows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, ...rows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -194,13 +206,19 @@ function buildTabelC(data) {
     const getV   = (id, f) => totals[id]?.[f] ?? 0;
     const W = [PAGE_W * 0.55, PAGE_W * 0.15, PAGE_W * 0.15, PAGE_W * 0.15].map(Math.round);
 
-    const headerRow = new TableRow({
+    const hr1 = new TableRow({
         tableHeader: true,
         children: [
-            cell('KETERANGAN', { bold: true, center: true, bg: HEADER_BG, w: W[0] }),
+            cell('KETERANGAN', { bold: true, center: true, bg: HEADER_BG, w: W[0], rowSpan: 2 }),
+            cell('JENIS KELAMIN',{ bold: true, center: true, bg: HEADER_BG, w: W[1] + W[2], colSpan: 2 }),
+            cell('TOTAL',      { bold: true, center: true, bg: HEADER_BG, w: W[3], rowSpan: 2 }),
+        ],
+    });
+    const hr2 = new TableRow({
+        tableHeader: true,
+        children: [
             cell('L',          { bold: true, center: true, bg: HEADER_BG, w: W[1] }),
             cell('P',          { bold: true, center: true, bg: HEADER_BG, w: W[2] }),
-            cell('TOTAL',      { bold: true, center: true, bg: HEADER_BG, w: W[3] }),
         ],
     });
 
@@ -218,7 +236,7 @@ function buildTabelC(data) {
         });
     });
 
-    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [headerRow, ...rows] });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.AUTOFIT, rows: [hr1, hr2, ...rows] });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -438,8 +456,8 @@ function buildProjusDocx(projusData) {
     const colW  = Math.round((PAGE_W - noW - pasW - jumlW) / (PROJUS_COLS.length * 2));
 
     const hr1 = new TableRow({ tableHeader: true, children: [
-        cell('NO', { bold: true, center: true, bg: HEADER_BG, rowSpan: 3, sz: FONT_SM, w: noW }),
-        cell('PASAL YANG DILANGGAR', { bold: true, center: true, bg: HEADER_BG, rowSpan: 3, sz: FONT_SM, w: pasW }),
+        cell('NO', { bold: true, center: true, bg: HEADER_BG, rowSpan: 4, sz: FONT_SM, w: noW }),
+        cell('PASAL YANG DILANGGAR', { bold: true, center: true, bg: HEADER_BG, rowSpan: 4, sz: FONT_SM, w: pasW }),
         cell('PELANGGARAN KEIMIGRASIAN', { bold: true, center: true, bg: HEADER_BG, colSpan: PROJUS_COLS.length * 2 + 1, sz: FONT_SM }),
     ]});
     const hr2 = new TableRow({ tableHeader: true, children: [
@@ -492,8 +510,8 @@ function buildTAKDocx(takData) {
     const colW  = Math.round((PAGE_W - noW - pasW - jumlW) / (TAK_COLS.length * 2));
 
     const hr1 = new TableRow({ tableHeader: true, children: [
-        cell('NO', { bold: true, center: true, bg: HEADER_BG, rowSpan: 3, sz: FONT_XS, w: noW }),
-        cell('PASAL YANG DILANGGAR', { bold: true, center: true, bg: HEADER_BG, rowSpan: 3, sz: FONT_XS, w: pasW }),
+        cell('NO', { bold: true, center: true, bg: HEADER_BG, rowSpan: 4, sz: FONT_XS, w: noW }),
+        cell('PASAL YANG DILANGGAR', { bold: true, center: true, bg: HEADER_BG, rowSpan: 4, sz: FONT_XS, w: pasW }),
         cell('PELANGGARAN KEIMIGRASIAN', { bold: true, center: true, bg: HEADER_BG, colSpan: TAK_COLS.length * 2 + 1, sz: FONT_XS }),
     ]});
     const hr2 = new TableRow({ tableHeader: true, children: [

@@ -448,7 +448,7 @@ export default function TemplatePenutup({
     };
 
     const toolBtn = (mode) => ({
-        padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+        padding: '6px 14px', borderRadius: '6px', cursor: 'pointer',
         fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px',
         background: mode === 'primary' ? '#2563eb' : mode === 'toggle' ? '#f1f5f9' : '#fff',
         color: mode === 'primary' ? '#fff' : mode === 'toggle' ? '#475569' : '#333',

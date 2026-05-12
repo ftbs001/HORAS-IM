@@ -398,13 +398,19 @@ const Bab5OrgChartView = ({ editMode = false }) => {
     );
 };
 
-const MonthlyReport = ({ sectionFilter = null }) => {
+const MonthlyReport = ({ sectionFilter = null, onNavigate }) => {
     const { user } = useAuth();
     const { reportData, updateSection, clearSection, reportAttachments, addAttachment, removeAttachment, getAttachments, coverLetterData, coverPageData, forewordData } = useReport();
     const { showNotification } = useNotification();
     const quillRef = useRef(null);
 
+    // Constants
+    const BULAN_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const tahunOptions = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+
     // State
+    const [previewMonth, setPreviewMonth] = useState(new Date().getMonth() + 1);
+    const [previewYear, setPreviewYear] = useState(new Date().getFullYear());
     const [activeSection, setActiveSection] = useState('cover_letter');
     const [previewFocusId, setPreviewFocusId] = useState(null); // null = show all sections; nodeId = focused single-section view
     const [expandedNodes, setExpandedNodes] = useState(['bab1', 'bab1_pengantar', 'bab2', 'bab2_substantif']);
@@ -1341,7 +1347,8 @@ const MonthlyReport = ({ sectionFilter = null }) => {
     }, [reportData]);
 
     const renderTemplateForPreview = (nodeId) => {
-        const { finalBulan, tahunInt } = parsedCoverData;
+        const finalBulan = previewMonth;
+        const tahunInt = previewYear;
 
         if (nodeId === 'bab2_substantif_dokumen_paspor' || 
             nodeId === 'bab2_substantif_dokumen_paspor_b' ||
@@ -1859,13 +1866,29 @@ const MonthlyReport = ({ sectionFilter = null }) => {
                     )}
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Add month/year filter for preview tab */}
+                    {viewMode === 'preview' && (
+                        <div className="flex gap-2 mr-4 bg-gray-50 p-1.5 rounded border border-gray-200">
+                            <select value={previewMonth} onChange={e => setPreviewMonth(Number(e.target.value))} className="bg-white border-none rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer">
+                                {BULAN_NAMES.slice(1).map((b, i) => <option key={i+1} value={i+1}>{b}</option>)}
+                            </select>
+                            <select value={previewYear} onChange={e => setPreviewYear(Number(e.target.value))} className="bg-white border-none rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer">
+                                {tahunOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                    )}
                     {/* Super admin: full export */}
                     {user?.role === 'super_admin' && (
                         <>
                             <button
-                                onClick={handleExportWord}
+                                onClick={() => {
+                                    showNotification('Membuka Gabung Laporan untuk Ekspor Word Resmi...', 'info');
+                                    if (onNavigate) {
+                                        onNavigate('gabung-laporan', { bulan: previewMonth, tahun: previewYear });
+                                    }
+                                }}
                                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2 text-sm font-bold transition-colors"
-                                title="Export semua laporan ke Microsoft Word"
+                                title="Export semua laporan ke Microsoft Word dengan layout tabel resmi"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                 Ekspor Word

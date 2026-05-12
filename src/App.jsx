@@ -42,6 +42,7 @@ import { SectionProvider } from './contexts/SectionContext';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LaporanProvider } from './contexts/LaporanContext';
+import { ArchiveProvider } from './contexts/ArchiveContext';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -117,11 +118,11 @@ function AppContent() {
       case 'work-program-list': return <WorkProgramInput initialMode="list" />;
 
       // ---- Monthly Report (legacy) ----
-      case 'monthly-report': return <MonthlyReport />;
-      case 'report-input-inteldakim': return <MonthlyReport sectionFilter="inteldakim" />;
-      case 'report-input-lalintalkim': return <MonthlyReport sectionFilter="lalintalkim" />;
-      case 'report-input-tikim': return <MonthlyReport sectionFilter="tikim" />;
-      case 'report-input-tu': return <MonthlyReport sectionFilter="tata_usaha" />;
+      case 'monthly-report': return <MonthlyReport onNavigate={handleNavigate} />;
+      case 'report-input-inteldakim': return <MonthlyReport sectionFilter="inteldakim" onNavigate={handleNavigate} />;
+      case 'report-input-lalintalkim': return <MonthlyReport sectionFilter="lalintalkim" onNavigate={handleNavigate} />;
+      case 'report-input-tikim': return <MonthlyReport sectionFilter="tikim" onNavigate={handleNavigate} />;
+      case 'report-input-tu': return <MonthlyReport sectionFilter="tata_usaha" onNavigate={handleNavigate} />;
 
       // ---- Lainnya ----
       case 'template-status': return <TemplateStatusDashboard />;
@@ -158,7 +159,9 @@ function App() {
             <SectionProvider>
               <ProgramProvider>
                 <ReportProvider>
-                  <AppContent />
+                  <ArchiveProvider>
+                    <AppContent />
+                  </ArchiveProvider>
                 </ReportProvider>
               </ProgramProvider>
             </SectionProvider>

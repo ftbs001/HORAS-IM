@@ -109,11 +109,14 @@ function TabelA({ data, onChange, isPreview, loading }) {
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '600px' }}>
                 <thead>
                     <tr>
-                        <th style={{ ...thStyle, width: '35%' }}>JENIS PASPOR</th>
-                        <th style={{ ...thStyle, width: '35%' }}>JENIS PERMOHONAN</th>
+                        <th style={{ ...thStyle, width: '35%' }} rowSpan={2}>JENIS PASPOR</th>
+                        <th style={{ ...thStyle, width: '35%' }} rowSpan={2}>JENIS PERMOHONAN</th>
+                        <th style={{ ...thStyle, width: '16%' }} colSpan={2}>JENIS KELAMIN</th>
+                        <th style={{ ...thStyle, width: '10%' }} rowSpan={2}>GRAND TOTAL</th>
+                    </tr>
+                    <tr>
                         <th style={{ ...thStyle, width: '8%' }}>L</th>
                         <th style={{ ...thStyle, width: '8%' }}>P</th>
-                        <th style={{ ...thStyle, width: '10%' }}>GRAND TOTAL</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -167,11 +170,14 @@ function TabelB({ data, onChange, isPreview, loading }) {
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '550px' }}>
                 <thead>
                     <tr>
-                        <th style={{ ...thStyle, width: '40%' }}>JENIS PASPOR</th>
-                        <th style={{ ...thStyle, width: '30%' }}>JENIS PERMOHONAN</th>
+                        <th style={{ ...thStyle, width: '40%' }} rowSpan={2}>JENIS PASPOR</th>
+                        <th style={{ ...thStyle, width: '30%' }} rowSpan={2}>JENIS PERMOHONAN</th>
+                        <th style={{ ...thStyle, width: '16%' }} colSpan={2}>JENIS KELAMIN</th>
+                        <th style={{ ...thStyle, width: '10%' }} rowSpan={2}>TOTAL</th>
+                    </tr>
+                    <tr>
                         <th style={{ ...thStyle, width: '8%' }}>L</th>
                         <th style={{ ...thStyle, width: '8%' }}>P</th>
-                        <th style={{ ...thStyle, width: '10%' }}>TOTAL</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -226,10 +232,13 @@ function TabelC({ data, onChange, isPreview, loading }) {
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                 <thead>
                     <tr>
-                        <th style={{ ...thStyle, width: '60%' }}>KETERANGAN</th>
+                        <th style={{ ...thStyle, width: '60%' }} rowSpan={2}>KETERANGAN</th>
+                        <th style={{ ...thStyle, width: '20%' }} colSpan={2}>JENIS KELAMIN</th>
+                        <th style={{ ...thStyle, width: '15%' }} rowSpan={2}>TOTAL</th>
+                    </tr>
+                    <tr>
                         <th style={{ ...thStyle, width: '10%' }}>L</th>
                         <th style={{ ...thStyle, width: '10%' }}>P</th>
-                        <th style={{ ...thStyle, width: '15%' }}>TOTAL</th>
                     </tr>
                 </thead>
                 <tbody>

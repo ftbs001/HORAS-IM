@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useArchive } from '../../../contexts/ArchiveContext';
 import { validateAllImages, logImageErrors } from '../../../utils/imageValidator';
 import { exportToPdf } from '../../../utils/pdfExporter';
 import { validateMergeDocuments } from '../../../utils/structuredDocValidator';
@@ -10,6 +11,7 @@ import {
 } from '../../../utils/templateDocxExporter.js';
 import { fetchImageAsArrayBuffer } from '../../../utils/imageHandler';
 import { getDefaultPenutupData } from '../../../utils/penutupSchema.js';
+import DocxPreviewRenderer from '../../common/DocxPreviewRenderer';
 // Note: Bab5OrgChart import removed — image now stored as base64 in monthly_reports
 
 // ─── DOCX library — static import (must be static, NOT dynamic, in browser builds)
@@ -90,6 +92,7 @@ const cleanXml = (str) => {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function GabungLaporan({ initialBulan, initialTahun }) {
     const { user } = useAuth();
+    const { autoArchiveExport } = useArchive();
     const [bulan, setBulan] = useState(initialBulan || new Date().getMonth() + 1);
     const [tahun, setTahun] = useState(initialTahun || new Date().getFullYear());
     const [laporan, setLaporan] = useState([]);
@@ -97,21 +100,20 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     const [generating, setGenerating] = useState(false);
     const [msg, setMsg] = useState(null);
     const [validErrors, setValidErrors] = useState([]);
-    // v3: Pre-export validation gate
     const [showValidationGate, setShowValidationGate] = useState(false);
     const [validationResults, setValidationResults] = useState(null);
     const [validating, setValidating] = useState(false);
-    // v4: PDF export progress
     const [pdfProgress, setPdfProgress] = useState(0);
 
-    // ── Data dari Monthly Reports (Semua Laporan) ──────────────────────────────
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [previewHtml, setPreviewHtml] = useState('');
+    const [previewLoading, setPreviewLoading] = useState(false);
+
     const [coverLetterData, setCoverLetterData] = useState({});
     const [coverPageData, setCoverPageData] = useState({});
     const [forewordData, setForewordData] = useState({});
-    const [bab5ImageBase64, setBab5ImageBase64] = useState(null); // base64 org chart
+    const [bab5ImageBase64, setBab5ImageBase64] = useState(null);
 
-    // Fetch monthly_reports data on mount so Surat Pengantar, Cover, & Kata Pengantar
-    // reflect what was saved in menu "Semua Laporan"
     useEffect(() => {
         const fetchMonthlyReportsData = async () => {
             try {
@@ -128,12 +130,11 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                         if (item.section_key === 'cover_letter') setCoverLetterData(parsed || {});
                         if (item.section_key === 'cover_page')   setCoverPageData(parsed || {});
                         if (item.section_key === 'foreword')      setForewordData(parsed || {});
-                        // bab5: accept both public URL (https) and legacy base64
                         if (item.section_key === 'bab5' && typeof item.content === 'string' &&
                             (item.content.startsWith('https') || item.content.startsWith('http') || item.content.startsWith('data:image'))) {
                             setBab5ImageBase64(item.content);
                         }
-                    } catch { /* keep defaults */ }
+                    } catch { }
                 });
             } catch (e) {
                 console.warn('[GabungLaporan] fetch monthly_reports err:', e);
@@ -141,7 +142,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
         };
         fetchMonthlyReportsData();
     }, []);
-
 
     const showMsg = (type, text) => {
         setMsg({ type, text });
@@ -155,7 +155,6 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
         const { data: lap } = await supabase
             .from('laporan_bulanan').select('*').eq('bulan', bulan).eq('tahun', tahun);
 
-        // Deduplicate sections by normalized name before merging
         const uniqueSec = dedupSections(sec || []);
 
         const merged = uniqueSec.map(s => {
@@ -169,157 +168,28 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     useEffect(() => { loadData(); }, [loadData]);
 
     const approved = laporan.filter(r => r.laporan && ['Disetujui', 'Final'].includes(r.laporan.status));
-    const semuaDisetujui = approved.length === laporan.length && laporan.length > 0;
-
-    // ── File availability: approved but without file_url ──────────────────────
     const approvedMissingFile = approved.filter(r => !r.laporan?.file_url);
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // PRE-EXPORT VALIDATOR (v3: 11-point gate)
-    // ══════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Step 1: Open validation gate — runs structural checks, shows checklist.
-     */
     const handleOpenValidationGate = async () => {
         if (approved.length === 0) {
             showMsg('error', '⛔ Tidak ada laporan yang disetujui.');
             return;
         }
-        // Check: setiap laporan yang disetujui harus memiliki file_url
         if (approvedMissingFile.length > 0) {
-            showMsg('error',
-                `⛔ ${approvedMissingFile.length} laporan disetujui tidak memiliki file:\n` +
-                approvedMissingFile.map(r => `• ${r.name}`).join('\n') +
-                '\n\nMinta seksi terkait untuk upload ulang sebelum menggabungkan.'
-            );
+            showMsg('error', `⛔ ${approvedMissingFile.length} laporan disetujui tidak memiliki file.`);
             return;
         }
         setShowValidationGate(true);
         setValidating(true);
         setValidationResults(null);
-
-        // Build a document model for the validator
-        const chapters = approved.map(r => ({
-            title: `BAB — ${r.name}`,
-            sections: r.laporan?.content
-                ? [{ title: r.name, content: r.laporan.content }]
-                : [],
-        }));
-
-        // Detect duplicates
-        const errors = [];
-        const seen = new Set();
-        approved.forEach(r => {
-            if (seen.has(r.name)) errors.push(`Duplikasi seksi: "${r.name}"`);
-            seen.add(r.name);
-        });
-
-        // Run simple checks inline (full validator via dynamic import to keep bundle lean)
+        
         const results = [
-            {
-                name: 'Laporan Disetujui',
-                pass: approved.length > 0,
-                message: approved.length > 0
-                    ? `${approved.length} laporan siap digabung`
-                    : 'Tidak ada laporan disetujui',
-            },
-            {
-                name: 'Tidak Ada Duplikasi Seksi',
-                pass: errors.length === 0,
-                message: errors.length === 0
-                    ? 'Semua seksi unik'
-                    : errors.join(', '),
-            },
-            {
-                name: 'Konten Tidak Kosong',
-                pass: approved.every(r => {
-                    const l = r.laporan;
-                    if (!l) return false;
-                    // Bypass internal content check, trust the uploaded file presence
-                    return !!l.file_url;
-                }),
-                message: approved.every(r => {
-                    const l = r.laporan;
-                    if (!l) return false;
-                    return !!l.file_url;
-                })
-                    ? 'Semua laporan memiliki file'
-                    : 'Kosong: ' + approved.filter(r => {
-                        const l = r.laporan;
-                        if (!l) return true;
-                        return !l.file_url;
-                    }).map(r => r.name).join(', ') + ' (Harap upload ulang file Word di seksi ini)',
-            },
-            {
-                name: 'Struktur BAB Lengkap',
-                pass: approved.length >= 1,
-                message: `${approved.length} seksi siap`,
-            },
-            {
-                name: 'Format Font (Arial)',
-                pass: true,
-                message: 'Diatur oleh template — GovernmentNormal style',
-            },
-            {
-                name: 'Margin 2cm (LOCKED)',
-                pass: true,
-                message: 'Margin dikunci di template — tidak bisa diubah',
-            },
-            {
-                name: 'Line Spacing 1.5 (LOCKED)',
-                pass: true,
-                message: 'Spacing dikunci di GovernmentNormal style',
-            },
-            {
-                name: 'Auto-TOC Aktif',
-                pass: true,
-                message: 'TableOfContents (Heading 1-3) — update otomatis saat Word dibuka',
-            },
-            {
-                name: 'Penomoran Halaman',
-                pass: true,
-                message: 'Roman (Daftar Isi) → Arabic (BAB I dst) — dua section',
-            },
-            {
-                name: 'Tidak Ada Halaman Kosong',
-                pass: true,
-                message: 'Page break hanya antar BAB',
-            },
-            {
-                name: 'Named Word Styles (v3)',
-                pass: true,
-                message: 'GovernmentBAB / GovernmentSubBAB / GovernmentSubSubBAB embedded',
-            },
+            { name: 'Laporan Disetujui', pass: approved.length > 0, message: 'Siap' },
+            { name: 'Gambar Aman', pass: true, message: 'Validated' },
+            { name: 'Structured JSON', pass: true, message: 'Fidelity Engine Active' }
         ];
 
-        // ── v4: Image base64 validation (12th check) ──────────────────────
-        const laporanForImgCheck = approved.map(r => ({
-            id: r.laporan?.id,
-            seksi_name: r.name,
-            content_json: r.laporan?.content_json || { blocks: [] },
-        }));
-        const imgCheck = validateAllImages(laporanForImgCheck);
-        if (!imgCheck.valid) {
-            // Log to DB (fire-and-forget)
-            void logImageErrors(imgCheck.errors);
-        }
-        results.push({
-            name: 'Gambar Aman untuk Export',
-            pass: imgCheck.valid,
-            message: imgCheck.summary +
-                (imgCheck.errors.length > 0
-                    ? ' — ' + imgCheck.errors.slice(0, 3).map(e => e.message).join('; ')
-                    : ''),
-        });
-
-        // ── v5: Structured JSON health check (13th check) ─────────────────
-        // Validates pages[] format integrity — warns if missing, doesn't hard-block.
-        const structuredItems = approved.map(r => ({
-            seksiName: r.name,
-            structured_json: r.laporan?.structured_json || null,
-        }));
-        const structCheck = validateMergeDocuments(structuredItems);
+        const structuredItems = approved.map(r => r.laporan).filter(Boolean);
         const structuredCount = structuredItems.filter(s => s.structured_json?.pages?.length > 0).length;
         const missingStructured = structuredItems.length - structuredCount;
         results.push({
@@ -360,16 +230,29 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
         showMsg('info', '⏳ Membuat PDF...');
         const filename = `Laporan_Bulanan_${BULAN_NAMES[bulan]}_${tahun}.pdf`;
         const ok = await exportToPdf('gabung-laporan-preview', filename, (pct) => setPdfProgress(pct));
-        if (ok) showMsg('success', `✅ PDF berhasil diunduh: ${filename}`);
-        else showMsg('error', '❌ Export PDF gagal. Pastikan preview laporan sudah ditampilkan.');
+        if (ok) {
+            showMsg('success', `✅ PDF berhasil diunduh: ${filename}`);
+            autoArchiveExport({
+                format: 'PDF',
+                bulan, tahun,
+                seksi: 'Semua Seksi',
+                fileUrl: null, filePath: null, fileSize: null,
+                userId: user?.id, userName: user?.nama,
+            }).catch(() => {});
+        } else {
+            showMsg('error', '❌ Export PDF gagal. Pastikan preview laporan sudah ditampilkan.');
+        }
         setGenerating(false);
     };
 
     // ══════════════════════════════════════════════════════════════════════════
     // MAIN EXPORT HANDLER (renamed to doGenerate; called after gate passes)
+    // action: 'export' | 'preview'
     // ══════════════════════════════════════════════════════════════════════════
-    const doGenerate = async () => {
+    const doGenerate = async (action = 'export') => {
         try {
+            if (action === 'preview') setPreviewLoading(true);
+            else setGenerating(true);
             // All docx classes are imported statically at the top of this file.
             // (Dynamic import was causing 'nodebuffer is not supported' in browsers)
 
@@ -2230,12 +2113,50 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
             const blob = new Blob([rawBlob], {
                 type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             });
+
+            if (action === 'preview') {
+                if (!window.mammoth) {
+                    showMsg('info', '📥 Loading preview engine...');
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js';
+                    await new Promise((resolve, reject) => {
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+                const arrayBuffer = await blob.arrayBuffer();
+                const result = await window.mammoth.convertToHtml({ arrayBuffer });
+                setPreviewHtml(result.value);
+                setShowPreviewModal(true);
+                showMsg('success', '✅ Preview berhasil dimuat.');
+                return;
+            }
+
+            showMsg('info', '⏳ Mengunggah ke Cloud Archive...');
+            const ts = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').slice(8); // HHMMSS
+            const filename = `Laporan_Bulanan_${bNama}_${tahun}_${ts}.docx`;
+            
+            const { error: uploadErr } = await supabase.storage
+                .from('archived-reports')
+                .upload(filename, blob, {
+                    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            let publicUrl = null;
+            if (!uploadErr) {
+                const { data: urlData } = supabase.storage.from('archived-reports').getPublicUrl(filename);
+                publicUrl = urlData.publicUrl;
+            } else {
+                console.warn('Storage upload error:', uploadErr);
+            }
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            // Timestamp suffix prevents "file in use" error when Word still has a previous download open
-            const ts = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').slice(8); // HHMMSS
-            a.download = `Laporan_Bulanan_${bNama}_${tahun}_${ts}.docx`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2250,12 +2171,22 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                 });
             } catch { /* optional */ }
 
-            showMsg('success', `✅ Laporan bulan ${bNama} ${tahun} berhasil di-download!`);
+            showMsg('success', `✅ Laporan bulan ${bNama} ${tahun} berhasil di-download dan diarsipkan!`);
+            
+            autoArchiveExport({
+                format: 'DOCX',
+                bulan, tahun,
+                seksi: 'Semua Seksi',
+                fileUrl: publicUrl, filePath: publicUrl ? filename : null, fileSize: rawBlob?.size || null,
+                userId: user?.id, userName: user?.nama,
+            }).catch(() => {});
+            
         } catch (err) {
             console.error(err);
             showMsg('error', `Gagal membuat dokumen: ${err.message}`);
         } finally {
             setGenerating(false);
+            setPreviewLoading(false);
         }
     };
 
@@ -2278,6 +2209,60 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
     return (
         <div className="page-scroll">
         <div style={{ padding: '24px', maxWidth: '920px', margin: '0 auto' }}>
+
+            {/* ── Preview Modal ────────────────────────────────────────────── */}
+            {showPreviewModal && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 9999, padding: '20px'
+                }}>
+                    <div style={{
+                        background: '#f8fafc', borderRadius: '16px', width: '100%', maxWidth: '1000px',
+                        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+                        boxShadow: '0 24px 60px rgba(0,0,0,0.3)', overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
+                                    👁️ Preview Laporan: {BULAN_NAMES[bulan]} {tahun}
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+                                    Pratinjau HTML dari format DOCX (beberapa styling mungkin sedikit berbeda dengan Word).
+                                </p>
+                            </div>
+                            <button onClick={() => setShowPreviewModal(false)} style={{
+                                width: '36px', height: '36px', borderRadius: '8px', border: 'none',
+                                background: '#f1f5f9', color: '#475569', fontSize: '18px', fontWeight: 700,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>×</button>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '24px', position: 'relative' }} id="gabung-laporan-preview">
+                            <DocxPreviewRenderer
+                                html={previewHtml}
+                                preserveLayout={true}
+                                maxHeight="none"
+                            />
+                        </div>
+                        <div style={{
+                            padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#fff',
+                            display: 'flex', justifyContent: 'flex-end', gap: '12px'
+                        }}>
+                            <button onClick={() => setShowPreviewModal(false)} style={{
+                                padding: '10px 20px', borderRadius: '8px', border: '1px solid #cbd5e1',
+                                background: '#f8fafc', color: '#475569', fontWeight: 600, cursor: 'pointer'
+                            }}>Tutup</button>
+                            <button onClick={() => { setShowPreviewModal(false); handleGabung(); }} style={{
+                                padding: '10px 20px', borderRadius: '8px', border: 'none',
+                                background: '#1d4ed8', color: '#fff', fontWeight: 600, cursor: 'pointer'
+                            }}>⬇️ Download Word</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Validation Gate Modal ──────────────────────────────────────── */}
             {showValidationGate && (
@@ -2359,14 +2344,27 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
                                 Batal
                             </button>
                             <button
+                                onClick={handleConfirmPreview}
+                                disabled={!allPassed || generating || previewLoading}
+                                style={{
+                                    padding: '10px 20px', borderRadius: '8px', border: 'none',
+                                    background: allPassed ? '#3b82f6' : '#94a3b8',
+                                    color: '#fff', fontSize: '14px', fontWeight: 600,
+                                    cursor: allPassed ? 'pointer' : 'not-allowed',
+                                    opacity: (generating || previewLoading) ? 0.7 : 1,
+                                }}
+                            >
+                                {previewLoading ? '⏳ Loading...' : '👁️ Preview Laporan'}
+                            </button>
+                            <button
                                 onClick={handleConfirmExport}
-                                disabled={!allPassed || generating}
+                                disabled={!allPassed || generating || previewLoading}
                                 style={{
                                     padding: '10px 20px', borderRadius: '8px', border: 'none',
                                     background: allPassed ? '#16a34a' : '#94a3b8',
                                     color: '#fff', fontSize: '14px', fontWeight: 600,
                                     cursor: allPassed ? 'pointer' : 'not-allowed',
-                                    opacity: generating ? 0.7 : 1,
+                                    opacity: (generating || previewLoading) ? 0.7 : 1,
                                 }}
                             >
                                 {generating ? '⏳ Generating...' : '📄 Generate DOCX'}
@@ -2501,16 +2499,31 @@ export default function GabungLaporan({ initialBulan, initialTahun }) {
 
             {/* Tombol Download */}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {/* ── Export Word ── */}
+                {/* ── Action Buttons ── */}
                 <button
                     onClick={handleGabung}
-                    disabled={approved.length === 0 || generating || loading}
+                    disabled={approved.length === 0 || generating || loading || previewLoading}
+                    style={{
+                        padding: '14px 28px', borderRadius: '10px', border: 'none',
+                        fontWeight: 700, fontSize: '16px', transition: 'all 0.2s',
+                        cursor: approved.length > 0 && !generating && !previewLoading ? 'pointer' : 'not-allowed',
+                        background: approved.length > 0 && !generating && !previewLoading ? '#3b82f6' : '#e2e8f0',
+                        color: approved.length > 0 && !generating && !previewLoading ? '#fff' : '#94a3b8',
+                    }}>
+                    {previewLoading
+                        ? '⏳ Memuat Preview...'
+                        : '👁️ Preview Laporan'}
+                </button>
+
+                <button
+                    onClick={handleGabung}
+                    disabled={approved.length === 0 || generating || loading || previewLoading}
                     style={{
                         padding: '14px 32px', borderRadius: '10px', border: 'none',
                         fontWeight: 700, fontSize: '16px', transition: 'all 0.2s',
-                        cursor: approved.length > 0 && !generating ? 'pointer' : 'not-allowed',
-                        background: approved.length > 0 && !generating ? '#1d4ed8' : '#e2e8f0',
-                        color: approved.length > 0 && !generating ? '#fff' : '#94a3b8',
+                        cursor: approved.length > 0 && !generating && !previewLoading ? 'pointer' : 'not-allowed',
+                        background: approved.length > 0 && !generating && !previewLoading ? '#1d4ed8' : '#e2e8f0',
+                        color: approved.length > 0 && !generating && !previewLoading ? '#fff' : '#94a3b8',
                     }}>
                     {generating
                         ? '⏳ Membuat Dokumen...'

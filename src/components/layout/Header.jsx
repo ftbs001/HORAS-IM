@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification, NOTIF_META } from '../../contexts/NotificationContext';
+import { getMenuItems, getQuickSuggestions } from '../../utils/menuRegistry';
 
 const Header = ({ onNavigate }) => {
     const today = new Date();
@@ -41,26 +42,28 @@ const Header = ({ onNavigate }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // ─── Smart Search ──────────────────────────────────────────
+    // ─── Smart Search (dynamic, role-aware, debounced) ────────
+    const runSearch = useCallback((query) => {
+        if (!query) { setSearchResults([]); return; }
+        const q = query.toLowerCase();
+        const allItems = getMenuItems(user);               // ambil dari registry
+        const seen = new Set();
+        const results = allItems.filter(item => {
+            if (seen.has(item.nav)) return false;           // hilangkan duplikasi
+            const match =
+                item.title.toLowerCase().includes(q) ||
+                item.caption.toLowerCase().includes(q);
+            if (match) seen.add(item.nav);
+            return match;
+        });
+        setSearchResults(results);
+    }, [user]);
+
     useEffect(() => {
         if (!searchQuery) { setSearchResults([]); return; }
-        const query = searchQuery.toLowerCase();
-        const allItems = [
-            { id: 'dash', type: 'page', title: 'Dashboard Utama', caption: 'Halaman Depan', nav: 'dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
-            { id: 'pol', type: 'action', title: 'Buat Laporan Baru', caption: 'Tulis Analisis / Policy Brief', nav: 'policy-brief', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
-            { id: 'ver', type: 'page', title: 'Verifikasi & Tinjauan', caption: 'Persetujuan Dokumen', nav: 'verification', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
-            { id: 'sec', type: 'page', title: 'Data Seksi', caption: 'Profil Organisasi & Tusi', nav: 'section-data', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-            { id: 'prog', type: 'page', title: 'Input Program Kerja', caption: 'Manajemen Target Kinerja', nav: 'work-program-input', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-            { id: 'arc', type: 'page', title: 'Arsip Digital', caption: 'Penyimpanan Dokumen Lama', nav: 'archive', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
-            { id: 'prof', type: 'user', title: 'Profil Saya', caption: 'Pengaturan Akun & Biodata', nav: 'profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-            { id: 'mem', type: 'user', title: 'Data Pegawai', caption: 'Daftar Anggota Tim', nav: 'members', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-            { id: 'lap', type: 'action', title: 'Upload Laporan', caption: 'Upload laporan bulanan seksi', nav: 'upload-laporan', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
-            { id: 'mon', type: 'page', title: 'Monitoring Laporan', caption: 'Pantau & review laporan seksi', nav: 'monitoring-laporan', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-        ];
-        setSearchResults(allItems.filter(item =>
-            item.title.toLowerCase().includes(query) || item.caption.toLowerCase().includes(query)
-        ));
-    }, [searchQuery]);
+        const timer = setTimeout(() => runSearch(searchQuery), 250); // debounce 250ms
+        return () => clearTimeout(timer);
+    }, [searchQuery, runSearch]);
 
     const handleResultClick = (nav) => {
         onNavigate(nav);
@@ -155,16 +158,23 @@ const Header = ({ onNavigate }) => {
                                 </div>
                             ) : searchQuery ? (
                                 <div className="p-8 text-center text-gray-500">
-                                    <p className="text-lg">😕</p>
-                                    <p>Tidak ditemukan hasil untuk "{searchQuery}"</p>
+                                    <p className="text-2xl mb-2">🔍</p>
+                                    <p className="font-semibold text-gray-600">Menu atau fitur tidak ditemukan.</p>
+                                    <p className="text-xs text-gray-400 mt-1">Coba kata kunci lain atau periksa ejaan.</p>
                                 </div>
                             ) : (
                                 <div className="p-4">
                                     <p className="px-2 mb-2 text-xs font-bold text-gray-400">SARAN CEPAT</p>
                                     <div className="flex gap-2 flex-wrap">
-                                        <button onClick={() => handleResultClick('upload-laporan')} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100 transition">⬆️ Upload Laporan</button>
-                                        <button onClick={() => handleResultClick('section-data')} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100 transition">🏢 Data Seksi</button>
-                                        <button onClick={() => handleResultClick('verification')} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100 transition">✅ Verifikasi</button>
+                                        {getQuickSuggestions(user).map(s => (
+                                            <button
+                                                key={s.nav}
+                                                onClick={() => handleResultClick(s.nav)}
+                                                className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100 transition"
+                                            >
+                                                {s.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             )}

@@ -89,8 +89,8 @@ function TabelProjus({ data, onChange, isPreview, loading }) {
             <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed', fontFamily: FONT }}>
                 <thead>
                     <tr>
-                        <th rowSpan={3} style={thStyle({ width: '40px' })}>NO</th>
-                        <th rowSpan={3} style={thStyle({ width: '180px' })}>PASAL YANG DILANGGAR</th>
+                        <th rowSpan={4} style={thStyle({ width: '40px' })}>NO</th>
+                        <th rowSpan={4} style={thStyle({ width: '180px' })}>PASAL YANG DILANGGAR</th>
                         <th colSpan={7} style={thStyle()}>PELANGGARAN KEIMIGRASIAN</th>
                     </tr>
                     <tr>
@@ -98,23 +98,17 @@ function TabelProjus({ data, onChange, isPreview, loading }) {
                     </tr>
                     <tr>
                         {PROJUS_COLS.map(col => (
-                            <React.Fragment key={col}>
-                                <th style={thStyle({ width: '32px' })}>{PROJUS_COL_LABELS[col]}</th>
-                                <th style={thStyle({ width: '32px' })}>{/* merged in next row */}</th>
-                            </React.Fragment>
+                            <th key={col} colSpan={2} style={thStyle()}>{PROJUS_COL_LABELS[col]}</th>
                         ))}
-                        <th style={thStyle({ width: '40px' })}>JUMLAH</th>
+                        <th rowSpan={2} style={thStyle({ width: '40px' })}>JUMLAH</th>
                     </tr>
                     <tr>
-                        <th style={thStyle()}></th>
-                        <th style={thStyle()}></th>
-                        {PROJUS_COLS.map(() => (
-                            <React.Fragment key={Math.random()}>
+                        {PROJUS_COLS.map(col => (
+                            <React.Fragment key={col}>
                                 <th style={thStyle({ fontSize: '8pt' })}>L</th>
                                 <th style={thStyle({ fontSize: '8pt' })}>P</th>
                             </React.Fragment>
                         ))}
-                        <th style={thStyle()}></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -186,8 +180,8 @@ function TabelTAK({ data, onChange, isPreview, loading }) {
             <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FONT, fontSize: '8pt' }}>
                 <thead>
                     <tr>
-                        <th rowSpan={3} style={thStyle({ width: '32px', fontSize: '8pt' })}>NO</th>
-                        <th rowSpan={3} style={thStyle({ width: '160px', fontSize: '8pt' })}>PASAL YANG DILANGGAR</th>
+                        <th rowSpan={4} style={thStyle({ width: '32px', fontSize: '8pt' })}>NO</th>
+                        <th rowSpan={4} style={thStyle({ width: '160px', fontSize: '8pt' })}>PASAL YANG DILANGGAR</th>
                         <th colSpan={TAK_COLS.length * 2 + 1} style={thStyle({ fontSize: '8pt' })}>PELANGGARAN KEIMIGRASIAN</th>
                     </tr>
                     <tr>
@@ -197,18 +191,15 @@ function TabelTAK({ data, onChange, isPreview, loading }) {
                         {TAK_COLS.map(col => (
                             <th key={col} colSpan={2} style={thStyle({ fontSize: '7pt' })}>{TAK_COL_LABELS[col]}</th>
                         ))}
-                        <th style={thStyle({ fontSize: '8pt' })}>JUMLAH</th>
+                        <th rowSpan={2} style={thStyle({ fontSize: '8pt' })}>JUMLAH</th>
                     </tr>
                     <tr>
-                        <th style={thStyle({ fontSize: '8pt' })}></th>
-                        <th style={thStyle({ fontSize: '8pt' })}></th>
-                        {TAK_COLS.map((col) => (
+                        {TAK_COLS.map(col => (
                             <React.Fragment key={col}>
                                 <th style={thStyle({ fontSize: '7pt' })}>L</th>
                                 <th style={thStyle({ fontSize: '7pt' })}>P</th>
                             </React.Fragment>
                         ))}
-                        <th style={thStyle({ fontSize: '8pt' })}></th>
                     </tr>
                 </thead>
                 <tbody>

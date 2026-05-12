@@ -70,6 +70,9 @@ const Sidebar = ({ onNavigate, currentView, onLogout }) => {
                 <div className={`${sub} ${currentView === 'monthly-report' ? subAct : ''}`} onClick={() => onNavigate('monthly-report')}>
                   <span>📋 Semua Laporan (Master)</span>
                 </div>
+                <div className={`${sub} ${currentView === 'gabung-laporan' ? subAct : ''}`} onClick={() => onNavigate('gabung-laporan')}>
+                  <span>🗂️ Gabung Laporan (Word)</span>
+                </div>
 
                 <div className="border-t border-white/5 my-1"/>
                 <div className="px-12 py-1 text-[10px] text-gray-600 uppercase tracking-widest">Tiap Seksi</div>
