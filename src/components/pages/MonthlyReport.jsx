@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReport, SECTION_TOC_MAPPING } from '../../contexts/ReportContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useArchive } from '../../contexts/ArchiveContext';
 import ReactQuill from 'react-quill-new';
 import Quill from 'quill';  // Import Quill directly from the package
 import 'react-quill-new/dist/quill.snow.css';
@@ -21,6 +22,7 @@ import logosCombined from '../../assets/logos-combined.png';
 
 // Import DOCX exporter for template-based Word export
 import { generateDocx } from '../../utils/docxExporter';
+import { generateMonthlyReport } from '../../utils/exportMonthlyReport';
 
 // Template Lalintalkim (Paspor, Izin Tinggal, Perlintasan — embedded in TOC)
 import TemplateLalintalkim from '../pages/laporanBulanan/TemplateLalintalkim';
@@ -402,6 +404,7 @@ const MonthlyReport = ({ sectionFilter = null, onNavigate }) => {
     const { user } = useAuth();
     const { reportData, updateSection, clearSection, reportAttachments, addAttachment, removeAttachment, getAttachments, coverLetterData, coverPageData, forewordData } = useReport();
     const { showNotification } = useNotification();
+    const { autoArchiveExport } = useArchive();
     const quillRef = useRef(null);
 
     // Constants
@@ -409,6 +412,8 @@ const MonthlyReport = ({ sectionFilter = null, onNavigate }) => {
     const tahunOptions = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
     // State
+    const [globalBulan, setGlobalBulan] = useState(new Date().getMonth() + 1);
+    const [globalTahun, setGlobalTahun] = useState(new Date().getFullYear());
     const [previewMonth, setPreviewMonth] = useState(new Date().getMonth() + 1);
     const [previewYear, setPreviewYear] = useState(new Date().getFullYear());
     const [activeSection, setActiveSection] = useState('cover_letter');
@@ -1347,8 +1352,8 @@ const MonthlyReport = ({ sectionFilter = null, onNavigate }) => {
     }, [reportData]);
 
     const renderTemplateForPreview = (nodeId) => {
-        const finalBulan = previewMonth;
-        const tahunInt = previewYear;
+        const finalBulan = globalBulan;
+        const tahunInt = globalTahun;
 
         if (nodeId === 'bab2_substantif_dokumen_paspor' || 
             nodeId === 'bab2_substantif_dokumen_paspor_b' ||
